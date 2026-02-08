@@ -2,24 +2,15 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import prisma from "./prisma";
+import { authConfig, type ExtendedUser } from "./auth.config";
 import type { UserRole, Office } from "@prisma/client";
 
-// Extended types for our app
-export interface ExtendedUser {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: UserRole;
-  office: Office;
-}
-
-export interface ExtendedSession {
-  user: ExtendedUser;
-  expires: string;
-}
+// Re-export types from auth.config
+export type { ExtendedUser, ExtendedSession } from "./auth.config";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
+  // Override providers with the server-only authorize callback that uses Prisma
   providers: [
     Credentials({
       async authorize(credentials) {
@@ -68,42 +59,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id as string;
-        token.email = user.email as string;
-        token.firstName = (user as ExtendedUser).firstName;
-        token.lastName = (user as ExtendedUser).lastName;
-        token.role = (user as ExtendedUser).role;
-        token.office = (user as ExtendedUser).office;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (token && session.user) {
-        (session as unknown as ExtendedSession).user = {
-          id: token.id as string,
-          email: token.email as string,
-          firstName: token.firstName as string,
-          lastName: token.lastName as string,
-          role: token.role as UserRole,
-          office: token.office as Office,
-        };
-      }
-      return session as unknown as ExtendedSession;
-    },
-  },
-  pages: {
-    signIn: "/login",
-    error: "/login",
-  },
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
-  },
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-  trustHost: true,
 });
 
 // Helper function to check if user has required role
