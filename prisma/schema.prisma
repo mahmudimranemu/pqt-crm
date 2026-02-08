@@ -1,0 +1,632 @@
+// PQT CRM Database Schema
+// Property Quest Turkey - Customer Relationship Management System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================
+// ENUMS
+// =====================
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  SALES_MANAGER
+  SALES_AGENT
+  VIEWER
+}
+
+enum Office {
+  UAE
+  TURKEY
+  UK
+  MALAYSIA
+  BANGLADESH
+  HEAD_OFFICE
+}
+
+enum PropertyType {
+  APARTMENT
+  VILLA
+  COMMERCIAL
+  LAND
+  PENTHOUSE
+}
+
+enum InvestmentPurpose {
+  CITIZENSHIP
+  INVESTMENT
+  RESIDENTIAL
+  COMMERCIAL
+}
+
+enum LeadSource {
+  WEBSITE
+  REFERRAL
+  SOCIAL_MEDIA
+  GOOGLE_ADS
+  FACEBOOK_ADS
+  WALK_IN
+  PARTNER
+  OTHER
+}
+
+enum ClientStatus {
+  NEW_LEAD
+  CONTACTED
+  QUALIFIED
+  VIEWING_SCHEDULED
+  VIEWED
+  NEGOTIATING
+  DEAL_CLOSED
+  LOST
+  INACTIVE
+}
+
+enum District {
+  BEYLIKDUZU
+  BASAKSEHIR
+  ESENYURT
+  KUCUKCEKMECE
+  BAHCESEHIR
+  BAKIRKOY
+  SISLI
+  BESIKTAS
+  KADIKOY
+  USKUDAR
+  MALTEPE
+  KARTAL
+  PENDIK
+  TUZLA
+  AVCILAR
+  BEYOGLU
+  FATIH
+  SARIYER
+  BEYKOZ
+  ZEYTINBURNU
+}
+
+enum PropertyStatus {
+  ACTIVE
+  SOLD_OUT
+  COMING_SOON
+  OFF_MARKET
+}
+
+enum EnquirySource {
+  WEBSITE_FORM
+  PHONE_CALL
+  EMAIL
+  WHATSAPP
+  LIVE_CHAT
+  PARTNER_REFERRAL
+}
+
+enum EnquiryStatus {
+  NEW
+  ASSIGNED
+  CONTACTED
+  CONVERTED_TO_CLIENT
+  SPAM
+  CLOSED
+}
+
+enum BookingType {
+  PROPERTY_VIEWING
+  FOLLOW_UP_MEETING
+  DOCUMENT_SIGNING
+  TITLE_DEED
+}
+
+enum BookingStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+  RESCHEDULED
+}
+
+enum BookingOutcome {
+  PENDING
+  INTERESTED
+  NOT_INTERESTED
+  OFFER_MADE
+  SOLD
+}
+
+enum Currency {
+  USD
+  EUR
+  GBP
+  TRY
+  AED
+}
+
+enum SaleStatus {
+  PENDING_DEPOSIT
+  DEPOSIT_RECEIVED
+  CONTRACT_SIGNED
+  TITLE_DEED_TRANSFER
+  COMPLETED
+  CANCELLED
+}
+
+enum CitizenshipStage {
+  DOCUMENT_COLLECTION
+  PROPERTY_VALUATION
+  APPLICATION_FILED
+  BIOMETRICS_SCHEDULED
+  BIOMETRICS_COMPLETED
+  UNDER_REVIEW
+  INTERVIEW_SCHEDULED
+  INTERVIEW_COMPLETED
+  APPROVED
+  PASSPORT_ISSUED
+  REJECTED
+}
+
+enum ApplicantType {
+  MAIN_APPLICANT
+  SPOUSE
+  DEPENDENT_CHILD
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  SKIPPED
+}
+
+enum Relationship {
+  SPOUSE
+  CHILD
+}
+
+enum FamilyMemberStatus {
+  INCLUDED
+  EXCLUDED
+  APPROVED
+  REJECTED
+}
+
+enum DocumentCategory {
+  PASSPORT
+  TITLE_DEED
+  POWER_OF_ATTORNEY
+  CITIZENSHIP_APPLICATION
+  CONTRACT
+  BANK_STATEMENT
+  PHOTO
+  BIRTH_CERTIFICATE
+  MARRIAGE_CERTIFICATE
+  OTHER
+}
+
+enum CallType {
+  OUTBOUND
+  INBOUND
+}
+
+enum CallOutcome {
+  CONNECTED
+  VOICEMAIL
+  NO_ANSWER
+  BUSY
+  WRONG_NUMBER
+}
+
+enum CommunicationType {
+  EMAIL
+  PHONE
+  WHATSAPP
+  SMS
+  IN_PERSON
+  NOTE
+}
+
+enum CommunicationDirection {
+  INBOUND
+  OUTBOUND
+}
+
+// =====================
+// MODELS
+// =====================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      UserRole @default(SALES_AGENT)
+  office    Office
+  isActive  Boolean  @default(true)
+  phone     String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  clients        Client[]
+  bookings       Booking[]
+  sales          Sale[]
+  callLogs       CallLog[]
+  timeEntries    TimeEntry[]
+  loginLogs      LoginLog[]
+  communications Communication[]
+  documents      Document[]
+  enquiries      Enquiry[]
+  enquiryNotes   EnquiryNote[]
+
+  @@map("users")
+}
+
+model Client {
+  id                    String            @id @default(cuid())
+  firstName             String
+  lastName              String
+  email                 String
+  phone                 String
+  whatsapp              String?
+  nationality           String
+  country               String
+  city                  String?
+  passportNumber        String?
+  dateOfBirth           DateTime?
+  budgetMin             Decimal           @db.Decimal(15, 2)
+  budgetMax             Decimal           @db.Decimal(15, 2)
+  preferredDistricts    District[]
+  preferredPropertyType PropertyType?
+  investmentPurpose     InvestmentPurpose @default(RESIDENTIAL)
+  source                LeadSource        @default(WEBSITE)
+  status                ClientStatus      @default(NEW_LEAD)
+  notes                 String?           @db.Text
+  assignedAgentId       String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  // Relations
+  assignedAgent            User?                     @relation(fields: [assignedAgentId], references: [id])
+  bookings                 Booking[]
+  enquiries                Enquiry[]
+  documents                Document[]
+  communications           Communication[]
+  citizenshipApplications  CitizenshipApplication[]
+  sales                    Sale[]
+
+  @@index([assignedAgentId])
+  @@index([status])
+  @@index([email])
+  @@map("clients")
+}
+
+model Property {
+  id                  String         @id @default(cuid())
+  pqtNumber           String         @unique
+  name                String
+  developer           String?
+  district            District
+  address             String?
+  propertyType        PropertyType
+  totalUnits          Int?
+  availableUnits      Int?
+  priceFrom           Decimal        @db.Decimal(15, 2)
+  priceTo             Decimal        @db.Decimal(15, 2)
+  sizeFrom            Decimal?       @db.Decimal(10, 2)
+  sizeTo              Decimal?       @db.Decimal(10, 2)
+  bedrooms            String?
+  amenities           String[]
+  completionDate      DateTime?
+  status              PropertyStatus @default(ACTIVE)
+  citizenshipEligible Boolean        @default(false)
+  description         String?        @db.Text
+  images              String[]
+  floorPlans          String[]
+  latitude            Decimal?       @db.Decimal(10, 8)
+  longitude           Decimal?       @db.Decimal(11, 8)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  // Relations
+  bookings  Booking[]
+  sales     Sale[]
+  enquiries Enquiry[]
+
+  @@index([district])
+  @@index([status])
+  @@map("properties")
+}
+
+model Enquiry {
+  id                String        @id @default(cuid())
+  firstName         String
+  lastName          String
+  email             String
+  phone             String
+  message           String?       @db.Text
+  source            EnquirySource @default(WEBSITE_FORM)
+  sourceUrl         String?
+  status            EnquiryStatus @default(NEW)
+  assignedAgentId   String?
+  convertedClientId String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Extended fields
+  budget            String?
+  country           String?
+  tags              String[]      @default([])
+  called            Boolean       @default(false)
+  spoken            Boolean       @default(false)
+  segment           String?       @default("Buyer")
+  leadStatus        String?       @default("New")
+  priority          String?       @default("Medium")
+  nextCallDate      DateTime?
+  snooze              String?       @default("Active")
+  interestedPropertyId String?
+
+  // Relations
+  assignedAgent      User?          @relation(fields: [assignedAgentId], references: [id])
+  convertedClient    Client?        @relation(fields: [convertedClientId], references: [id])
+  interestedProperty Property?      @relation(fields: [interestedPropertyId], references: [id])
+  notes              EnquiryNote[]
+
+  @@index([status])
+  @@index([assignedAgentId])
+  @@map("enquiries")
+}
+
+model EnquiryNote {
+  id        String   @id @default(cuid())
+  enquiryId String
+  agentId   String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  // Relations
+  enquiry Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  agent   User    @relation(fields: [agentId], references: [id])
+
+  @@index([enquiryId])
+  @@index([createdAt])
+  @@map("enquiry_notes")
+}
+
+model Booking {
+  id           String          @id @default(cuid())
+  clientId     String
+  propertyId   String
+  agentId      String
+  bookingDate  DateTime
+  bookingType  BookingType     @default(PROPERTY_VIEWING)
+  status       BookingStatus   @default(SCHEDULED)
+  outcome      BookingOutcome?
+  notes        String?         @db.Text
+  noSaleReason String?         @db.Text
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  // Relations
+  client   Client   @relation(fields: [clientId], references: [id])
+  property Property @relation(fields: [propertyId], references: [id])
+  agent    User     @relation(fields: [agentId], references: [id])
+  sale     Sale?
+
+  @@index([clientId])
+  @@index([propertyId])
+  @@index([agentId])
+  @@index([bookingDate])
+  @@index([status])
+  @@map("bookings")
+}
+
+model Sale {
+  id                  String     @id @default(cuid())
+  bookingId           String?    @unique
+  clientId            String
+  propertyId          String
+  agentId             String
+  unitNumber          String?
+  salePrice           Decimal    @db.Decimal(15, 2)
+  currency            Currency   @default(USD)
+  paymentPlan         String?    @db.Text
+  depositAmount       Decimal?   @db.Decimal(15, 2)
+  depositDate         DateTime?
+  completionDate      DateTime?
+  commissionAmount    Decimal?   @db.Decimal(15, 2)
+  status              SaleStatus @default(PENDING_DEPOSIT)
+  citizenshipEligible Boolean    @default(false)
+  notes               String?    @db.Text
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  // Relations
+  booking                Booking?                @relation(fields: [bookingId], references: [id])
+  client                 Client                  @relation(fields: [clientId], references: [id])
+  property               Property                @relation(fields: [propertyId], references: [id])
+  agent                  User                    @relation(fields: [agentId], references: [id])
+  citizenshipApplication CitizenshipApplication?
+
+  @@index([clientId])
+  @@index([propertyId])
+  @@index([agentId])
+  @@index([status])
+  @@map("sales")
+}
+
+model CitizenshipApplication {
+  id                      String           @id @default(cuid())
+  saleId                  String           @unique
+  clientId                String
+  applicationNumber       String?
+  stage                   CitizenshipStage @default(DOCUMENT_COLLECTION)
+  applicantType           ApplicantType    @default(MAIN_APPLICANT)
+  startDate               DateTime         @default(now())
+  estimatedCompletionDate DateTime?
+  actualCompletionDate    DateTime?
+  notes                   String?          @db.Text
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+
+  // Relations
+  sale          Sale                   @relation(fields: [saleId], references: [id])
+  client        Client                 @relation(fields: [clientId], references: [id])
+  milestones    CitizenshipMilestone[]
+  familyMembers FamilyMember[]
+  documents     Document[]
+
+  @@index([clientId])
+  @@index([stage])
+  @@map("citizenship_applications")
+}
+
+model CitizenshipMilestone {
+  id            String          @id @default(cuid())
+  applicationId String
+  milestone     String
+  dueDate       DateTime?
+  completedDate DateTime?
+  status        MilestoneStatus @default(PENDING)
+  notes         String?         @db.Text
+  createdAt     DateTime        @default(now())
+
+  // Relations
+  application CitizenshipApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([status])
+  @@map("citizenship_milestones")
+}
+
+model FamilyMember {
+  id             String             @id @default(cuid())
+  applicationId  String
+  firstName      String
+  lastName       String
+  relationship   Relationship
+  dateOfBirth    DateTime?
+  passportNumber String?
+  status         FamilyMemberStatus @default(INCLUDED)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  // Relations
+  application CitizenshipApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("family_members")
+}
+
+model Document {
+  id            String           @id @default(cuid())
+  name          String
+  fileUrl       String
+  fileType      String
+  category      DocumentCategory @default(OTHER)
+  clientId      String?
+  applicationId String?
+  uploadedById  String
+  createdAt     DateTime         @default(now())
+
+  // Relations
+  client      Client?                 @relation(fields: [clientId], references: [id])
+  application CitizenshipApplication? @relation(fields: [applicationId], references: [id])
+  uploadedBy  User                    @relation(fields: [uploadedById], references: [id])
+
+  @@index([clientId])
+  @@index([applicationId])
+  @@map("documents")
+}
+
+model CallLog {
+  id       String      @id @default(cuid())
+  agentId  String
+  clientId String?
+  callType CallType    @default(OUTBOUND)
+  duration Int         @default(0)
+  outcome  CallOutcome @default(NO_ANSWER)
+  notes    String?     @db.Text
+  callDate DateTime    @default(now())
+
+  // Relations
+  agent User @relation(fields: [agentId], references: [id])
+
+  @@index([agentId])
+  @@index([callDate])
+  @@map("call_logs")
+}
+
+model TimeEntry {
+  id          String   @id @default(cuid())
+  agentId     String
+  date        DateTime
+  hoursWorked Decimal  @db.Decimal(4, 2)
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  // Relations
+  agent User @relation(fields: [agentId], references: [id])
+
+  @@index([agentId])
+  @@index([date])
+  @@map("time_entries")
+}
+
+model LoginLog {
+  id         String    @id @default(cuid())
+  userId     String
+  loginTime  DateTime  @default(now())
+  logoutTime DateTime?
+  ipAddress  String?
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([loginTime])
+  @@map("login_logs")
+}
+
+model Communication {
+  id        String                 @id @default(cuid())
+  clientId  String
+  agentId   String
+  type      CommunicationType
+  direction CommunicationDirection @default(OUTBOUND)
+  subject   String?
+  content   String?                @db.Text
+  createdAt DateTime               @default(now())
+
+  // Relations
+  client Client @relation(fields: [clientId], references: [id])
+  agent  User   @relation(fields: [agentId], references: [id])
+
+  @@index([clientId])
+  @@index([agentId])
+  @@index([createdAt])
+  @@map("communications")
+}
+
+model WebsiteAnalytics {
+  id        String   @id @default(cuid())
+  pageUrl   String
+  pageTitle String?
+  visits    Int      @default(0)
+  exits     Int      @default(0)
+  date      DateTime
+  source    String?
+
+  @@index([date])
+  @@index([pageUrl])
+  @@map("website_analytics")
+}
