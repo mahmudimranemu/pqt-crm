@@ -30,13 +30,52 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           throw new Error("Your account has been deactivated");
         }
 
+        // Check account lockout
+        if (user.lockedUntil && user.lockedUntil > new Date()) {
+          const minutesLeft = Math.ceil(
+            (user.lockedUntil.getTime() - Date.now()) / 60000,
+          );
+          throw new Error(
+            `Account locked. Try again in ${minutesLeft} minute${minutesLeft > 1 ? "s" : ""}.`,
+          );
+        }
+
         const isPasswordValid = await bcrypt.compare(
           credentials.password as string,
           user.password,
         );
 
         if (!isPasswordValid) {
+          // Increment failed attempts
+          const failedAttempts = user.failedLoginAttempts + 1;
+          const lockout =
+            failedAttempts >= 5
+              ? { lockedUntil: new Date(Date.now() + 30 * 60 * 1000) }
+              : {};
+
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              failedLoginAttempts: failedAttempts,
+              ...lockout,
+            },
+          });
+
+          if (failedAttempts >= 5) {
+            throw new Error(
+              "Too many failed attempts. Account locked for 30 minutes.",
+            );
+          }
+
           throw new Error("Invalid email or password");
+        }
+
+        // Reset failed attempts on successful login
+        if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { failedLoginAttempts: 0, lockedUntil: null },
+          });
         }
 
         // Log the login

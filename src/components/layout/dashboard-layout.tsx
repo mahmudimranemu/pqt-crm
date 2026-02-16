@@ -15,9 +15,14 @@ interface DashboardLayoutProps {
     role: UserRole;
     office: Office;
   };
+  unreadNotifications?: number;
 }
 
-export function DashboardLayout({ children, user }: DashboardLayoutProps) {
+export function DashboardLayout({
+  children,
+  user,
+  unreadNotifications = 0,
+}: DashboardLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
@@ -35,10 +40,10 @@ export function DashboardLayout({ children, user }: DashboardLayoutProps) {
       <div
         className={cn(
           "transition-all duration-300",
-          sidebarCollapsed ? "lg:pl-16" : "lg:pl-56",
+          sidebarCollapsed ? "lg:pl-16" : "lg:pl-60",
         )}
       >
-        <Topbar user={user} />
+        <Topbar user={user} unreadNotifications={unreadNotifications} />
         <main className="p-6">{children}</main>
       </div>
     </div>

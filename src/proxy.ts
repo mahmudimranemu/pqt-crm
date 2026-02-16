@@ -1,41 +1,25 @@
-import NextAuth from "next-auth";
-import { authConfig } from "@/lib/auth.config";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-const { auth } = NextAuth(authConfig);
+// Security headers applied to all responses
+const securityHeaders: Record<string, string> = {
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "X-XSS-Protection": "1; mode=block",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+};
 
 export async function proxy(request: NextRequest) {
-  const { nextUrl } = request;
+  const response = NextResponse.next();
 
-  // Public routes that don't require authentication
-  const publicRoutes = ["/login"];
-  const isPublicRoute = publicRoutes.includes(nextUrl.pathname);
-
-  // API routes for authentication
-  const isAuthApi = nextUrl.pathname.startsWith("/api/auth");
-
-  // Allow auth API routes
-  if (isAuthApi) {
-    return NextResponse.next();
+  // Apply security headers to all responses
+  for (const [key, value] of Object.entries(securityHeaders)) {
+    response.headers.set(key, value);
   }
 
-  // Get the session
-  const session = await auth();
-  const isLoggedIn = !!session?.user;
-
-  // Redirect logged-in users away from login page
-  if (isLoggedIn && isPublicRoute) {
-    return NextResponse.redirect(new URL("/dashboard", nextUrl));
-  }
-
-  // Redirect non-logged-in users to login
-  if (!isLoggedIn && !isPublicRoute) {
-    const loginUrl = new URL("/login", nextUrl);
-    loginUrl.searchParams.set("callbackUrl", nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
@@ -44,9 +28,9 @@ export const config = {
      * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
+     * - favicon.ico, sitemap.xml, robots.txt (metadata files)
+     * - public folder static assets
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

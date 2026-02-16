@@ -40,10 +40,17 @@ import {
   Eye,
   Loader2,
   UserPlus,
+  Download,
 } from "lucide-react";
-import { updateEnquiryField, convertToClient } from "@/lib/actions/enquiries";
+import {
+  updateEnquiryField,
+  convertToClient,
+  assignEnquiryToPool,
+  removeEnquiryFromPool,
+} from "@/lib/actions/enquiries";
 import { createBooking } from "@/lib/actions/bookings";
 import { createSale } from "@/lib/actions/sales";
+import { generateCSV, downloadCSV } from "@/lib/export";
 
 interface Agent {
   id: string;
@@ -354,7 +361,7 @@ export function EnquiriesTable({
   ) => {
     setConvertLoading(true);
     try {
-      const client = await convertToClient(enquiryId, convertData);
+      const { client } = await convertToClient(enquiryId, convertData);
       toast({
         title: "Converted to client",
         description: `${client.firstName} ${client.lastName} is now a client. You can proceed.`,
@@ -392,8 +399,38 @@ export function EnquiriesTable({
     );
   }
 
+  function handleExportCSV() {
+    const csv = generateCSV(enquiries as unknown as Record<string, unknown>[], [
+      { key: "id", header: "ID" },
+      { key: "firstName", header: "First Name" },
+      { key: "lastName", header: "Last Name" },
+      { key: "email", header: "Email" },
+      { key: "phone", header: "Phone" },
+      { key: "source", header: "Source" },
+      { key: "status", header: "Status" },
+      { key: "budget", header: "Budget" },
+      { key: "country", header: "Country" },
+      { key: "priority", header: "Priority" },
+      { key: "called", header: "Called" },
+      { key: "spoken", header: "Spoken" },
+      { key: "assignedAgent.firstName", header: "Agent First Name" },
+      { key: "assignedAgent.lastName", header: "Agent Last Name" },
+      { key: "createdAt", header: "Created" },
+    ]);
+    downloadCSV(
+      csv,
+      `enquiries-export-${new Date().toISOString().slice(0, 10)}.csv`,
+    );
+  }
+
   return (
     <>
+      <div className="flex items-center justify-end px-4 py-2">
+        <Button variant="outline" size="sm" onClick={handleExportCSV}>
+          <Download className="h-4 w-4 mr-1" />
+          Export CSV
+        </Button>
+      </div>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -652,16 +689,43 @@ export function EnquiriesTable({
                   <TableCell>
                     <select
                       className="rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] text-gray-600 cursor-pointer min-w-[110px]"
-                      value={enquiry.assignedAgentId || "unassigned"}
-                      onChange={(e) => {
-                        const val =
-                          e.target.value === "unassigned"
-                            ? null
-                            : e.target.value;
-                        handleFieldUpdate(enquiry.id, "assignedAgentId", val);
+                      value={
+                        enquiry.tags?.includes("POOL_1")
+                          ? "POOL_1"
+                          : enquiry.tags?.includes("POOL_2")
+                            ? "POOL_2"
+                            : enquiry.tags?.includes("POOL_3")
+                              ? "POOL_3"
+                              : enquiry.assignedAgentId || "unassigned"
+                      }
+                      onChange={async (e) => {
+                        const val = e.target.value;
+                        if (
+                          val === "POOL_1" ||
+                          val === "POOL_2" ||
+                          val === "POOL_3"
+                        ) {
+                          await assignEnquiryToPool(enquiry.id, val);
+                          startTransition(() => router.refresh());
+                        } else {
+                          if (
+                            enquiry.tags?.some((t) => t.startsWith("POOL_"))
+                          ) {
+                            await removeEnquiryFromPool(enquiry.id);
+                          }
+                          const agentVal = val === "unassigned" ? null : val;
+                          handleFieldUpdate(
+                            enquiry.id,
+                            "assignedAgentId",
+                            agentVal,
+                          );
+                        }
                       }}
                     >
                       <option value="unassigned">Unassigned</option>
+                      <option value="POOL_1">Pool 1</option>
+                      <option value="POOL_2">Pool 2</option>
+                      <option value="POOL_3">Pool 3</option>
                       {agents.map((agent) => (
                         <option key={agent.id} value={agent.id}>
                           {agent.firstName} {agent.lastName}

@@ -126,7 +126,7 @@ export function EnquiryActions({ enquiry, agents }: EnquiryActionsProps) {
   const handleConvert = async () => {
     setIsLoading(true);
     try {
-      const client = await convertToClient(enquiry.id, convertData);
+      const { client } = await convertToClient(enquiry.id, convertData);
       toast({
         title: "Converted to client",
         description: "The enquiry has been converted to a client.",

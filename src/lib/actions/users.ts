@@ -5,6 +5,18 @@ import prisma from "@/lib/prisma";
 import { auth, type ExtendedSession } from "@/lib/auth";
 import { hash } from "bcryptjs";
 import type { UserRole, Office } from "@prisma/client";
+import { auditLog } from "@/lib/audit";
+
+// Password validation: min 8 chars, 1 uppercase, 1 number, 1 special char
+function validatePassword(password: string): string | null {
+  if (password.length < 8) return "Password must be at least 8 characters";
+  if (!/[A-Z]/.test(password))
+    return "Password must contain at least 1 uppercase letter";
+  if (!/[0-9]/.test(password)) return "Password must contain at least 1 number";
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password))
+    return "Password must contain at least 1 special character";
+  return null;
+}
 
 // Get all users
 export async function getUsers(params?: {
@@ -117,6 +129,12 @@ export async function createUser(data: {
     throw new Error("Unauthorized - Admin access required");
   }
 
+  // Validate password strength
+  const passwordError = validatePassword(data.password);
+  if (passwordError) {
+    throw new Error(passwordError);
+  }
+
   // Check if email already exists
   const existing = await prisma.user.findUnique({
     where: { email: data.email },
@@ -134,6 +152,12 @@ export async function createUser(data: {
       ...data,
       password: hashedPassword,
     },
+  });
+
+  await auditLog("CREATE", "User", user.id, {
+    email: data.email,
+    role: data.role,
+    office: data.office,
   });
 
   revalidatePath("/settings/users");
@@ -173,6 +197,8 @@ export async function updateUser(
     data,
   });
 
+  await auditLog("UPDATE", "User", id, data as Record<string, unknown>);
+
   revalidatePath("/settings/users");
   revalidatePath("/settings/profile");
   return user;
@@ -186,6 +212,12 @@ export async function updatePassword(id: string, newPassword: string) {
   // Users can update their own password, super admins can update anyone's
   if (session.user.id !== id && session.user.role !== "SUPER_ADMIN") {
     throw new Error("Unauthorized");
+  }
+
+  // Validate password strength
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    throw new Error(passwordError);
   }
 
   const hashedPassword = await hash(newPassword, 12);
@@ -216,6 +248,8 @@ export async function deactivateUser(id: string) {
     data: { isActive: false },
   });
 
+  await auditLog("UPDATE", "User", id, { isActive: false });
+
   revalidatePath("/settings/users");
   return { success: true };
 }
@@ -232,6 +266,8 @@ export async function reactivateUser(id: string) {
     where: { id },
     data: { isActive: true },
   });
+
+  await auditLog("UPDATE", "User", id, { isActive: true });
 
   revalidatePath("/settings/users");
   return { success: true };

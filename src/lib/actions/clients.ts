@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { auth, type ExtendedSession } from "@/lib/auth";
-import type { ClientStatus, LeadSource, PropertyType, InvestmentPurpose, District } from "@prisma/client";
+import { auditLog } from "@/lib/audit";
+import type {
+  ClientStatus,
+  LeadSource,
+  PropertyType,
+  InvestmentPurpose,
+  District,
+} from "@prisma/client";
 
 export interface ClientFormData {
   firstName: string;
@@ -33,10 +40,17 @@ export async function getClients(params?: {
   page?: number;
   limit?: number;
 }) {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const { search, status, agentId, source, page = 1, limit = 25 } = params || {};
+  const {
+    search,
+    status,
+    agentId,
+    source,
+    page = 1,
+    limit = 25,
+  } = params || {};
   const skip = (page - 1) * limit;
 
   // Build where clause based on user role
@@ -91,7 +105,7 @@ export async function getClients(params?: {
 }
 
 export async function getClient(id: string) {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
   const client = await prisma.client.findUnique({
@@ -131,13 +145,36 @@ export async function getClient(id: string) {
       documents: {
         orderBy: { createdAt: "desc" },
       },
+      leads: {
+        include: {
+          owner: { select: { id: true, firstName: true, lastName: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      deals: {
+        include: {
+          owner: { select: { id: true, firstName: true, lastName: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      enquiries: {
+        include: {
+          assignedAgent: {
+            select: { id: true, firstName: true, lastName: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 
   if (!client) return null;
 
   // Check access for non-super-admin users
-  if (session.user.role === "SALES_AGENT" && client.assignedAgentId !== session.user.id) {
+  if (
+    session.user.role === "SALES_AGENT" &&
+    client.assignedAgentId !== session.user.id
+  ) {
     throw new Error("Unauthorized");
   }
 
@@ -145,7 +182,7 @@ export async function getClient(id: string) {
 }
 
 export async function createClient(data: ClientFormData) {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
 
@@ -158,12 +195,50 @@ export async function createClient(data: ClientFormData) {
     },
   });
 
+  await auditLog("CREATE", "Client", client.id, {
+    name: data.firstName + " " + data.lastName,
+    email: data.email,
+  });
+  revalidatePath("/clients");
+  return client;
+}
+
+export async function createQuickClient(data: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  nationality: string;
+  country: string;
+}) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  const client = await prisma.client.create({
+    data: {
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      phone: data.phone,
+      nationality: data.nationality,
+      country: data.country,
+      budgetMin: 0,
+      budgetMax: 0,
+      preferredDistricts: [],
+      investmentPurpose: "RESIDENTIAL",
+      source: "WEBSITE",
+      status: "NEW_LEAD",
+      assignedAgentId: session.user.id,
+    },
+  });
+
   revalidatePath("/clients");
   return client;
 }
 
 export async function updateClient(id: string, data: Partial<ClientFormData>) {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
 
@@ -187,24 +262,26 @@ export async function updateClient(id: string, data: Partial<ClientFormData>) {
     data,
   });
 
+  await auditLog("UPDATE", "Client", id, data as Record<string, unknown>);
   revalidatePath(`/clients/${id}`);
   revalidatePath("/clients");
   return client;
 }
 
 export async function deleteClient(id: string) {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role !== "SUPER_ADMIN" && session.user.role !== "ADMIN") {
     throw new Error("Unauthorized");
   }
 
   await prisma.client.delete({ where: { id } });
+  await auditLog("DELETE", "Client", id);
   revalidatePath("/clients");
 }
 
 export async function getAgentsForAssignment() {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
   const where: Record<string, unknown> = {
@@ -227,4 +304,48 @@ export async function getAgentsForAssignment() {
     },
     orderBy: { firstName: "asc" },
   });
+}
+
+export async function getClientsForSelect() {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+
+  const where: Record<string, unknown> = {};
+
+  if (session.user.role === "SALES_AGENT") {
+    where.assignedAgentId = session.user.id;
+  } else if (session.user.role !== "SUPER_ADMIN") {
+    const officeAgents = await prisma.user.findMany({
+      where: { office: session.user.office },
+      select: { id: true },
+    });
+    where.assignedAgentId = { in: officeAgents.map((a) => a.id) };
+  }
+
+  return prisma.client.findMany({
+    where,
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+    },
+    orderBy: { firstName: "asc" },
+  });
+}
+
+export async function updateClientTags(clientId: string, tags: string[]) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  const client = await prisma.client.update({
+    where: { id: clientId },
+    data: { tags },
+  });
+
+  revalidatePath("/clients");
+  revalidatePath("/clients/" + clientId);
+  return client;
 }

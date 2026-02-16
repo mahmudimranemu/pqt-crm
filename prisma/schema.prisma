@@ -250,11 +250,15 @@ model User {
   lastName  String
   role      UserRole @default(SALES_AGENT)
   office    Office
-  isActive  Boolean  @default(true)
-  phone     String?
-  avatar    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive            Boolean   @default(true)
+  phone               String?
+  avatar              String?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  twoFactorEnabled    Boolean   @default(false)
+  twoFactorSecret     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   // Relations
   clients        Client[]
@@ -267,6 +271,20 @@ model User {
   documents      Document[]
   enquiries      Enquiry[]
   enquiryNotes   EnquiryNote[]
+
+  // New CRM relations
+  ownedLeads       Lead[]       @relation("LeadOwner")
+  leadNotes        LeadNote[]   @relation("LeadNoteAgent")
+  ownedDeals       Deal[]       @relation("DealOwner")
+  assignedTasks    Task[]       @relation("TaskAssignee")
+  createdTasks     Task[]       @relation("TaskCreator")
+  commissions      Commission[]
+  auditLogs        AuditLog[]
+  managedTeams     Team[]       @relation("TeamManager")
+  teamMemberships  TeamMember[]
+  notifications    Notification[]
+  activities       Activity[]
+  handovers        Handover[]     @relation("HandoverAssignee")
 
   @@map("users")
 }
@@ -291,6 +309,7 @@ model Client {
   source                LeadSource        @default(WEBSITE)
   status                ClientStatus      @default(NEW_LEAD)
   notes                 String?           @db.Text
+  tags                  String[]          @default([])
   assignedAgentId       String?
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
@@ -303,6 +322,13 @@ model Client {
   communications           Communication[]
   citizenshipApplications  CitizenshipApplication[]
   sales                    Sale[]
+
+  // New CRM relations
+  leads      Lead[]
+  deals      Deal[]
+  payments   Payment[]
+  activities Activity[]
+  handovers  Handover[]
 
   @@index([assignedAgentId])
   @@index([status])
@@ -341,6 +367,7 @@ model Property {
   bookings  Booking[]
   sales     Sale[]
   enquiries Enquiry[]
+  interestedLeads Lead[] @relation("LeadProperty")
 
   @@index([district])
   @@index([status])
@@ -629,4 +656,526 @@ model WebsiteAnalytics {
   @@index([date])
   @@index([pageUrl])
   @@map("website_analytics")
+}
+
+// =====================
+// NEW CRM ENUMS
+// =====================
+
+enum LeadStage {
+  NEW_ENQUIRY
+  CONTACTED
+  QUALIFIED
+  VIEWING_ARRANGED
+  VIEWED
+  OFFER_MADE
+  NEGOTIATING
+  WON
+  LOST
+}
+
+enum DealStage {
+  RESERVATION
+  DEPOSIT
+  CONTRACT
+  PAYMENT_PLAN
+  TITLE_DEED
+  COMPLETED
+  CANCELLED
+}
+
+enum DealResult {
+  PENDING
+  WON
+  LOST
+  CANCELLED
+}
+
+enum BudgetRange {
+  UNDER_100K
+  FROM_100K_TO_250K
+  FROM_250K_TO_500K
+  FROM_500K_TO_1M
+  OVER_1M
+}
+
+enum SourceChannel {
+  ORGANIC
+  PAID_SEARCH
+  SOCIAL_MEDIA
+  REFERRAL
+  DIRECT
+  EMAIL_CAMPAIGN
+  PARTNER
+  EVENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum PaymentStatus {
+  PENDING
+  RECEIVED
+  OVERDUE
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CASH
+  CREDIT_CARD
+  CRYPTO
+  CHECK
+}
+
+enum CommissionStatus {
+  PENDING
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  ASSIGN
+  STAGE_CHANGE
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_DUE
+  LEAD_ASSIGNED
+  DEAL_STAGE_CHANGED
+  PAYMENT_RECEIVED
+  COMMISSION_APPROVED
+  SYSTEM_ALERT
+  MENTION
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  NOTE
+  FOLLOW_UP
+  SITE_VISIT
+  STAGE_CHANGE
+  DOCUMENT_UPLOAD
+  PAYMENT_RECEIVED
+  TASK_COMPLETED
+}
+
+// =====================
+// NEW CRM MODELS
+// =====================
+
+model Lead {
+  id               String       @id @default(cuid())
+  leadNumber       String       @unique @default(cuid())
+  title            String
+  description      String?      @db.Text
+  stage            LeadStage    @default(NEW_ENQUIRY)
+  estimatedValue   Decimal?     @db.Decimal(15, 2)
+  currency         Currency     @default(USD)
+  budgetRange      BudgetRange?
+  source           LeadSource   @default(WEBSITE)
+  sourceChannel    SourceChannel?
+  sourceDetail     String?
+  propertyType     PropertyType?
+  preferredLocation String?
+  score            Int?         @default(0)
+  temperature      String?
+  slaDeadline      DateTime?
+  lostReason       String?      @db.Text
+  convertedDealId  String?      @unique
+  clientId         String
+  ownerId          String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  // Extended fields (mirror enquiry management features)
+  tags             String[]     @default([])
+  called           Boolean      @default(false)
+  spoken           Boolean      @default(false)
+  segment          String?      @default("Buyer")
+  priority         String?      @default("Medium")
+  nextCallDate     DateTime?
+  snooze           String?      @default("Active")
+  interestedPropertyId String?
+
+  // Relations
+  client             Client     @relation(fields: [clientId], references: [id])
+  owner              User       @relation("LeadOwner", fields: [ownerId], references: [id])
+  convertedDeal      Deal?      @relation("LeadToDeal", fields: [convertedDealId], references: [id])
+  interestedProperty Property?  @relation("LeadProperty", fields: [interestedPropertyId], references: [id])
+  activities         Activity[]
+  tasks              Task[]     @relation("LeadTasks")
+  notes              LeadNote[]
+
+  @@index([stage])
+  @@index([ownerId])
+  @@index([clientId])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+model LeadNote {
+  id        String   @id @default(cuid())
+  leadId    String
+  agentId   String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+
+  lead  Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  agent User @relation("LeadNoteAgent", fields: [agentId], references: [id])
+
+  @@index([leadId])
+  @@map("lead_notes")
+}
+
+model Deal {
+  id                String     @id @default(cuid())
+  dealNumber        String     @unique @default(cuid())
+  title             String
+  description       String?    @db.Text
+  dealValue         Decimal    @db.Decimal(15, 2)
+  currency          Currency   @default(USD)
+  stage             DealStage  @default(RESERVATION)
+  result            DealResult @default(PENDING)
+  probability       Int?       @default(50)
+  propertyType      PropertyType?
+  propertyName      String?
+  unitNumber        String?
+  expectedCloseDate DateTime?
+  actualCloseDate   DateTime?
+  lostReason        String?    @db.Text
+  clientId          String
+  ownerId           String
+  fromLeadId        String?    @unique
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  // Relations
+  client      Client       @relation(fields: [clientId], references: [id])
+  owner       User         @relation("DealOwner", fields: [ownerId], references: [id])
+  fromLead    Lead?        @relation("LeadToDeal")
+  activities  Activity[]
+  tasks       Task[]       @relation("DealTasks")
+  payments    Payment[]
+  commissions Commission[]
+  handovers   Handover[]
+
+  @@index([stage])
+  @@index([result])
+  @@index([ownerId])
+  @@index([clientId])
+  @@index([createdAt])
+  @@map("deals")
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?      @db.Text
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?
+  completedAt DateTime?
+  assigneeId  String
+  createdById String
+  leadId      String?
+  dealId      String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  assignee  User  @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdBy User  @relation("TaskCreator", fields: [createdById], references: [id])
+  lead      Lead? @relation("LeadTasks", fields: [leadId], references: [id])
+  deal      Deal? @relation("DealTasks", fields: [dealId], references: [id])
+
+  @@index([status])
+  @@index([priority])
+  @@index([assigneeId])
+  @@index([dueDate])
+  @@index([leadId])
+  @@index([dealId])
+  @@map("tasks")
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  amount     Decimal       @db.Decimal(15, 2)
+  currency   Currency      @default(USD)
+  status     PaymentStatus @default(PENDING)
+  method     PaymentMethod?
+  reference  String?
+  dueDate    DateTime?
+  receivedAt DateTime?
+  notes      String?       @db.Text
+  dealId     String
+  clientId   String
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  // Relations
+  deal   Deal   @relation(fields: [dealId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@index([status])
+  @@index([dealId])
+  @@index([clientId])
+  @@index([dueDate])
+  @@map("payments")
+}
+
+model Commission {
+  id         String           @id @default(cuid())
+  amount     Decimal          @db.Decimal(15, 2)
+  currency   Currency         @default(USD)
+  percentage Decimal?         @db.Decimal(5, 2)
+  status     CommissionStatus @default(PENDING)
+  paidAt     DateTime?
+  notes      String?          @db.Text
+  dealId     String
+  agentId    String
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  // Relations
+  deal  Deal @relation(fields: [dealId], references: [id])
+  agent User @relation(fields: [agentId], references: [id])
+
+  @@index([status])
+  @@index([dealId])
+  @@index([agentId])
+  @@map("commissions")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  message   String?          @db.Text
+  isRead    Boolean          @default(false)
+  link      String?
+  userId    String
+  createdAt DateTime         @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  action     AuditAction
+  entityType String
+  entityId   String
+  changes    Json?
+  ipAddress  String?
+  userAgent  String?
+  userId     String
+  createdAt  DateTime    @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  office      Office   @default(HEAD_OFFICE)
+  managerId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  manager User         @relation("TeamManager", fields: [managerId], references: [id])
+  members TeamMember[]
+
+  @@index([managerId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  teamId   String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  // Relations
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model Campaign {
+  id             String         @id @default(cuid())
+  name           String
+  description    String?        @db.Text
+  source         LeadSource?
+  channel        SourceChannel?
+  budget         Decimal?       @db.Decimal(15, 2)
+  spent          Decimal?       @db.Decimal(15, 2)
+  leadsGenerated Int            @default(0)
+  conversions    Int            @default(0)
+  startDate      DateTime?
+  endDate        DateTime?
+  status         CampaignStatus @default(DRAFT)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Relations
+  steps CampaignStep[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("campaigns")
+}
+
+model CampaignStep {
+  id         String   @id @default(cuid())
+  campaignId String
+  stepOrder  Int
+  name       String
+  type       String
+  config     Json?
+  delayDays  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  // Relations
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([stepOrder])
+  @@map("campaign_steps")
+}
+
+model Activity {
+  id          String       @id @default(cuid())
+  type        ActivityType
+  title       String
+  description String?      @db.Text
+  leadId      String?
+  dealId      String?
+  clientId    String?
+  userId      String
+  createdAt   DateTime     @default(now())
+
+  // Relations
+  lead   Lead?   @relation(fields: [leadId], references: [id])
+  deal   Deal?   @relation(fields: [dealId], references: [id])
+  client Client? @relation(fields: [clientId], references: [id])
+  user   User    @relation(fields: [userId], references: [id])
+
+  @@index([leadId])
+  @@index([dealId])
+  @@index([clientId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activities")
+}
+
+// --- Phase 3: New models ---
+
+enum HandoverStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  subject   String
+  bodyHtml  String   @db.Text
+  category  String
+  variables String[]
+  isActive  Boolean  @default(true)
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("email_templates")
+}
+
+model AutomationRule {
+  id           String    @id @default(cuid())
+  name         String
+  triggerEvent String
+  conditions   Json
+  actions      Json
+  isActive     Boolean   @default(true)
+  runCount     Int       @default(0)
+  lastRunAt    DateTime?
+  createdBy    String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("automation_rules")
+}
+
+model Handover {
+  id           String         @id @default(cuid())
+  dealId       String
+  clientId     String
+  status       HandoverStatus @default(PENDING)
+  steps        Json
+  assignedToId String
+  completedAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  // Relations
+  deal       Deal   @relation(fields: [dealId], references: [id])
+  client     Client @relation(fields: [clientId], references: [id])
+  assignedTo User   @relation("HandoverAssignee", fields: [assignedToId], references: [id])
+
+  @@index([dealId])
+  @@index([clientId])
+  @@index([assignedToId])
+  @@map("handovers")
 }

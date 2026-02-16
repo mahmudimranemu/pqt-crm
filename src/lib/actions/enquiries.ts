@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { auth, type ExtendedSession } from "@/lib/auth";
-import type { EnquiryStatus, EnquirySource } from "@prisma/client";
+import type {
+  EnquiryStatus,
+  EnquirySource,
+  LeadSource,
+  BudgetRange,
+  PropertyType,
+} from "@prisma/client";
+import { auditLog } from "@/lib/audit";
 
 export async function getEnquiries(params?: {
   status?: EnquiryStatus;
@@ -11,14 +18,26 @@ export async function getEnquiries(params?: {
   agentId?: string;
   page?: number;
   limit?: number;
+  tab?: string;
+  tag?: string;
+  search?: string;
 }) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const { status, source, agentId, page = 1, limit = 25 } = params || {};
+  const {
+    status,
+    source,
+    agentId,
+    page = 1,
+    limit = 25,
+    tab,
+    tag,
+    search,
+  } = params || {};
   const skip = (page - 1) * limit;
 
-  const where: Record<string, unknown> = {};
+  const where: any = {};
 
   // Role-based filtering
   if (session.user.role === "SALES_AGENT") {
@@ -41,7 +60,50 @@ export async function getEnquiries(params?: {
   if (source) where.source = source;
   if (agentId) where.assignedAgentId = agentId;
 
-  const [enquiries, total, newCount] = await Promise.all([
+  // Tab-based filtering
+  const now = new Date();
+  if (tab === "48h") {
+    where.createdAt = { gte: new Date(now.getTime() - 48 * 60 * 60 * 1000) };
+  } else if (tab === "today") {
+    where.nextCallDate = {
+      gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+      lt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
+    };
+  } else if (tab === "previous") {
+    where.nextCallDate = {
+      lt: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+    };
+  } else if (tab === "future") {
+    where.nextCallDate = {
+      gt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
+    };
+  } else if (tab === "new") {
+    where.status = "NEW";
+  } else if (tab === "tagged") {
+    where.tags = { isEmpty: false };
+  }
+
+  // Tag filtering
+  if (tag) {
+    where.tags = { has: tag };
+  }
+
+  // Search filtering
+  if (search) {
+    where.AND = [
+      ...(where.AND || []),
+      {
+        OR: [
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+          { email: { contains: search, mode: "insensitive" } },
+          { phone: { contains: search, mode: "insensitive" } },
+        ],
+      },
+    ];
+  }
+
+  const [enquiries, total, newCount, futureCallCount] = await Promise.all([
     prisma.enquiry.findMany({
       where,
       include: {
@@ -57,16 +119,100 @@ export async function getEnquiries(params?: {
       take: limit,
     }),
     prisma.enquiry.count({ where }),
-    prisma.enquiry.count({ where: { ...where, status: "NEW" } }),
+    prisma.enquiry.count({
+      where: {
+        ...(session.user.role === "SALES_AGENT"
+          ? {
+              OR: [
+                { assignedAgentId: session.user.id },
+                { assignedAgentId: null },
+              ],
+            }
+          : {}),
+        status: "NEW",
+      },
+    }),
+    prisma.enquiry.count({
+      where: {
+        ...(session.user.role === "SALES_AGENT"
+          ? {
+              OR: [
+                { assignedAgentId: session.user.id },
+                { assignedAgentId: null },
+              ],
+            }
+          : {}),
+        nextCallDate: {
+          gt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
+        },
+      },
+    }),
   ]);
 
   return {
     enquiries,
     total,
     newCount,
+    futureCallCount,
     pages: Math.ceil(total / limit),
     currentPage: page,
   };
+}
+
+export async function getEnquiriesByStatus() {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+
+  const statuses: EnquiryStatus[] = [
+    "NEW",
+    "ASSIGNED",
+    "CONTACTED",
+    "CONVERTED_TO_CLIENT",
+    "SPAM",
+    "CLOSED",
+  ];
+
+  const where: Record<string, unknown> =
+    session.user.role === "SALES_AGENT"
+      ? { assignedAgentId: session.user.id }
+      : {};
+
+  const enquiries = await prisma.enquiry.findMany({
+    where,
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      status: true,
+      source: true,
+      budget: true,
+      country: true,
+      priority: true,
+      tags: true,
+      createdAt: true,
+      assignedAgent: {
+        select: { id: true, firstName: true, lastName: true },
+      },
+      interestedProperty: {
+        select: { id: true, name: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const grouped: Record<string, typeof enquiries> = {};
+  for (const status of statuses) {
+    grouped[status] = [];
+  }
+  for (const enquiry of enquiries) {
+    if (grouped[enquiry.status]) {
+      grouped[enquiry.status].push(enquiry);
+    }
+  }
+
+  return grouped;
 }
 
 export async function getEnquiry(id: string) {
@@ -115,6 +261,17 @@ export async function createEnquiry(data: CreateEnquiryData) {
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
 
+  // Auto-assign if no agent specified
+  let assignedAgentId = data.assignedAgentId || null;
+  if (!assignedAgentId) {
+    try {
+      const { autoAssignEnquiry } = await import("@/lib/lead-routing");
+      // We'll create first then auto-assign
+    } catch {
+      // Lead routing not critical
+    }
+  }
+
   const enquiry = await prisma.enquiry.create({
     data: {
       firstName: data.firstName,
@@ -127,10 +284,25 @@ export async function createEnquiry(data: CreateEnquiryData) {
       country: data.country || null,
       segment: data.segment || "Buyer",
       priority: data.priority || "Medium",
-      assignedAgentId: data.assignedAgentId || null,
+      assignedAgentId: assignedAgentId,
       interestedPropertyId: data.interestedPropertyId || null,
-      status: data.assignedAgentId ? "ASSIGNED" : "NEW",
+      status: assignedAgentId ? "ASSIGNED" : "NEW",
     },
+  });
+
+  // Auto-assign via routing if no agent was manually set
+  if (!assignedAgentId) {
+    try {
+      const { autoAssignEnquiry } = await import("@/lib/lead-routing");
+      await autoAssignEnquiry(enquiry.id, data.country);
+    } catch {
+      // Lead routing is non-critical
+    }
+  }
+
+  await auditLog("CREATE", "Enquiry", enquiry.id, {
+    subject: data.firstName + " " + data.lastName,
+    clientId: data.email,
   });
 
   revalidatePath("/clients/enquiries");
@@ -197,6 +369,8 @@ export async function assignEnquiry(enquiryId: string, agentId: string) {
     },
   });
 
+  await auditLog("ASSIGN", "Enquiry", enquiryId, { assignedAgentId: agentId });
+
   revalidatePath("/clients/enquiries");
   return enquiry;
 }
@@ -214,18 +388,44 @@ export async function updateEnquiryStatus(
     data: { status },
   });
 
+  await auditLog("STAGE_CHANGE", "Enquiry", enquiryId, { status });
+
   revalidatePath("/clients/enquiries");
   return enquiry;
 }
 
-export async function convertToClient(
+// Map EnquirySource to LeadSource
+function mapEnquirySourceToLeadSource(source: EnquirySource): LeadSource {
+  const mapping: Record<EnquirySource, LeadSource> = {
+    WEBSITE_FORM: "WEBSITE",
+    PHONE_CALL: "OTHER",
+    EMAIL: "OTHER",
+    WHATSAPP: "SOCIAL_MEDIA",
+    LIVE_CHAT: "WEBSITE",
+    PARTNER_REFERRAL: "PARTNER",
+  };
+  return mapping[source];
+}
+
+export interface ConvertEnquiryData {
+  // Client fields
+  nationality?: string;
+  country?: string;
+  budgetMin?: number;
+  budgetMax?: number;
+  investmentPurpose?: string;
+  // Lead fields
+  leadTitle: string;
+  estimatedValue?: number;
+  budgetRange?: BudgetRange;
+  propertyType?: PropertyType;
+  preferredLocation?: string;
+  description?: string;
+}
+
+export async function convertToClientAndLead(
   enquiryId: string,
-  additionalData?: {
-    budgetMin?: number;
-    budgetMax?: number;
-    nationality?: string;
-    country?: string;
-  },
+  data: ConvertEnquiryData,
 ) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
@@ -236,50 +436,115 @@ export async function convertToClient(
   });
 
   if (!enquiry) throw new Error("Enquiry not found");
-  if (enquiry.convertedClientId) throw new Error("Already converted to client");
+  if (enquiry.convertedClientId) throw new Error("Already converted");
 
-  // Create the client
-  const client = await prisma.client.create({
-    data: {
-      firstName: enquiry.firstName,
-      lastName: enquiry.lastName,
-      email: enquiry.email,
-      phone: enquiry.phone,
-      nationality: additionalData?.nationality || "Not specified",
-      country: additionalData?.country || "Not specified",
-      budgetMin: additionalData?.budgetMin || 200000,
-      budgetMax: additionalData?.budgetMax || 500000,
-      source:
-        enquiry.source === "WEBSITE_FORM"
-          ? "WEBSITE"
-          : enquiry.source === "PHONE_CALL"
-            ? "OTHER"
-            : enquiry.source === "EMAIL"
-              ? "OTHER"
-              : enquiry.source === "WHATSAPP"
-                ? "OTHER"
-                : enquiry.source === "LIVE_CHAT"
-                  ? "OTHER"
-                  : "PARTNER",
-      status: "NEW_LEAD",
-      investmentPurpose: "RESIDENTIAL",
-      assignedAgentId: enquiry.assignedAgentId || session.user.id,
-      notes: enquiry.message || undefined,
-    },
+  // Generate lead number
+  const today = new Date();
+  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+  const todayStart = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const count = await prisma.lead.count({
+    where: { createdAt: { gte: todayStart } },
   });
+  const leadNumber = `PQT-L-${dateStr}-${String(count + 1).padStart(4, "0")}`;
 
-  // Update the enquiry
-  await prisma.enquiry.update({
-    where: { id: enquiryId },
-    data: {
-      status: "CONVERTED_TO_CLIENT",
-      convertedClientId: client.id,
-    },
+  const ownerId = enquiry.assignedAgentId || session.user.id;
+  const leadSource = mapEnquirySourceToLeadSource(enquiry.source);
+
+  // Run everything in a transaction
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Create Client
+    const client = await tx.client.create({
+      data: {
+        firstName: enquiry.firstName,
+        lastName: enquiry.lastName,
+        email: enquiry.email,
+        phone: enquiry.phone,
+        nationality: data.nationality || enquiry.country || "Not specified",
+        country: data.country || enquiry.country || "Not specified",
+        budgetMin: data.budgetMin || 200000,
+        budgetMax: data.budgetMax || 500000,
+        source: leadSource,
+        status: "NEW_LEAD",
+        investmentPurpose: (data.investmentPurpose || "RESIDENTIAL") as any,
+        assignedAgentId: ownerId,
+        notes: enquiry.message || undefined,
+      },
+    });
+
+    // 2. Create Lead linked to the new Client
+    const lead = await tx.lead.create({
+      data: {
+        leadNumber,
+        title: data.leadTitle,
+        description: data.description || enquiry.message || undefined,
+        stage: "NEW_ENQUIRY",
+        estimatedValue: data.estimatedValue || undefined,
+        budgetRange: data.budgetRange || undefined,
+        source: leadSource,
+        sourceDetail: enquiry.sourceUrl || undefined,
+        propertyType: data.propertyType || undefined,
+        preferredLocation: data.preferredLocation || undefined,
+        clientId: client.id,
+        ownerId,
+      },
+    });
+
+    // 3. Create Activity on the lead
+    await tx.activity.create({
+      data: {
+        type: "NOTE",
+        title: "Lead Created from Enquiry",
+        description: `Converted from enquiry for ${enquiry.firstName} ${enquiry.lastName}. Original source: ${enquiry.source}.`,
+        leadId: lead.id,
+        clientId: client.id,
+        userId: session.user.id,
+      },
+    });
+
+    // 4. Update Enquiry status
+    await tx.enquiry.update({
+      where: { id: enquiryId },
+      data: {
+        status: "CONVERTED_TO_CLIENT",
+        convertedClientId: client.id,
+      },
+    });
+
+    return { client, lead };
   });
 
   revalidatePath("/clients/enquiries");
   revalidatePath("/clients");
-  return client;
+  revalidatePath("/leads");
+  return result;
+}
+
+// Keep old function for backward compatibility but have it use the new one
+export async function convertToClient(
+  enquiryId: string,
+  additionalData?: {
+    budgetMin?: number;
+    budgetMax?: number;
+    nationality?: string;
+    country?: string;
+  },
+) {
+  const enquiry = await prisma.enquiry.findUnique({
+    where: { id: enquiryId },
+  });
+  if (!enquiry) throw new Error("Enquiry not found");
+
+  return convertToClientAndLead(enquiryId, {
+    nationality: additionalData?.nationality,
+    country: additionalData?.country,
+    budgetMin: additionalData?.budgetMin,
+    budgetMax: additionalData?.budgetMax,
+    leadTitle: `${enquiry.firstName} ${enquiry.lastName} - New Opportunity`,
+  });
 }
 
 export async function updateEnquiryField(
@@ -314,6 +579,11 @@ export async function updateEnquiryField(
     where: { id: enquiryId },
     data: { [field]: value },
   });
+
+  await auditLog("UPDATE", "Enquiry", enquiryId, { [field]: value } as Record<
+    string,
+    unknown
+  >);
 
   revalidatePath("/clients/enquiries");
   return enquiry;
@@ -355,6 +625,7 @@ export async function deleteEnquiry(id: string) {
   }
 
   await prisma.enquiry.delete({ where: { id } });
+  await auditLog("DELETE", "Enquiry", id);
   revalidatePath("/clients/enquiries");
 }
 
@@ -401,6 +672,59 @@ export async function addEnquiryNote(enquiryId: string, content: string) {
   return note;
 }
 
+export async function addEnquiryContactLog(
+  enquiryId: string,
+  data: { contactType: "CALL" | "EMAIL" | "SPOKEN" | "NOTE"; content: string },
+) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  if (!data.content.trim()) throw new Error("Note content is required");
+
+  const agent = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, firstName: true, lastName: true },
+  });
+  if (!agent)
+    throw new Error("Session expired. Please log out and log back in.");
+
+  // Prefix the note content with the contact type
+  const prefixedContent =
+    data.contactType === "NOTE"
+      ? data.content.trim()
+      : `[${data.contactType}] ${data.content.trim()}`;
+
+  // Create the note
+  const note = await prisma.enquiryNote.create({
+    data: {
+      enquiryId,
+      agentId: agent.id,
+      content: prefixedContent,
+    },
+    include: {
+      agent: {
+        select: { id: true, firstName: true, lastName: true },
+      },
+    },
+  });
+
+  // Update called/spoken flags on the enquiry
+  const updateData: { called?: boolean; spoken?: boolean } = {};
+  if (data.contactType === "CALL") updateData.called = true;
+  if (data.contactType === "SPOKEN") updateData.spoken = true;
+
+  if (Object.keys(updateData).length > 0) {
+    await prisma.enquiry.update({
+      where: { id: enquiryId },
+      data: updateData,
+    });
+  }
+
+  revalidatePath(`/clients/enquiries/${enquiryId}`);
+  return note;
+}
+
 export async function deleteEnquiryNote(noteId: string) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
@@ -419,4 +743,71 @@ export async function deleteEnquiryNote(noteId: string) {
 
   await prisma.enquiryNote.delete({ where: { id: noteId } });
   revalidatePath(`/clients/enquiries/${note.enquiryId}`);
+}
+
+export async function updateEnquiryTags(enquiryId: string, tags: string[]) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  const enquiry = await prisma.enquiry.update({
+    where: { id: enquiryId },
+    data: { tags },
+  });
+
+  revalidatePath("/clients/enquiries");
+  revalidatePath("/clients/enquiries/" + enquiryId);
+  return enquiry;
+}
+
+export async function assignEnquiryToPool(
+  enquiryId: string,
+  pool: "POOL_1" | "POOL_2" | "POOL_3",
+) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  const enquiry = await prisma.enquiry.findUnique({
+    where: { id: enquiryId },
+    select: { tags: true },
+  });
+  if (!enquiry) throw new Error("Enquiry not found");
+
+  const filteredTags = enquiry.tags.filter(
+    (t) => t !== "POOL_1" && t !== "POOL_2" && t !== "POOL_3",
+  );
+  filteredTags.push(pool);
+
+  await prisma.enquiry.update({
+    where: { id: enquiryId },
+    data: { tags: filteredTags, assignedAgentId: null },
+  });
+
+  revalidatePath("/clients/enquiries");
+  revalidatePath("/settings/users");
+}
+
+export async function removeEnquiryFromPool(enquiryId: string) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  const enquiry = await prisma.enquiry.findUnique({
+    where: { id: enquiryId },
+    select: { tags: true },
+  });
+  if (!enquiry) throw new Error("Enquiry not found");
+
+  const filteredTags = enquiry.tags.filter(
+    (t) => t !== "POOL_1" && t !== "POOL_2" && t !== "POOL_3",
+  );
+
+  await prisma.enquiry.update({
+    where: { id: enquiryId },
+    data: { tags: filteredTags },
+  });
+
+  revalidatePath("/clients/enquiries");
+  revalidatePath("/settings/users");
 }

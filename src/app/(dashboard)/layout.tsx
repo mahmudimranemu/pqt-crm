@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth, type ExtendedSession } from "@/lib/auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
+import { getUnreadNotificationCount } from "@/lib/actions/notifications";
 
 export default async function DashboardRootLayout({
   children,
@@ -13,6 +14,8 @@ export default async function DashboardRootLayout({
     redirect("/login");
   }
 
+  const unreadCount = await getUnreadNotificationCount();
+
   return (
     <DashboardLayout
       user={{
@@ -22,6 +25,7 @@ export default async function DashboardRootLayout({
         role: session.user.role,
         office: session.user.office,
       }}
+      unreadNotifications={unreadCount}
     >
       {children}
     </DashboardLayout>

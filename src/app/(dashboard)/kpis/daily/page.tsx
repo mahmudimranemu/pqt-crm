@@ -11,6 +11,7 @@ import {
   TrendingUp,
   TrendingDown,
 } from "lucide-react";
+import { DailyGauges } from "./daily-charts";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -80,31 +81,31 @@ export default async function DailyKPIsPage() {
       title: "Calls Made",
       value: data.metrics.callsMade.value,
       target: data.metrics.callsMade.target,
-      icon: Phone
+      icon: Phone,
     },
     {
       title: "New Leads",
       value: data.metrics.newLeads.value,
       target: data.metrics.newLeads.target,
-      icon: Users
+      icon: Users,
     },
     {
       title: "Bookings Scheduled",
       value: data.metrics.bookingsScheduled.value,
       target: data.metrics.bookingsScheduled.target,
-      icon: Calendar
+      icon: Calendar,
     },
     {
       title: "Viewings Completed",
       value: data.metrics.viewingsCompleted.value,
       target: data.metrics.viewingsCompleted.target,
-      icon: Eye
+      icon: Eye,
     },
     {
       title: "Sales Closed",
       value: data.metrics.salesClosed.value,
       target: data.metrics.salesClosed.target,
-      icon: Target
+      icon: Target,
     },
     {
       title: "Sales Revenue",
@@ -116,10 +117,12 @@ export default async function DailyKPIsPage() {
   ];
 
   // Calculate overall daily score
-  const overallScore = metrics.reduce((acc, metric) => {
-    const percentage = metric.target > 0 ? (metric.value / metric.target) * 100 : 0;
-    return acc + Math.min(percentage, 100);
-  }, 0) / metrics.length;
+  const overallScore =
+    metrics.reduce((acc, metric) => {
+      const percentage =
+        metric.target > 0 ? (metric.value / metric.target) * 100 : 0;
+      return acc + Math.min(percentage, 100);
+    }, 0) / metrics.length;
 
   return (
     <div className="space-y-6">
@@ -130,30 +133,44 @@ export default async function DailyKPIsPage() {
             weekday: "long",
             year: "numeric",
             month: "long",
-            day: "numeric"
+            day: "numeric",
           })}
         </p>
       </div>
 
       {/* Overall Score */}
-      <Card className="bg-gradient-to-r from-[#dc2626] to-[#991b1b] text-white">
+      <Card className="bg-gradient-to-r from-[#dc2626] to-[#b91c1c] text-white">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-white/80 text-sm">Overall Daily Score</p>
-              <p className="text-4xl font-bold mt-1">{overallScore.toFixed(0)}%</p>
+              <p className="text-4xl font-bold mt-1">
+                {overallScore.toFixed(0)}%
+              </p>
               <p className="text-white/80 text-sm mt-2">
                 {overallScore >= 80
                   ? "Excellent! You're on track to hit your targets."
                   : overallScore >= 50
-                  ? "Good progress. Keep pushing!"
-                  : "Let's pick up the pace to hit today's targets."}
+                    ? "Good progress. Keep pushing!"
+                    : "Let's pick up the pace to hit today's targets."}
               </p>
             </div>
             <div className="text-6xl opacity-20">
               <Target className="h-24 w-24" />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Visual Gauges */}
+      <Card className="border border-gray-200">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-gray-900">
+            Progress Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DailyGauges metrics={data.metrics} />
         </CardContent>
       </Card>
 

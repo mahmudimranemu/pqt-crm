@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import { CheckSquare, Square } from "lucide-react";
-import { updateEnquiryField } from "@/lib/actions/enquiries";
+import {
+  updateEnquiryField,
+  assignEnquiryToPool,
+  removeEnquiryFromPool,
+} from "@/lib/actions/enquiries";
 
 interface Agent {
   id: string;
@@ -23,6 +27,7 @@ interface EnquiryFieldsData {
   nextCallDate: string | null;
   snooze: string | null;
   assignedAgentId: string | null;
+  tags: string[];
 }
 
 interface EnquiryDetailFieldsProps {
@@ -43,7 +48,10 @@ const priorityColors: Record<string, string> = {
   Low: "text-green-600 bg-green-50",
 };
 
-export function EnquiryDetailFields({ enquiry, agents }: EnquiryDetailFieldsProps) {
+export function EnquiryDetailFields({
+  enquiry,
+  agents,
+}: EnquiryDetailFieldsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -60,7 +68,8 @@ export function EnquiryDetailFields({ enquiry, agents }: EnquiryDetailFieldsProp
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update",
+        description:
+          error instanceof Error ? error.message : "Failed to update",
       });
     }
   };
@@ -84,7 +93,9 @@ export function EnquiryDetailFields({ enquiry, agents }: EnquiryDetailFieldsProp
             )}
             <div>
               <p className="text-xs text-gray-500">Called</p>
-              <p className="text-sm font-medium">{enquiry.called ? "Yes" : "No"}</p>
+              <p className="text-sm font-medium">
+                {enquiry.called ? "Yes" : "No"}
+              </p>
             </div>
           </button>
 
@@ -99,14 +110,18 @@ export function EnquiryDetailFields({ enquiry, agents }: EnquiryDetailFieldsProp
             )}
             <div>
               <p className="text-xs text-gray-500">Spoken</p>
-              <p className="text-sm font-medium">{enquiry.spoken ? "Yes" : "No"}</p>
+              <p className="text-sm font-medium">
+                {enquiry.spoken ? "Yes" : "No"}
+              </p>
             </div>
           </button>
         </div>
 
         {/* Segment */}
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">Segment</label>
+          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">
+            Segment
+          </label>
           <select
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#dc2626]/20 focus:border-[#dc2626]"
             value={enquiry.segment || "Buyer"}
@@ -120,7 +135,9 @@ export function EnquiryDetailFields({ enquiry, agents }: EnquiryDetailFieldsProp
 
         {/* Lead Status */}
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">Lead Status</label>
+          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">
+            Lead Status
+          </label>
           <select
             className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#dc2626]/20 focus:border-[#dc2626] ${statusColors[enquiry.leadStatus || "New"] || "text-gray-600"}`}
             value={enquiry.leadStatus || "New"}
@@ -135,7 +152,9 @@ export function EnquiryDetailFields({ enquiry, agents }: EnquiryDetailFieldsProp
 
         {/* Priority */}
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">Priority</label>
+          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">
+            Priority
+          </label>
           <select
             className={`w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#dc2626]/20 focus:border-[#dc2626] ${priorityColors[enquiry.priority || "Medium"] || "text-gray-600 bg-white"}`}
             value={enquiry.priority || "Medium"}
@@ -149,7 +168,9 @@ export function EnquiryDetailFields({ enquiry, agents }: EnquiryDetailFieldsProp
 
         {/* Next Call Date */}
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">Next Call Date</label>
+          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">
+            Next Call Date
+          </label>
           <input
             type="date"
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#dc2626]/20 focus:border-[#dc2626]"
@@ -167,7 +188,9 @@ export function EnquiryDetailFields({ enquiry, agents }: EnquiryDetailFieldsProp
 
         {/* Snooze */}
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">Snooze</label>
+          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">
+            Snooze
+          </label>
           <select
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#dc2626]/20 focus:border-[#dc2626]"
             value={enquiry.snooze || "Active"}
@@ -184,16 +207,44 @@ export function EnquiryDetailFields({ enquiry, agents }: EnquiryDetailFieldsProp
 
         {/* Assigned Agent */}
         <div>
-          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">Assigned Consultant</label>
+          <label className="text-xs text-gray-500 uppercase tracking-wide block mb-1.5">
+            Assigned Consultant
+          </label>
           <select
             className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#dc2626]/20 focus:border-[#dc2626]"
-            value={enquiry.assignedAgentId || "unassigned"}
-            onChange={(e) => {
-              const val = e.target.value === "unassigned" ? null : e.target.value;
-              handleFieldUpdate("assignedAgentId", val);
+            value={
+              enquiry.tags.includes("POOL_1")
+                ? "POOL_1"
+                : enquiry.tags.includes("POOL_2")
+                  ? "POOL_2"
+                  : enquiry.tags.includes("POOL_3")
+                    ? "POOL_3"
+                    : enquiry.assignedAgentId || "unassigned"
+            }
+            onChange={async (e) => {
+              const val = e.target.value;
+              if (val === "POOL_1" || val === "POOL_2" || val === "POOL_3") {
+                await assignEnquiryToPool(enquiry.id, val);
+                startTransition(() => router.refresh());
+              } else {
+                if (enquiry.tags.some((t) => t.startsWith("POOL_"))) {
+                  await removeEnquiryFromPool(enquiry.id);
+                }
+                const agentVal = val === "unassigned" ? null : val;
+                await handleFieldUpdate("assignedAgentId", agentVal);
+              }
             }}
           >
             <option value="unassigned">Unassigned</option>
+            <option value="POOL_1" className="text-blue-600 font-medium">
+              Pool 1
+            </option>
+            <option value="POOL_2" className="text-blue-600 font-medium">
+              Pool 2
+            </option>
+            <option value="POOL_3" className="text-blue-600 font-medium">
+              Pool 3
+            </option>
             {agents.map((agent) => (
               <option key={agent.id} value={agent.id}>
                 {agent.firstName} {agent.lastName}

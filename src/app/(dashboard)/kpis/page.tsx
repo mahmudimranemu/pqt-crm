@@ -40,7 +40,7 @@ export default function KPIsPage() {
             <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader>
                 <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-lg bg-red-50">
+                  <div className="p-3 rounded-lg bg-blue-50">
                     <dashboard.icon className="h-6 w-6 text-gray-900" />
                   </div>
                   <CardTitle>{dashboard.title}</CardTitle>

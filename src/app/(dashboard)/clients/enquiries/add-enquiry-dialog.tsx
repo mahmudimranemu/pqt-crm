@@ -83,7 +83,10 @@ const initialFormState = {
   interestedPropertyId: "",
 };
 
-export function AddEnquiryDialog({ agents, properties }: AddEnquiryDialogProps) {
+export function AddEnquiryDialog({
+  agents,
+  properties,
+}: AddEnquiryDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,7 +108,8 @@ export function AddEnquiryDialog({ agents, properties }: AddEnquiryDialogProps) 
 
     setIsSubmitting(true);
     try {
-      await createEnquiry({
+      const isPool = form.assignedAgentId.startsWith("POOL_");
+      const result = await createEnquiry({
         firstName: form.firstName,
         lastName: form.lastName,
         email: form.email,
@@ -116,9 +120,16 @@ export function AddEnquiryDialog({ agents, properties }: AddEnquiryDialogProps) 
         country: form.country || undefined,
         segment: form.segment,
         priority: form.priority,
-        assignedAgentId: form.assignedAgentId || undefined,
+        assignedAgentId: isPool ? undefined : form.assignedAgentId || undefined,
         interestedPropertyId: form.interestedPropertyId || undefined,
       });
+      if (isPool && result?.id) {
+        const { assignEnquiryToPool } = await import("@/lib/actions/enquiries");
+        await assignEnquiryToPool(
+          result.id,
+          form.assignedAgentId as "POOL_1" | "POOL_2" | "POOL_3",
+        );
+      }
       toast({
         title: "Enquiry created",
         description: `Enquiry for ${form.firstName} ${form.lastName} has been created.`,
@@ -333,6 +344,9 @@ export function AddEnquiryDialog({ agents, properties }: AddEnquiryDialogProps) 
                     <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="POOL_1">Pool 1</SelectItem>
+                    <SelectItem value="POOL_2">Pool 2</SelectItem>
+                    <SelectItem value="POOL_3">Pool 3</SelectItem>
                     {agents.map((agent) => (
                       <SelectItem key={agent.id} value={agent.id}>
                         {agent.firstName} {agent.lastName}
@@ -347,7 +361,9 @@ export function AddEnquiryDialog({ agents, properties }: AddEnquiryDialogProps) 
               <Label className="text-sm">Interested Property</Label>
               <Select
                 value={form.interestedPropertyId}
-                onValueChange={(val) => updateField("interestedPropertyId", val)}
+                onValueChange={(val) =>
+                  updateField("interestedPropertyId", val)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select property (optional)" />

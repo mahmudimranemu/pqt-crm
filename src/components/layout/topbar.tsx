@@ -12,8 +12,8 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { SearchCommand } from "@/components/search-command";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,24 +33,33 @@ interface TopbarProps {
     role: UserRole;
     office: Office;
   };
+  unreadNotifications?: number;
 }
 
-export function Topbar({ user }: TopbarProps) {
+export function Topbar({ user, unreadNotifications = 0 }: TopbarProps) {
   const handleLogout = async () => {
     await signOut({ callbackUrl: "/login" });
   };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-white px-6">
-      {/* Search Bar */}
-      <div className="relative w-full max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-        <Input
-          type="text"
-          placeholder="Search leads, properties..."
-          className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
-        />
-      </div>
+      {/* Search Trigger */}
+      <SearchCommand />
+      <button
+        onClick={() => {
+          // Trigger Cmd+K programmatically
+          document.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "k", metaKey: true }),
+          );
+        }}
+        className="flex w-full max-w-md items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-100"
+      >
+        <Search className="h-4 w-4" />
+        <span className="flex-1 text-left">Search leads, properties...</span>
+        <kbd className="hidden rounded border bg-white px-1.5 py-0.5 text-xs font-mono text-gray-400 sm:inline-block">
+          ⌘K
+        </kbd>
+      </button>
 
       {/* Right Side Actions */}
       <div className="flex items-center gap-3">
@@ -74,8 +83,15 @@ export function Topbar({ user }: TopbarProps) {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem asChild>
-              <a href="/clients/create">New Lead</a>
+              <a href="/clients/create">New Client</a>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a href="/leads/create">New Lead</a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a href="/deals/create">New Deal</a>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <a href="/properties/create">New Property</a>
             </DropdownMenuItem>
@@ -89,12 +105,16 @@ export function Topbar({ user }: TopbarProps) {
         </DropdownMenu>
 
         {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5 text-gray-500" />
-          <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#dc2626] text-[10px] text-white">
-            3
-          </span>
-        </Button>
+        <a href="/notifications">
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5 text-gray-500" />
+            {unreadNotifications > 0 && (
+              <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#dc2626] text-[10px] text-white">
+                {unreadNotifications > 9 ? "9+" : unreadNotifications}
+              </span>
+            )}
+          </Button>
+        </a>
 
         {/* User Menu */}
         <DropdownMenu>
@@ -132,7 +152,7 @@ export function Topbar({ user }: TopbarProps) {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={handleLogout}
-              className="text-[#dc2626] focus:text-[#dc2626]"
+              className="text-red-600 focus:text-red-600"
             >
               <LogOut className="mr-2 h-4 w-4" />
               Log out

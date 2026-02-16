@@ -30,7 +30,7 @@ const demoAccounts = [
     email: "admin@pqt.com",
     password: "password123",
     icon: Shield,
-    color: "bg-red-600 hover:bg-red-700 text-white",
+    color: "bg-[#dc2626] hover:bg-[#b91c1c] text-white",
   },
   {
     label: "Admin",
@@ -241,7 +241,7 @@ function LoginFormFallback() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#dc2626] to-[#991b1b] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#dc2626] to-[#b91c1c] p-4">
       <Suspense fallback={<LoginFormFallback />}>
         <LoginForm />
       </Suspense>

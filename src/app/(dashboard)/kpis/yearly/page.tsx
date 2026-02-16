@@ -12,6 +12,11 @@ import {
   Award,
   Flag,
 } from "lucide-react";
+import {
+  YearlyRevenueChart,
+  YearlyTargetChart,
+  ConversionFunnel,
+} from "./yearly-charts";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -93,9 +98,6 @@ export default async function YearlyKPIsPage() {
     },
   ];
 
-  // Calculate max revenue for chart scaling
-  const maxRevenue = Math.max(...data.monthlyData.map((m) => m.revenue), 1);
-
   return (
     <div className="space-y-6">
       <div>
@@ -107,7 +109,7 @@ export default async function YearlyKPIsPage() {
 
       {/* Key Insights */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-gradient-to-br from-[#dc2626] to-[#991b1b] text-white">
+        <Card className="bg-gradient-to-br from-[#dc2626] to-[#b91c1c] text-white">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <TrendingUp className="h-8 w-8 opacity-80" />
@@ -121,7 +123,7 @@ export default async function YearlyKPIsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-[#dc2626] to-[#ef4444] text-white">
+        <Card className="bg-gradient-to-br from-[#dc2626] to-[#0150B5] text-white">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <Award className="h-8 w-8 opacity-80" />
@@ -178,34 +180,56 @@ export default async function YearlyKPIsPage() {
         ))}
       </div>
 
-      {/* Monthly Chart */}
-      <Card>
+      {/* Charts Row */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Monthly Revenue & Sales */}
+        <Card className="lg:col-span-2 border border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-900">
+              Monthly Revenue & Sales
+            </CardTitle>
+            <p className="text-sm text-gray-500">
+              Revenue trend with sales count by month
+            </p>
+          </CardHeader>
+          <CardContent>
+            <YearlyRevenueChart data={data.monthlyData} />
+          </CardContent>
+        </Card>
+
+        {/* Conversion Funnel */}
+        <Card className="border border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-900">
+              Conversion Funnel
+            </CardTitle>
+            <p className="text-sm text-gray-500">
+              Lead to sale conversion flow
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ConversionFunnel
+              leads={data.metrics.totalLeads.value}
+              bookings={data.metrics.totalBookings.value}
+              viewings={data.metrics.completedViewings.value}
+              sales={data.metrics.totalSales.value}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Actual vs Target */}
+      <Card className="border border-gray-200">
         <CardHeader>
-          <CardTitle>Monthly Revenue</CardTitle>
+          <CardTitle className="text-lg font-semibold text-gray-900">
+            Annual Targets Progress
+          </CardTitle>
+          <p className="text-sm text-gray-500">
+            Actual performance vs annual targets
+          </p>
         </CardHeader>
         <CardContent>
-          <div className="h-64">
-            <div className="flex h-full items-end gap-2">
-              {data.monthlyData.map((month) => (
-                <div
-                  key={month.month}
-                  className="flex-1 flex flex-col items-center"
-                >
-                  <div
-                    className="w-full bg-[#dc2626] rounded-t transition-all hover:bg-[#dc2626] cursor-pointer"
-                    style={{
-                      height: `${(month.revenue / maxRevenue) * 100}%`,
-                      minHeight: month.revenue > 0 ? "4px" : "0px",
-                    }}
-                    title={`${month.month}: ${formatCurrency(month.revenue)}`}
-                  />
-                  <span className="text-xs text-muted-foreground mt-2">
-                    {month.month}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <YearlyTargetChart metrics={data.metrics} />
         </CardContent>
       </Card>
 

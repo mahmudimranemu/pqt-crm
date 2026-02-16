@@ -174,7 +174,7 @@ function ImportCSVDialog({
               onClick={() => fileInputRef.current?.click()}
               className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 cursor-pointer transition-colors ${
                 isDragging
-                  ? "border-[#dc2626] bg-red-50"
+                  ? "border-[#dc2626] bg-blue-50"
                   : file
                     ? "border-green-300 bg-green-50"
                     : "border-gray-300 hover:border-gray-400 bg-gray-50"

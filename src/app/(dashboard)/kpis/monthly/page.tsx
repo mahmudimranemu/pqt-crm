@@ -10,6 +10,7 @@ import {
   Wallet,
   Target,
 } from "lucide-react";
+import { MonthlyRevenueChart, MonthlyTargetChart } from "./monthly-charts";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
@@ -92,9 +93,6 @@ export default async function MonthlyKPIsPage() {
     },
   ];
 
-  // Calculate max revenue for chart scaling
-  const maxRevenue = Math.max(...data.dailyData.map((d) => d.revenue), 1);
-
   return (
     <div className="space-y-6">
       <div>
@@ -118,42 +116,38 @@ export default async function MonthlyKPIsPage() {
         ))}
       </div>
 
-      {/* Daily Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Daily Revenue</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64">
-            <div className="flex h-full items-end gap-1">
-              {data.dailyData.map((day) => (
-                <div
-                  key={day.day}
-                  className="flex-1 flex flex-col items-center"
-                >
-                  <div
-                    className="w-full bg-[#dc2626] rounded-t transition-all hover:bg-[#dc2626]"
-                    style={{
-                      height: `${(day.revenue / maxRevenue) * 100}%`,
-                      minHeight: day.revenue > 0 ? "4px" : "0px",
-                    }}
-                    title={`Day ${day.day}: ${formatCurrency(day.revenue)}`}
-                  />
-                  {day.day % 5 === 1 && (
-                    <span className="text-xs text-muted-foreground mt-1">
-                      {day.day}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="flex justify-between mt-4 text-sm text-muted-foreground">
-            <span>Day 1</span>
-            <span>Day {data.dailyData.length}</span>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Charts Row */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Daily Revenue & Activity Chart */}
+        <Card className="border border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-900">
+              Daily Revenue & Activity
+            </CardTitle>
+            <p className="text-sm text-gray-500">
+              Revenue, sales, and bookings by day
+            </p>
+          </CardHeader>
+          <CardContent>
+            <MonthlyRevenueChart data={data.dailyData} />
+          </CardContent>
+        </Card>
+
+        {/* Actual vs Target */}
+        <Card className="border border-gray-200">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-900">
+              Actual vs Target
+            </CardTitle>
+            <p className="text-sm text-gray-500">
+              Monthly progress against targets
+            </p>
+          </CardHeader>
+          <CardContent>
+            <MonthlyTargetChart metrics={data.metrics} />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Daily Sales Table */}
       <Card>

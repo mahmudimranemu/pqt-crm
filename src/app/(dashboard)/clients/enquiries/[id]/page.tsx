@@ -8,22 +8,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  ArrowLeft,
-  Mail,
-  Phone,
-  Globe,
-  DollarSign,
-  Calendar,
-  Clock,
-  User,
-  MessageSquare,
-  Tag,
-} from "lucide-react";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { ArrowLeft, Mail, Phone, Globe, DollarSign, Tag } from "lucide-react";
+import { formatDateTime } from "@/lib/utils";
 import { EnquiryDetailFields } from "./enquiry-detail-fields";
 import { EnquiryNotes } from "./enquiry-notes";
 import { EnquiryPropertySelector } from "./enquiry-property-selector";
+import { ConvertEnquiryDialog } from "./convert-enquiry-dialog";
+import { TagManager } from "@/components/tag-manager";
+import { updateEnquiryTags } from "@/lib/actions/enquiries";
 import type { EnquiryStatus, EnquirySource } from "@prisma/client";
 
 interface PageProps {
@@ -77,6 +69,10 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
     createdAt: note.createdAt.toISOString(),
   }));
 
+  const isConverted = enquiry.status === "CONVERTED_TO_CLIENT";
+  const isSpamOrClosed =
+    enquiry.status === "SPAM" || enquiry.status === "CLOSED";
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -108,7 +104,46 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
             </p>
           </div>
         </div>
+
+        {/* Convert Button */}
+        {!isConverted && !isSpamOrClosed && (
+          <ConvertEnquiryDialog
+            enquiryId={enquiry.id}
+            enquiryName={`${enquiry.firstName} ${enquiry.lastName}`}
+            enquiryBudget={enquiry.budget}
+            enquiryCountry={enquiry.country}
+            enquiryMessage={enquiry.message}
+          />
+        )}
       </div>
+
+      {/* Converted Banner */}
+      {isConverted && enquiry.convertedClient && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-green-800">
+                This enquiry has been converted to a client and lead
+              </p>
+              <p className="text-sm text-green-600 mt-0.5">
+                Client: {enquiry.convertedClient.firstName}{" "}
+                {enquiry.convertedClient.lastName}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Link href={`/clients/${enquiry.convertedClient.id}`}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-green-300 text-green-700 hover:bg-green-100"
+                >
+                  View Client
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Info Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -191,24 +226,17 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
                   </p>
                 </div>
               )}
-              {enquiry.tags.length > 0 && (
-                <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
-                    Tags
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {enquiry.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-xs font-medium text-gray-600"
-                      >
-                        <Tag className="h-3 w-3" />
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">
+                  Tags
+                </p>
+                <TagManager
+                  entityId={enquiry.id}
+                  tags={enquiry.tags}
+                  onUpdate={updateEnquiryTags}
+                  compact
+                />
+              </div>
               {enquiry.convertedClient && (
                 <div>
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
@@ -245,6 +273,7 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
               nextCallDate: enquiry.nextCallDate?.toISOString() || null,
               snooze: enquiry.snooze,
               assignedAgentId: enquiry.assignedAgentId,
+              tags: enquiry.tags,
             }}
             agents={agents}
           />

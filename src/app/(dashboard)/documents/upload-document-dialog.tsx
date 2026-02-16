@@ -22,6 +22,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Plus, Upload } from "lucide-react";
 import { createDocument, getDocumentFormData } from "@/lib/actions/documents";
+import { FileDropzone } from "@/components/file-dropzone";
 import type { DocumentCategory } from "@prisma/client";
 
 const categories: { value: DocumentCategory; label: string }[] = [
@@ -52,6 +53,8 @@ export function UploadDocumentDialog() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formOptions, setFormOptions] = useState<FormDataType | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -68,10 +71,25 @@ export function UploadDocumentDialog() {
     }
   }, [isOpen, formOptions]);
 
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file);
+    // Auto-fill name if empty
+    if (!formData.name) {
+      const nameWithoutExt = file.name
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[_-]/g, " ");
+      setFormData((prev) => ({ ...prev, name: nameWithoutExt }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.fileUrl) {
-      setError("Name and file URL are required");
+    if (!formData.name) {
+      setError("Document name is required");
+      return;
+    }
+    if (!selectedFile && !formData.fileUrl) {
+      setError("Please select a file to upload or provide a URL");
       return;
     }
 
@@ -79,10 +97,32 @@ export function UploadDocumentDialog() {
       setIsSubmitting(true);
       setError(null);
 
+      let fileUrl = formData.fileUrl;
+      let fileType = formData.fileType;
+
+      // Upload file if selected
+      if (selectedFile) {
+        setUploadProgress(true);
+        const body = new FormData();
+        body.append("file", selectedFile);
+        body.append("subfolder", "documents");
+
+        const res = await fetch("/api/upload", { method: "POST", body });
+        const result = await res.json();
+        setUploadProgress(false);
+
+        if (!res.ok) {
+          throw new Error(result.error || "Upload failed");
+        }
+
+        fileUrl = result.url;
+        fileType = result.fileType;
+      }
+
       await createDocument({
         name: formData.name,
-        fileUrl: formData.fileUrl,
-        fileType: formData.fileType || "pdf",
+        fileUrl,
+        fileType: fileType || "application/octet-stream",
         category: formData.category,
         clientId:
           formData.clientId === "none"
@@ -95,6 +135,7 @@ export function UploadDocumentDialog() {
       });
 
       setIsOpen(false);
+      setSelectedFile(null);
       setFormData({
         name: "",
         fileUrl: "",
@@ -110,6 +151,7 @@ export function UploadDocumentDialog() {
       );
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(false);
     }
   };
 
@@ -146,58 +188,51 @@ export function UploadDocumentDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="fileUrl">File URL *</Label>
-            <Input
-              id="fileUrl"
-              placeholder="https://..."
-              value={formData.fileUrl}
-              onChange={(e) =>
-                setFormData({ ...formData, fileUrl: e.target.value })
-              }
-              required
+            <Label>Upload File</Label>
+            <FileDropzone
+              onFileSelect={handleFileSelect}
+              accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.csv,.txt"
+              disabled={isSubmitting}
             />
-            <p className="text-xs text-muted-foreground">
-              Enter the URL where the document is stored (e.g., cloud storage
-              link)
-            </p>
+            {!selectedFile && (
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground text-center">
+                  or provide a URL
+                </p>
+                <Input
+                  id="fileUrl"
+                  placeholder="https://..."
+                  value={formData.fileUrl}
+                  onChange={(e) =>
+                    setFormData({ ...formData, fileUrl: e.target.value })
+                  }
+                />
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="fileType">File Type</Label>
-              <Input
-                id="fileType"
-                placeholder="pdf, jpg, etc."
-                value={formData.fileType}
-                onChange={(e) =>
-                  setFormData({ ...formData, fileType: e.target.value })
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="category">Category *</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
-                    category: value as DocumentCategory,
-                  })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="category">Category *</Label>
+            <Select
+              value={formData.category}
+              onValueChange={(value) =>
+                setFormData({
+                  ...formData,
+                  category: value as DocumentCategory,
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -257,7 +292,11 @@ export function UploadDocumentDialog() {
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               <Upload className="h-4 w-4 mr-2" />
-              {isSubmitting ? "Uploading..." : "Upload"}
+              {uploadProgress
+                ? "Uploading file..."
+                : isSubmitting
+                  ? "Saving..."
+                  : "Upload"}
             </Button>
           </div>
         </form>

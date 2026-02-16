@@ -111,7 +111,7 @@ async function PropertiesGrid({
           <Link key={property.id} href={`/properties/${property.slug}`}>
             <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full overflow-hidden">
               {/* Property Image */}
-              <div className="h-48 relative overflow-hidden bg-gradient-to-br from-[#dc2626] to-[#991b1b]">
+              <div className="h-48 relative overflow-hidden bg-gradient-to-br from-[#dc2626] to-[#b91c1c]">
                 {property.imageUrl ? (
                   <img
                     src={property.imageUrl}

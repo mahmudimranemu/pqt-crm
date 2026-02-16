@@ -31,7 +31,7 @@ interface CalendarBooking {
 
 const statusColors: Record<BookingStatus, string> = {
   SCHEDULED: "#dc2626",
-  CONFIRMED: "#991b1b",
+  CONFIRMED: "#b91c1c",
   COMPLETED: "#22c55e",
   NO_SHOW: "#dc2626",
   CANCELLED: "#dc2626",

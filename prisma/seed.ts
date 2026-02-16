@@ -6,7 +6,19 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("Starting seed...");
 
-  // Clear existing data
+  // Clear existing data (new models first, then original)
+  await prisma.activity.deleteMany();
+  await prisma.campaignStep.deleteMany();
+  await prisma.campaign.deleteMany();
+  await prisma.teamMember.deleteMany();
+  await prisma.team.deleteMany();
+  await prisma.auditLog.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.commission.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.deal.deleteMany();
+  await prisma.lead.deleteMany();
   await prisma.websiteAnalytics.deleteMany();
   await prisma.communication.deleteMany();
   await prisma.loginLog.deleteMany();
@@ -1188,6 +1200,653 @@ async function main() {
     });
   }
   console.log("Created enquiries");
+
+  // ===== NEW CRM DATA =====
+
+  // Create Leads (15 leads across different stages)
+  const leadStages = [
+    "NEW_ENQUIRY",
+    "CONTACTED",
+    "QUALIFIED",
+    "VIEWING_ARRANGED",
+    "VIEWED",
+    "OFFER_MADE",
+    "NEGOTIATING",
+    "WON",
+    "LOST",
+  ] as const;
+
+  const budgetRanges = [
+    "UNDER_100K",
+    "FROM_100K_TO_250K",
+    "FROM_250K_TO_500K",
+    "FROM_500K_TO_1M",
+    "OVER_1M",
+  ] as const;
+
+  const sourceChannels = [
+    "ORGANIC",
+    "PAID_SEARCH",
+    "SOCIAL_MEDIA",
+    "REFERRAL",
+    "DIRECT",
+    "EMAIL_CAMPAIGN",
+    "PARTNER",
+    "EVENT",
+  ] as const;
+
+  const leads = await Promise.all(
+    Array.from({ length: 15 }, (_, i) => {
+      const client = clients[i % clients.length];
+      const agent = users[i % 5]; // assign to non-viewer agents
+      const stage = leadStages[i % leadStages.length];
+      const dateOffset = i * 3;
+      const createdAt = new Date();
+      createdAt.setDate(createdAt.getDate() - dateOffset);
+
+      return prisma.lead.create({
+        data: {
+          leadNumber: `PQT-L-20260201-${String(i + 1).padStart(4, "0")}`,
+          title: [
+            "3-bed apartment in Kadikoy",
+            "Villa with sea view in Beylikduzu",
+            "Investment property near airport",
+            "Penthouse in Sisli",
+            "Commercial unit in Levent",
+            "Family home in Bahcesehir",
+            "Studio apartment in Esenyurt",
+            "Luxury flat in Uskudar",
+            "Land plot in Sariyer",
+            "Duplex in Maltepe",
+            "Citizenship-eligible property",
+            "Retirement home in Kadikoy",
+            "Student accommodation",
+            "Office space in Besiktas",
+            "Waterfront villa in Sariyer",
+          ][i],
+          description: `Lead generated from ${sourceChannels[i % sourceChannels.length].toLowerCase().replace("_", " ")} channel. Client interested in Turkish property market.`,
+          stage,
+          estimatedValue: 200000 + i * 75000,
+          currency: "USD",
+          budgetRange: budgetRanges[i % budgetRanges.length],
+          source: sources[i % sources.length],
+          sourceChannel: sourceChannels[i % sourceChannels.length],
+          propertyType: [
+            "APARTMENT",
+            "VILLA",
+            "COMMERCIAL",
+            "LAND",
+            "PENTHOUSE",
+          ][i % 5] as
+            | "APARTMENT"
+            | "VILLA"
+            | "COMMERCIAL"
+            | "LAND"
+            | "PENTHOUSE",
+          preferredLocation: [
+            "Kadikoy",
+            "Beylikduzu",
+            "Basaksehir",
+            "Sisli",
+            "Levent",
+            "Bahcesehir",
+            "Esenyurt",
+            "Uskudar",
+            "Sariyer",
+            "Maltepe",
+            "Besiktas",
+            "Kadikoy",
+            "Esenyurt",
+            "Besiktas",
+            "Sariyer",
+          ][i],
+          score: Math.floor(Math.random() * 80) + 20,
+          clientId: client.id,
+          ownerId: agent.id,
+          createdAt,
+        },
+      });
+    }),
+  );
+
+  console.log(`Created ${leads.length} leads`);
+
+  // Create Deals (10 deals across different stages)
+  const dealStages = [
+    "RESERVATION",
+    "DEPOSIT",
+    "CONTRACT",
+    "PAYMENT_PLAN",
+    "TITLE_DEED",
+    "COMPLETED",
+    "CANCELLED",
+  ] as const;
+
+  const deals = await Promise.all(
+    Array.from({ length: 10 }, (_, i) => {
+      const client = clients[i % clients.length];
+      const agent = users[i % 5];
+      const stage = dealStages[i % dealStages.length];
+      const dateOffset = i * 5;
+      const createdAt = new Date();
+      createdAt.setDate(createdAt.getDate() - dateOffset);
+      const expectedClose = new Date();
+      expectedClose.setDate(expectedClose.getDate() + 30 + i * 10);
+
+      return prisma.deal.create({
+        data: {
+          dealNumber: `PQT-D-20260201-${String(i + 1).padStart(4, "0")}`,
+          title: [
+            "Marina Residence 2+1 Purchase",
+            "Green Valley Villa Sale",
+            "Central Park Tower Unit",
+            "Nisantasi Elite Penthouse",
+            "Moda Lifestyle 3+1",
+            "Lake View Residence",
+            "Bosphorus View Flat",
+            "Coastal Living Apartment",
+            "Forest Hills Villa",
+            "Levent Office Space",
+          ][i],
+          description: `Deal for ${properties[i % properties.length].name}. Client: ${client.firstName} ${client.lastName}.`,
+          dealValue: 300000 + i * 120000,
+          currency: "USD",
+          stage,
+          result:
+            stage === "COMPLETED"
+              ? "WON"
+              : stage === "CANCELLED"
+                ? "CANCELLED"
+                : "PENDING",
+          probability:
+            stage === "COMPLETED"
+              ? 100
+              : stage === "CANCELLED"
+                ? 0
+                : 30 + i * 7,
+          propertyType: [
+            "APARTMENT",
+            "VILLA",
+            "APARTMENT",
+            "PENTHOUSE",
+            "APARTMENT",
+            "APARTMENT",
+            "APARTMENT",
+            "APARTMENT",
+            "VILLA",
+            "COMMERCIAL",
+          ][i] as "APARTMENT" | "VILLA" | "PENTHOUSE" | "COMMERCIAL",
+          propertyName: properties[i % properties.length].name,
+          unitNumber: `${["A", "B", "C", "D"][i % 4]}${200 + i}`,
+          expectedCloseDate: expectedClose,
+          clientId: client.id,
+          ownerId: agent.id,
+          createdAt,
+        },
+      });
+    }),
+  );
+
+  console.log(`Created ${deals.length} deals`);
+
+  // Create Tasks (20 tasks)
+  const taskStatuses = ["TODO", "IN_PROGRESS", "DONE", "CANCELLED"] as const;
+  const taskPriorities = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
+
+  const taskTitles = [
+    "Follow up with client",
+    "Schedule property viewing",
+    "Prepare contract documents",
+    "Send property brochure",
+    "Arrange airport pickup",
+    "Process deposit payment",
+    "Book notary appointment",
+    "Submit citizenship application",
+    "Client meeting prep",
+    "Property valuation review",
+    "Update CRM records",
+    "Send weekly report",
+    "Call back - missed inquiry",
+    "Review offer terms",
+    "Coordinate with developer",
+    "Title deed transfer follow-up",
+    "Commission calculation",
+    "Post-sale follow-up",
+    "Market analysis report",
+    "Prepare investment proposal",
+  ];
+
+  const tasks = await Promise.all(
+    taskTitles.map((title, i) => {
+      const assignee = users[i % 5];
+      const creator = users[0]; // super admin creates
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + (i - 5)); // some overdue, some upcoming
+      const status = taskStatuses[i % taskStatuses.length];
+
+      return prisma.task.create({
+        data: {
+          title,
+          description: `Task: ${title}. Assigned to ${assignee.firstName} ${assignee.lastName}.`,
+          status,
+          priority: taskPriorities[i % taskPriorities.length],
+          dueDate,
+          completedAt: status === "DONE" ? new Date() : null,
+          assigneeId: assignee.id,
+          createdById: creator.id,
+          leadId: i < 5 ? leads[i].id : null,
+          dealId: i >= 5 && i < 15 ? deals[i - 5].id : null,
+        },
+      });
+    }),
+  );
+
+  console.log(`Created ${tasks.length} tasks`);
+
+  // Create Payments (12 payments for deals)
+  const paymentStatuses = [
+    "PENDING",
+    "RECEIVED",
+    "OVERDUE",
+    "REFUNDED",
+    "CANCELLED",
+  ] as const;
+  const paymentMethods = [
+    "BANK_TRANSFER",
+    "CASH",
+    "CREDIT_CARD",
+    "CRYPTO",
+    "CHECK",
+  ] as const;
+
+  const payments = await Promise.all(
+    Array.from({ length: 12 }, (_, i) => {
+      const deal = deals[i % deals.length];
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + (i * 15 - 30));
+      const status = paymentStatuses[i % paymentStatuses.length];
+
+      return prisma.payment.create({
+        data: {
+          dealId: deal.id,
+          clientId: deal.clientId,
+          amount: 50000 + i * 25000,
+          currency: "USD",
+          dueDate,
+          receivedAt: status === "RECEIVED" ? new Date() : null,
+          status,
+          method:
+            status === "RECEIVED"
+              ? paymentMethods[i % paymentMethods.length]
+              : null,
+          notes: [
+            "Reservation deposit",
+            "First installment",
+            "Second installment",
+            "Contract signing payment",
+            "Progress payment",
+            "Final payment",
+            "Reservation deposit",
+            "First installment",
+            "Second installment",
+            "Contract signing payment",
+            "Progress payment",
+            "Final payment",
+          ][i],
+          reference:
+            status === "RECEIVED"
+              ? `REC-2026-${String(i + 1).padStart(4, "0")}`
+              : null,
+        },
+      });
+    }),
+  );
+
+  console.log(`Created ${payments.length} payments`);
+
+  // Create Commissions (8 commissions for agents)
+  const commissionStatuses = [
+    "PENDING",
+    "APPROVED",
+    "PAID",
+    "CANCELLED",
+  ] as const;
+
+  const commissions = await Promise.all(
+    Array.from({ length: 8 }, (_, i) => {
+      const deal = deals[i % deals.length];
+      const agent = users[i % 5];
+      const status = commissionStatuses[i % commissionStatuses.length];
+
+      return prisma.commission.create({
+        data: {
+          dealId: deal.id,
+          agentId: agent.id,
+          amount: 5000 + i * 3000,
+          percentage: 2.5 + (i % 3) * 0.5,
+          currency: "USD",
+          status,
+          paidAt: status === "PAID" ? new Date() : null,
+          notes: `Commission for ${deal.title}`,
+        },
+      });
+    }),
+  );
+
+  console.log(`Created ${commissions.length} commissions`);
+
+  // Create Teams (3 teams)
+  const teams = await Promise.all([
+    prisma.team.create({
+      data: {
+        name: "Turkey Sales Team",
+        description: "Core sales team for Turkey operations",
+        managerId: users[2].id, // Mehmet - Sales Manager
+      },
+    }),
+    prisma.team.create({
+      data: {
+        name: "International Sales",
+        description: "Handles overseas client acquisition",
+        managerId: users[1].id, // Sarah - Admin UAE
+      },
+    }),
+    prisma.team.create({
+      data: {
+        name: "VIP Client Services",
+        description: "Dedicated team for high-value clients",
+        managerId: users[0].id, // Ahmed - Super Admin
+      },
+    }),
+  ]);
+
+  // Add team members
+  await prisma.teamMember.createMany({
+    data: [
+      { teamId: teams[0].id, userId: users[2].id },
+      { teamId: teams[0].id, userId: users[3].id },
+      { teamId: teams[0].id, userId: users[4].id },
+      { teamId: teams[1].id, userId: users[1].id },
+      { teamId: teams[1].id, userId: users[3].id },
+      { teamId: teams[1].id, userId: users[5].id },
+      { teamId: teams[2].id, userId: users[0].id },
+      { teamId: teams[2].id, userId: users[2].id },
+      { teamId: teams[2].id, userId: users[1].id },
+    ],
+    skipDuplicates: true,
+  });
+
+  console.log(`Created ${teams.length} teams with members`);
+
+  // Create Campaigns (4 campaigns)
+  const campaignStatuses = [
+    "DRAFT",
+    "ACTIVE",
+    "PAUSED",
+    "COMPLETED",
+    "CANCELLED",
+  ] as const;
+
+  const campaigns = await Promise.all([
+    prisma.campaign.create({
+      data: {
+        name: "Spring 2026 Property Expo",
+        description:
+          "Multi-channel campaign for upcoming Istanbul property expo",
+        status: "ACTIVE",
+        startDate: new Date("2026-03-01"),
+        endDate: new Date("2026-04-30"),
+        budget: 50000,
+        spent: 12500,
+        leadsGenerated: 45,
+        conversions: 3,
+      },
+    }),
+    prisma.campaign.create({
+      data: {
+        name: "Citizenship Investment Drive",
+        description:
+          "Targeted campaign for citizenship-eligible property buyers",
+        status: "ACTIVE",
+        startDate: new Date("2026-01-15"),
+        endDate: new Date("2026-06-30"),
+        budget: 75000,
+        spent: 28000,
+        leadsGenerated: 82,
+        conversions: 7,
+      },
+    }),
+    prisma.campaign.create({
+      data: {
+        name: "Dubai Roadshow Q1",
+        description: "Property showcase events in Dubai targeting Gulf buyers",
+        status: "COMPLETED",
+        startDate: new Date("2025-10-01"),
+        endDate: new Date("2025-12-31"),
+        budget: 30000,
+        spent: 29500,
+        leadsGenerated: 120,
+        conversions: 12,
+      },
+    }),
+    prisma.campaign.create({
+      data: {
+        name: "Social Media Summer Push",
+        description: "Instagram and Facebook ad campaign for summer season",
+        status: "DRAFT",
+        startDate: new Date("2026-06-01"),
+        endDate: new Date("2026-08-31"),
+        budget: 25000,
+        spent: 0,
+        leadsGenerated: 0,
+        conversions: 0,
+      },
+    }),
+  ]);
+
+  // Add campaign steps
+  for (const campaign of campaigns.slice(0, 2)) {
+    await Promise.all([
+      prisma.campaignStep.create({
+        data: {
+          campaignId: campaign.id,
+          stepOrder: 1,
+          name: "Initial Outreach",
+          type: "EMAIL",
+          config: { message: "Welcome email with property highlights" },
+          delayDays: 0,
+        },
+      }),
+      prisma.campaignStep.create({
+        data: {
+          campaignId: campaign.id,
+          stepOrder: 2,
+          name: "Follow-up Call",
+          type: "PHONE",
+          config: { message: "Personal call to discuss interests" },
+          delayDays: 3,
+        },
+      }),
+      prisma.campaignStep.create({
+        data: {
+          campaignId: campaign.id,
+          stepOrder: 3,
+          name: "Property Brochure",
+          type: "WHATSAPP",
+          config: { message: "Send personalized property brochure" },
+          delayDays: 7,
+        },
+      }),
+    ]);
+  }
+
+  console.log(`Created ${campaigns.length} campaigns with steps`);
+
+  // Create Notifications (20 notifications for different users)
+  const notificationTypes = [
+    "TASK_ASSIGNED",
+    "TASK_DUE",
+    "LEAD_ASSIGNED",
+    "DEAL_STAGE_CHANGED",
+    "PAYMENT_RECEIVED",
+    "COMMISSION_APPROVED",
+    "SYSTEM_ALERT",
+    "MENTION",
+  ] as const;
+
+  await Promise.all(
+    Array.from({ length: 20 }, (_, i) => {
+      const user = users[i % users.length];
+      const type = notificationTypes[i % notificationTypes.length];
+      const createdAt = new Date();
+      createdAt.setHours(createdAt.getHours() - i * 4);
+
+      return prisma.notification.create({
+        data: {
+          userId: user.id,
+          type,
+          title: [
+            "New task assigned to you",
+            "Task due tomorrow",
+            "New lead assigned",
+            "Deal moved to next stage",
+            "Payment received",
+            "Commission approved",
+            "System maintenance tonight",
+            "You were mentioned in a note",
+            "New task: Follow up with client",
+            "Overdue task reminder",
+            "Hot lead from website",
+            "Deal closed successfully",
+            "Payment overdue alert",
+            "Commission paid",
+            "New feature available",
+            "Team meeting reminder",
+            "Task completed by team member",
+            "SLA deadline approaching",
+            "New lead from Dubai expo",
+            "Deal requires attention",
+          ][i],
+          message: `Notification #${i + 1} for ${user.firstName}. Action may be required.`,
+          isRead: i < 8,
+          createdAt,
+        },
+      });
+    }),
+  );
+
+  console.log("Created 20 notifications");
+
+  // Create Audit Logs (15 logs)
+  const auditActions = [
+    "CREATE",
+    "UPDATE",
+    "DELETE",
+    "LOGIN",
+    "LOGOUT",
+    "EXPORT",
+    "ASSIGN",
+    "STAGE_CHANGE",
+  ] as const;
+
+  await Promise.all(
+    Array.from({ length: 15 }, (_, i) => {
+      const user = users[i % users.length];
+      const action = auditActions[i % auditActions.length];
+      const createdAt = new Date();
+      createdAt.setHours(createdAt.getHours() - i * 6);
+
+      return prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action,
+          entityType: [
+            "Lead",
+            "Deal",
+            "Client",
+            "Task",
+            "Payment",
+            "User",
+            "Team",
+            "Campaign",
+          ][i % 8],
+          entityId: `sample-entity-${i}`,
+          changes: JSON.stringify({
+            field: "status",
+            oldValue: "previous",
+            newValue: "current",
+          }),
+          ipAddress: `192.168.1.${100 + i}`,
+          createdAt,
+        },
+      });
+    }),
+  );
+
+  console.log("Created 15 audit logs");
+
+  // Create Activities (25 activities across leads and deals)
+  const activityTypes = [
+    "CALL",
+    "EMAIL",
+    "MEETING",
+    "NOTE",
+    "FOLLOW_UP",
+    "SITE_VISIT",
+    "STAGE_CHANGE",
+    "DOCUMENT_UPLOAD",
+    "PAYMENT_RECEIVED",
+    "TASK_COMPLETED",
+  ] as const;
+
+  await Promise.all(
+    Array.from({ length: 25 }, (_, i) => {
+      const user = users[i % users.length];
+      const type = activityTypes[i % activityTypes.length];
+      const createdAt = new Date();
+      createdAt.setDate(createdAt.getDate() - i);
+
+      return prisma.activity.create({
+        data: {
+          type,
+          title: [
+            "Called client to discuss requirements",
+            "Sent property listing email",
+            "Client meeting at office",
+            "Added note about budget preferences",
+            "Scheduled follow-up for next week",
+            "Site visit to Marina Residence",
+            "Lead moved to Qualified stage",
+            "Uploaded passport copy",
+            "Deposit payment received",
+            "Task: Send brochure completed",
+            "Follow-up call about viewing",
+            "Email: Investment opportunities",
+            "Virtual meeting with overseas client",
+            "Note: Client prefers sea view",
+            "Follow-up on offer response",
+            "Visited Green Valley Homes",
+            "Deal advanced to Contract stage",
+            "Uploaded contract draft",
+            "Second installment received",
+            "Task: Notary booking completed",
+            "Initial inquiry call",
+            "Sent citizenship info pack",
+            "Developer meeting",
+            "Updated client preferences",
+            "Scheduled property viewing",
+          ][i],
+          description: `Activity by ${user.firstName} ${user.lastName}: ${type.toLowerCase().replace("_", " ")}`,
+          leadId: i < 12 ? leads[i % leads.length].id : null,
+          dealId: i >= 12 ? deals[(i - 12) % deals.length].id : null,
+          userId: user.id,
+          createdAt,
+        },
+      });
+    }),
+  );
+
+  console.log("Created 25 activities");
 
   console.log("\n========================================");
   console.log("Seed completed successfully!");

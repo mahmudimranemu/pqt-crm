@@ -234,7 +234,7 @@ export default async function LeaderboardsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-50 rounded-lg">
+              <div className="p-2 bg-blue-50 rounded-lg">
                 <Trophy className="h-5 w-5 text-gray-900" />
               </div>
               <div>
@@ -252,7 +252,7 @@ export default async function LeaderboardsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-50 rounded-lg">
+              <div className="p-2 bg-blue-50 rounded-lg">
                 <DollarSign className="h-5 w-5 text-[#dc2626]" />
               </div>
               <div>
