@@ -56,15 +56,19 @@ export default async function DealsPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Deal Pipeline</h1>
-            <p className="text-gray-500">Track deals from reservation to completion</p>
+            <p className="text-gray-500">
+              Track deals from reservation to completion
+            </p>
           </div>
         </div>
-        <Link href="/deals/create">
-          <Button className="gap-2 bg-[#dc2626] hover:bg-[#b91c1c] text-white">
-            <Plus className="h-4 w-4" />
-            New Deal
-          </Button>
-        </Link>
+        {session.user.role !== "VIEWER" && (
+          <Link href="/deals/create">
+            <Button className="gap-2 bg-[#dc2626] hover:bg-[#b91c1c] text-white">
+              <Plus className="h-4 w-4" />
+              New Deal
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Stats */}
@@ -79,7 +83,9 @@ export default async function DealsPage() {
                     {stat.value}
                   </p>
                 </div>
-                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.bg}`}>
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.bg}`}
+                >
                   <stat.icon className={`h-5 w-5 ${stat.color}`} />
                 </div>
               </div>
@@ -89,7 +95,7 @@ export default async function DealsPage() {
       </div>
 
       {/* Kanban Board */}
-      <DealKanban initialData={stageData} />
+      <DealKanban initialData={stageData} userRole={session.user.role} />
     </div>
   );
 }

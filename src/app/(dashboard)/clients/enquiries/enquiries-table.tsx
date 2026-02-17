@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +31,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
 import {
   CheckSquare,
@@ -41,12 +52,15 @@ import {
   Loader2,
   UserPlus,
   Download,
+  Trash2,
 } from "lucide-react";
 import {
   updateEnquiryField,
   convertToClient,
   assignEnquiryToPool,
   removeEnquiryFromPool,
+  deleteEnquiry,
+  bulkDeleteEnquiries,
 } from "@/lib/actions/enquiries";
 import { createBooking } from "@/lib/actions/bookings";
 import { createSale } from "@/lib/actions/sales";
@@ -102,6 +116,7 @@ interface EnquiriesTableProps {
   total: number;
   pages: number;
   currentPage: number;
+  userRole?: string;
 }
 
 const sourceLabels: Record<string, string> = {
@@ -142,9 +157,74 @@ export function EnquiriesTable({
   total,
   pages,
   currentPage,
+  userRole,
 }: EnquiriesTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  // Bulk delete state
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
+
+  const canDelete = userRole === "SUPER_ADMIN";
+
+  const toggleSelectAll = () => {
+    if (selectedRows.size === enquiries.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(enquiries.map((e) => e.id)));
+    }
+  };
+
+  const toggleSelectRow = (id: string) => {
+    const next = new Set(selectedRows);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedRows(next);
+  };
+
+  const handleDeleteSingle = () => {
+    if (!deleteId) return;
+    startTransition(async () => {
+      try {
+        await deleteEnquiry(deleteId);
+        toast({
+          title: "Enquiry deleted",
+          description: "The enquiry has been removed.",
+        });
+        setDeleteId(null);
+        router.refresh();
+      } catch {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to delete enquiry.",
+        });
+      }
+    });
+  };
+
+  const handleBulkDelete = () => {
+    startTransition(async () => {
+      try {
+        await bulkDeleteEnquiries(Array.from(selectedRows));
+        toast({
+          title: "Enquiries deleted",
+          description: `${selectedRows.size} enquiry(ies) deleted.`,
+        });
+        setSelectedRows(new Set());
+        setShowBulkDelete(false);
+        router.refresh();
+      } catch {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to delete enquiries.",
+        });
+      }
+    });
+  };
 
   // Reallocate dialog state
   const [reallocateOpen, setReallocateOpen] = useState(false);
@@ -431,6 +511,22 @@ export function EnquiriesTable({
 
   return (
     <>
+      {/* Bulk Delete Bar */}
+      {canDelete && selectedRows.size > 0 && (
+        <div className="flex items-center gap-3 border-b border-red-200 bg-red-50 px-4 py-2">
+          <span className="text-sm font-medium text-red-700">
+            {selectedRows.size} selected
+          </span>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => setShowBulkDelete(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Delete Selected
+          </Button>
+        </div>
+      )}
       <div className="flex items-center justify-end px-4 py-2">
         <Button variant="outline" size="sm" onClick={handleExportCSV}>
           <Download className="h-4 w-4 mr-1" />
@@ -441,6 +537,17 @@ export function EnquiriesTable({
         <Table>
           <TableHeader>
             <TableRow className="border-b border-gray-100">
+              {canDelete && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={
+                      selectedRows.size === enquiries.length &&
+                      enquiries.length > 0
+                    }
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
+              )}
               <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap">
                 ID
               </TableHead>
@@ -492,6 +599,7 @@ export function EnquiriesTable({
               <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap">
                 Actions
               </TableHead>
+              {canDelete && <TableHead className="w-[40px]"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -503,6 +611,15 @@ export function EnquiriesTable({
                   key={enquiry.id}
                   className="border-b border-gray-50 hover:bg-gray-50/50"
                 >
+                  {/* Checkbox */}
+                  {canDelete && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedRows.has(enquiry.id)}
+                        onCheckedChange={() => toggleSelectRow(enquiry.id)}
+                      />
+                    </TableCell>
+                  )}
                   {/* ID */}
                   <TableCell className="text-xs font-medium text-gray-500 whitespace-nowrap">
                     {refId}
@@ -811,6 +928,19 @@ export function EnquiriesTable({
                       </Button>
                     </div>
                   </TableCell>
+                  {/* Delete */}
+                  {canDelete && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => setDeleteId(enquiry.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               );
             })}
@@ -1331,6 +1461,55 @@ export function EnquiriesTable({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Single Delete Dialog */}
+      <AlertDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Enquiry</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this enquiry? This action cannot
+              be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSingle}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Dialog */}
+      <AlertDialog open={showBulkDelete} onOpenChange={setShowBulkDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedRows.size} Enquiry(ies)
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedRows.size} selected
+              enquiry(ies)? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete {selectedRows.size} Enquiry(ies)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

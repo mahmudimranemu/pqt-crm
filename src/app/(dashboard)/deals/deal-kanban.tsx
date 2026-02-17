@@ -3,11 +3,27 @@
 import { useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { updateDealStage, closeDealLost } from "@/lib/actions/deals";
+import {
+  updateDealStage,
+  closeDealLost,
+  deleteDeal,
+} from "@/lib/actions/deals";
 import { LostReasonDialog } from "./lost-reason-dialog";
-import { Phone, GripVertical } from "lucide-react";
+import { Phone, GripVertical, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "@/components/ui/use-toast";
 
 const STAGES = [
   {
@@ -60,9 +76,10 @@ interface DealCard {
 
 interface DealKanbanProps {
   initialData: Record<string, DealCard[]>;
+  userRole?: string;
 }
 
-export function DealKanban({ initialData }: DealKanbanProps) {
+export function DealKanban({ initialData, userRole }: DealKanbanProps) {
   const [data, setData] = useState(initialData);
   const [draggedDeal, setDraggedDeal] = useState<{
     deal: DealCard;
@@ -75,6 +92,37 @@ export function DealKanban({ initialData }: DealKanbanProps) {
     deal: DealCard;
     fromStage: string;
   } | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const canDelete = userRole === "SUPER_ADMIN";
+
+  const handleDeleteDeal = () => {
+    if (!deleteId) return;
+    startTransition(async () => {
+      try {
+        await deleteDeal(deleteId);
+        // Remove from local state
+        setData((prev) => {
+          const updated = { ...prev };
+          for (const stage of Object.keys(updated)) {
+            updated[stage] = updated[stage].filter((d) => d.id !== deleteId);
+          }
+          return updated;
+        });
+        toast({
+          title: "Deal deleted",
+          description: "The deal has been removed.",
+        });
+        setDeleteId(null);
+      } catch {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to delete deal.",
+        });
+      }
+    });
+  };
 
   const handleDragStart = (deal: DealCard, stage: string) => {
     setDraggedDeal({ deal, fromStage: stage });
@@ -276,6 +324,19 @@ export function DealKanban({ initialData }: DealKanbanProps) {
                                 {deal.owner.lastName[0]}
                               </div>
                             )}
+                            {canDelete && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  setDeleteId(deal.id);
+                                }}
+                                className="flex h-5 w-5 items-center justify-center rounded text-red-400 hover:text-red-600 hover:bg-red-50"
+                                title="Delete deal"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -302,6 +363,31 @@ export function DealKanban({ initialData }: DealKanbanProps) {
         }}
         onConfirm={handleLostReasonConfirm}
       />
+
+      {/* Delete Deal Dialog */}
+      <AlertDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Deal</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this deal? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteDeal}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

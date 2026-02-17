@@ -1,46 +1,14 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { getClients, getAgentsForAssignment } from "@/lib/actions/clients";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, Filter } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { Plus } from "lucide-react";
 import { ClientFilters } from "./client-filters";
+import { ClientsTableContent } from "./clients-table";
 import type { ClientStatus, LeadSource } from "@prisma/client";
-
-const statusColors: Record<ClientStatus, "default" | "secondary" | "success" | "warning" | "destructive"> = {
-  NEW_LEAD: "secondary",
-  CONTACTED: "default",
-  QUALIFIED: "default",
-  VIEWING_SCHEDULED: "warning",
-  VIEWED: "warning",
-  NEGOTIATING: "warning",
-  DEAL_CLOSED: "success",
-  LOST: "destructive",
-  INACTIVE: "outline" as "default",
-};
-
-const statusLabels: Record<ClientStatus, string> = {
-  NEW_LEAD: "New Lead",
-  CONTACTED: "Contacted",
-  QUALIFIED: "Qualified",
-  VIEWING_SCHEDULED: "Viewing Scheduled",
-  VIEWED: "Viewed",
-  NEGOTIATING: "Negotiating",
-  DEAL_CLOSED: "Deal Closed",
-  LOST: "Lost",
-  INACTIVE: "Inactive",
-};
 
 interface PageProps {
   searchParams: Promise<{
@@ -52,7 +20,13 @@ interface PageProps {
   }>;
 }
 
-async function ClientsTable({ searchParams }: { searchParams: PageProps["searchParams"] }) {
+async function ClientsTableWrapper({
+  searchParams,
+  userRole,
+}: {
+  searchParams: PageProps["searchParams"];
+  userRole: string;
+}) {
   const params = await searchParams;
   const { clients, total, pages, currentPage } = await getClients({
     search: params.search,
@@ -62,110 +36,20 @@ async function ClientsTable({ searchParams }: { searchParams: PageProps["searchP
     page: params.page ? parseInt(params.page) : 1,
   });
 
-  if (clients.length === 0) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-muted-foreground">No clients found.</p>
-        <Link href="/clients/create">
-          <Button className="mt-4">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Your First Client
-          </Button>
-        </Link>
-      </div>
-    );
-  }
-
   return (
-    <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Contact</TableHead>
-            <TableHead>Nationality</TableHead>
-            <TableHead>Budget</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Agent</TableHead>
-            <TableHead>Created</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {clients.map((client) => (
-            <TableRow key={client.id}>
-              <TableCell>
-                <Link
-                  href={`/clients/${client.id}`}
-                  className="font-medium text-gray-900 hover:underline"
-                >
-                  {client.firstName} {client.lastName}
-                </Link>
-              </TableCell>
-              <TableCell>
-                <div className="text-sm">
-                  <div>{client.email}</div>
-                  <div className="text-muted-foreground">{client.phone}</div>
-                </div>
-              </TableCell>
-              <TableCell>{client.nationality}</TableCell>
-              <TableCell>
-                <span className="text-sm">
-                  {formatCurrency(Number(client.budgetMin))} -{" "}
-                  {formatCurrency(Number(client.budgetMax))}
-                </span>
-              </TableCell>
-              <TableCell>
-                <Badge variant={statusColors[client.status]}>
-                  {statusLabels[client.status]}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                {client.assignedAgent ? (
-                  <span className="text-sm">
-                    {client.assignedAgent.firstName} {client.assignedAgent.lastName}
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground text-sm">Unassigned</span>
-                )}
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {formatDate(client.createdAt)}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-
-      {/* Pagination */}
-      {pages > 1 && (
-        <div className="flex items-center justify-between px-2 py-4">
-          <p className="text-sm text-muted-foreground">
-            Showing {(currentPage - 1) * 25 + 1} to{" "}
-            {Math.min(currentPage * 25, total)} of {total} clients
-          </p>
-          <div className="flex gap-2">
-            {currentPage > 1 && (
-              <Link
-                href={`/clients?page=${currentPage - 1}${params.search ? `&search=${params.search}` : ""}${params.status ? `&status=${params.status}` : ""}`}
-              >
-                <Button variant="outline" size="sm">
-                  Previous
-                </Button>
-              </Link>
-            )}
-            {currentPage < pages && (
-              <Link
-                href={`/clients?page=${currentPage + 1}${params.search ? `&search=${params.search}` : ""}${params.status ? `&status=${params.status}` : ""}`}
-              >
-                <Button variant="outline" size="sm">
-                  Next
-                </Button>
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-    </>
+    <ClientsTableContent
+      clients={clients}
+      total={total}
+      pages={pages}
+      currentPage={currentPage}
+      searchParams={{
+        search: params.search,
+        status: params.status,
+        agent: params.agent,
+        source: params.source,
+      }}
+      userRole={userRole}
+    />
   );
 }
 
@@ -182,7 +66,9 @@ function ClientsTableSkeleton() {
 }
 
 export default async function ClientsPage({ searchParams }: PageProps) {
+  const session = (await auth()) as ExtendedSession | null;
   const agents = await getAgentsForAssignment();
+  const userRole = session?.user?.role || "VIEWER";
 
   return (
     <div className="space-y-6">
@@ -194,12 +80,14 @@ export default async function ClientsPage({ searchParams }: PageProps) {
             Manage your client database and track their journey
           </p>
         </div>
-        <Link href="/clients/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Client
-          </Button>
-        </Link>
+        {session?.user?.role !== "VIEWER" && (
+          <Link href="/clients/create">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Client
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Filters */}
@@ -212,7 +100,10 @@ export default async function ClientsPage({ searchParams }: PageProps) {
         </CardHeader>
         <CardContent>
           <Suspense fallback={<ClientsTableSkeleton />}>
-            <ClientsTable searchParams={searchParams} />
+            <ClientsTableWrapper
+              searchParams={searchParams}
+              userRole={userRole}
+            />
           </Suspense>
         </CardContent>
       </Card>

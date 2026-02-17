@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { getCitizenshipApplications, getCitizenshipStats } from "@/lib/actions/citizenship";
+import { auth, type ExtendedSession } from "@/lib/auth";
+import {
+  getCitizenshipApplications,
+  getCitizenshipStats,
+} from "@/lib/actions/citizenship";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +18,10 @@ import {
 import { Plus, Flag, Clock, CheckCircle, Award, Users } from "lucide-react";
 import type { CitizenshipStage } from "@prisma/client";
 
-const stageColors: Record<CitizenshipStage, "default" | "secondary" | "success" | "warning" | "destructive"> = {
+const stageColors: Record<
+  CitizenshipStage,
+  "default" | "secondary" | "success" | "warning" | "destructive"
+> = {
   DOCUMENT_COLLECTION: "secondary",
   PROPERTY_VALUATION: "secondary",
   APPLICATION_FILED: "default",
@@ -43,6 +50,7 @@ const stageLabels: Record<CitizenshipStage, string> = {
 };
 
 export default async function CitizenshipPage() {
+  const session = (await auth()) as ExtendedSession | null;
   const [{ applications, total }, stats] = await Promise.all([
     getCitizenshipApplications(),
     getCitizenshipStats(),
@@ -59,28 +67,36 @@ export default async function CitizenshipPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Citizenship Applications</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Citizenship Applications
+          </h1>
           <p className="text-muted-foreground">
             Track Turkish citizenship by investment applications
           </p>
         </div>
-        <Link href="/citizenship/create">
-          <Button className="bg-[#dc2626] hover:bg-[#dc2626]/90">
-            <Plus className="h-4 w-4 mr-2" />
-            New Application
-          </Button>
-        </Link>
+        {session?.user?.role !== "VIEWER" && (
+          <Link href="/citizenship/create">
+            <Button className="bg-[#dc2626] hover:bg-[#dc2626]/90">
+              <Plus className="h-4 w-4 mr-2" />
+              New Application
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
         {statCards.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+              <div className="text-2xl font-bold text-gray-900">
+                {stat.value}
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -93,7 +109,9 @@ export default async function CitizenshipPage() {
         <CardContent>
           {applications.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">No citizenship applications yet.</p>
+              <p className="text-muted-foreground">
+                No citizenship applications yet.
+              </p>
               <Link href="/citizenship/create">
                 <Button variant="outline" className="mt-4">
                   <Plus className="h-4 w-4 mr-2" />
@@ -122,7 +140,8 @@ export default async function CitizenshipPage() {
                         href={`/citizenship/${app.id}`}
                         className="font-medium text-gray-900 hover:underline"
                       >
-                        {app.applicationNumber || app.id.slice(0, 8).toUpperCase()}
+                        {app.applicationNumber ||
+                          app.id.slice(0, 8).toUpperCase()}
                       </Link>
                     </TableCell>
                     <TableCell>
@@ -137,9 +156,7 @@ export default async function CitizenshipPage() {
                         {app.client.nationality}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      {app.sale.property.name}
-                    </TableCell>
+                    <TableCell>{app.sale.property.name}</TableCell>
                     <TableCell>
                       {app.sale.agent.firstName} {app.sale.agent.lastName}
                     </TableCell>

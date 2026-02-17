@@ -1,8 +1,11 @@
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { getSalesBookings } from "@/lib/actions/bookings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookingTable } from "../booking-table";
 
 export default async function SalesBookingsPage() {
+  const session = (await auth()) as ExtendedSession | null;
+  const userRole = session?.user?.role || "VIEWER";
   const { bookings, total } = await getSalesBookings();
 
   return (
@@ -21,10 +24,7 @@ export default async function SalesBookingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <BookingTable
-            bookings={bookings}
-            showOutcome
-          />
+          <BookingTable bookings={bookings} showOutcome userRole={userRole} />
         </CardContent>
       </Card>
     </div>

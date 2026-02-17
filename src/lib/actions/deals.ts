@@ -247,6 +247,19 @@ export async function updateDeal(data: UpdateDealData) {
   return deal;
 }
 
+export async function bulkDeleteDeals(ids: string[]) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role !== "SUPER_ADMIN")
+    throw new Error("Unauthorized: Only SUPER_ADMIN can bulk delete");
+
+  await prisma.deal.deleteMany({
+    where: { id: { in: ids } },
+  });
+
+  revalidatePath("/deals");
+}
+
 export async function updateDealStage(id: string, stage: DealStage) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -48,15 +49,17 @@ const statusLabels: Record<BookingStatus, string> = {
 };
 
 export default function BookingCalendarPage() {
+  const { data: sessionData } = useSession();
   const [bookings, setBookings] = useState<CalendarBooking[]>([]);
-  const [selectedBooking, setSelectedBooking] = useState<CalendarBooking | null>(null);
+  const [selectedBooking, setSelectedBooking] =
+    useState<CalendarBooking | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchBookings = async (start: Date, end: Date) => {
     setIsLoading(true);
     try {
       const response = await fetch(
-        `/api/bookings/calendar?start=${start.toISOString()}&end=${end.toISOString()}`
+        `/api/bookings/calendar?start=${start.toISOString()}&end=${end.toISOString()}`,
       );
       if (response.ok) {
         const data = await response.json();
@@ -95,12 +98,14 @@ export default function BookingCalendarPage() {
             View and manage property viewings and appointments
           </p>
         </div>
-        <Link href="/bookings/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Booking
-          </Button>
-        </Link>
+        {(sessionData?.user as any)?.role !== "VIEWER" && (
+          <Link href="/bookings/create">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Booking
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Legend */}
@@ -111,7 +116,9 @@ export default function BookingCalendarPage() {
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: color }}
             />
-            <span className="text-sm">{statusLabels[status as BookingStatus]}</span>
+            <span className="text-sm">
+              {statusLabels[status as BookingStatus]}
+            </span>
           </div>
         ))}
       </div>
@@ -145,7 +152,10 @@ export default function BookingCalendarPage() {
       </Card>
 
       {/* Booking Detail Dialog */}
-      <Dialog open={!!selectedBooking} onOpenChange={() => setSelectedBooking(null)}>
+      <Dialog
+        open={!!selectedBooking}
+        onOpenChange={() => setSelectedBooking(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Booking Details</DialogTitle>
@@ -154,7 +164,9 @@ export default function BookingCalendarPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Badge
-                  style={{ backgroundColor: statusColors[selectedBooking.status] }}
+                  style={{
+                    backgroundColor: statusColors[selectedBooking.status],
+                  }}
                   className="text-white"
                 >
                   {statusLabels[selectedBooking.status]}
@@ -183,7 +195,8 @@ export default function BookingCalendarPage() {
                       href={`/clients/${selectedBooking.client.id}`}
                       className="text-sm text-gray-900 hover:underline"
                     >
-                      {selectedBooking.client.firstName} {selectedBooking.client.lastName}
+                      {selectedBooking.client.firstName}{" "}
+                      {selectedBooking.client.lastName}
                     </Link>
                   </div>
                 </div>
@@ -209,17 +222,24 @@ export default function BookingCalendarPage() {
                   <div>
                     <p className="font-medium">Agent</p>
                     <p className="text-sm text-muted-foreground">
-                      {selectedBooking.agent.firstName} {selectedBooking.agent.lastName}
+                      {selectedBooking.agent.firstName}{" "}
+                      {selectedBooking.agent.lastName}
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Link href={`/bookings/${selectedBooking.id}`} className="flex-1">
+                <Link
+                  href={`/bookings/${selectedBooking.id}`}
+                  className="flex-1"
+                >
                   <Button className="w-full">View Details</Button>
                 </Link>
-                <Button variant="outline" onClick={() => setSelectedBooking(null)}>
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedBooking(null)}
+                >
                   Close
                 </Button>
               </div>

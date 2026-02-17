@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { getPendingBookings } from "@/lib/actions/bookings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Clock } from "lucide-react";
 import { BookingTable } from "../booking-table";
 
-async function PendingBookingsTable() {
+async function PendingBookingsTable({ userRole }: { userRole: string }) {
   const { bookings, total } = await getPendingBookings();
 
   return (
@@ -17,12 +18,14 @@ async function PendingBookingsTable() {
           {total} pending booking{total !== 1 ? "s" : ""} awaiting outcome
         </p>
       </div>
-      <BookingTable bookings={bookings} />
+      <BookingTable bookings={bookings} userRole={userRole} />
     </>
   );
 }
 
-export default function PendingBookingsPage() {
+export default async function PendingBookingsPage() {
+  const session = (await auth()) as ExtendedSession | null;
+  const userRole = session?.user?.role || "VIEWER";
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -32,12 +35,14 @@ export default function PendingBookingsPage() {
             Bookings awaiting completion or outcome update
           </p>
         </div>
-        <Link href="/bookings/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Booking
-          </Button>
-        </Link>
+        {session?.user?.role !== "VIEWER" && (
+          <Link href="/bookings/create">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Booking
+            </Button>
+          </Link>
+        )}
       </div>
 
       <Card>
@@ -49,7 +54,7 @@ export default function PendingBookingsPage() {
         </CardHeader>
         <CardContent>
           <Suspense fallback={<Skeleton className="h-[400px] w-full" />}>
-            <PendingBookingsTable />
+            <PendingBookingsTable userRole={userRole} />
           </Suspense>
         </CardContent>
       </Card>

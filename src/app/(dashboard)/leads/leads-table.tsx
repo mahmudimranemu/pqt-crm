@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -13,6 +14,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Eye,
   Phone,
@@ -24,14 +35,18 @@ import {
   Tag,
   MessageSquare,
   Download,
+  Trash2,
 } from "lucide-react";
 import {
   updateLeadField,
   updateLeadStage,
   assignLeadToPool,
   removeLeadFromPool,
+  deleteLead,
+  bulkDeleteLeads,
 } from "@/lib/actions/leads";
 import { generateCSV, downloadCSV } from "@/lib/export";
+import { toast } from "@/components/ui/use-toast";
 
 const stageColors: Record<string, string> = {
   NEW_ENQUIRY: "bg-gray-100 text-gray-700",
@@ -125,6 +140,7 @@ interface LeadsTableProps {
   total: number;
   pages: number;
   currentPage: number;
+  userRole?: string;
 }
 
 export function LeadsTable({
@@ -133,9 +149,72 @@ export function LeadsTable({
   total,
   pages,
   currentPage,
+  userRole,
 }: LeadsTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
+
+  const canDelete = userRole === "SUPER_ADMIN";
+
+  const toggleSelectAll = () => {
+    if (selectedRows.size === leads.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(leads.map((l) => l.id)));
+    }
+  };
+
+  const toggleSelectRow = (id: string) => {
+    const next = new Set(selectedRows);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedRows(next);
+  };
+
+  const handleDelete = () => {
+    if (!deleteId) return;
+    startTransition(async () => {
+      try {
+        await deleteLead(deleteId);
+        toast({
+          title: "Lead deleted",
+          description: "The lead has been removed.",
+        });
+        setDeleteId(null);
+        router.refresh();
+      } catch {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to delete lead.",
+        });
+      }
+    });
+  };
+
+  const handleBulkDelete = () => {
+    startTransition(async () => {
+      try {
+        await bulkDeleteLeads(Array.from(selectedRows));
+        toast({
+          title: "Leads deleted",
+          description: `${selectedRows.size} lead(s) deleted.`,
+        });
+        setSelectedRows(new Set());
+        setShowBulkDelete(false);
+        router.refresh();
+      } catch {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to delete leads.",
+        });
+      }
+    });
+  };
 
   function handleFieldChange(
     leadId: string,
@@ -180,6 +259,22 @@ export function LeadsTable({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white">
+      {/* Bulk Delete Bar */}
+      {canDelete && selectedRows.size > 0 && (
+        <div className="flex items-center gap-3 border-b border-red-200 bg-red-50 px-4 py-2">
+          <span className="text-sm font-medium text-red-700">
+            {selectedRows.size} selected
+          </span>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => setShowBulkDelete(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-1" />
+            Delete Selected
+          </Button>
+        </div>
+      )}
       <div className="flex items-center justify-end px-4 py-2 border-b border-gray-100">
         <Button variant="outline" size="sm" onClick={handleExportCSV}>
           <Download className="h-4 w-4 mr-1" />
@@ -190,6 +285,16 @@ export function LeadsTable({
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50">
+              {canDelete && (
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={
+                      selectedRows.size === leads.length && leads.length > 0
+                    }
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
+              )}
               <TableHead className="w-[100px]">Lead #</TableHead>
               <TableHead>Client</TableHead>
               <TableHead>Title</TableHead>
@@ -201,6 +306,7 @@ export function LeadsTable({
               <TableHead>Tags</TableHead>
               <TableHead>Owner</TableHead>
               <TableHead className="w-[80px]">Actions</TableHead>
+              {canDelete && <TableHead className="w-[40px]"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -219,6 +325,15 @@ export function LeadsTable({
                   key={lead.id}
                   className={`hover:bg-gray-50 ${isPending ? "opacity-60" : ""}`}
                 >
+                  {/* Checkbox */}
+                  {canDelete && (
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedRows.has(lead.id)}
+                        onCheckedChange={() => toggleSelectRow(lead.id)}
+                      />
+                    </TableCell>
+                  )}
                   {/* Lead Number */}
                   <TableCell className="text-xs font-mono text-gray-500">
                     {lead.leadNumber}
@@ -430,6 +545,19 @@ export function LeadsTable({
                       )}
                     </div>
                   </TableCell>
+                  {/* Delete */}
+                  {canDelete && (
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => setDeleteId(lead.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
@@ -469,6 +597,55 @@ export function LeadsTable({
           </div>
         </div>
       )}
+
+      {/* Single Delete Dialog */}
+      <AlertDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this lead? This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Dialog */}
+      <AlertDialog open={showBulkDelete} onOpenChange={setShowBulkDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {selectedRows.size} Lead(s)
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedRows.size} selected
+              lead(s)? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete {selectedRows.size} Lead(s)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

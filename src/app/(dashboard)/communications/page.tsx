@@ -1,3 +1,4 @@
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { getCallLogs, getCallStats } from "@/lib/actions/communications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +22,10 @@ import type { CallType, CallOutcome } from "@prisma/client";
 import { LogCallDialog } from "./log-call-dialog";
 import Link from "next/link";
 
-const outcomeColors: Record<CallOutcome, "default" | "secondary" | "success" | "warning" | "destructive"> = {
+const outcomeColors: Record<
+  CallOutcome,
+  "default" | "secondary" | "success" | "warning" | "destructive"
+> = {
   CONNECTED: "success",
   VOICEMAIL: "warning",
   NO_ANSWER: "secondary",
@@ -45,6 +49,7 @@ function formatDuration(seconds: number) {
 }
 
 export default async function CommunicationsPage() {
+  const session = (await auth()) as ExtendedSession | null;
   const [{ calls, total }, stats] = await Promise.all([
     getCallLogs(),
     getCallStats(),
@@ -86,19 +91,25 @@ export default async function CommunicationsPage() {
             Track calls and client communications
           </p>
         </div>
-        <LogCallDialog />
+        {session?.user?.role !== "VIEWER" && <LogCallDialog />}
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
         {statCards.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">{stat.description}</p>
+              <div className="text-2xl font-bold text-gray-900">
+                {stat.value}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {stat.description}
+              </p>
             </CardContent>
           </Card>
         ))}
@@ -113,7 +124,7 @@ export default async function CommunicationsPage() {
             <div className="text-center py-12">
               <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No calls logged yet.</p>
-              <LogCallDialog />
+              {session?.user?.role !== "VIEWER" && <LogCallDialog />}
             </div>
           ) : (
             <Table>

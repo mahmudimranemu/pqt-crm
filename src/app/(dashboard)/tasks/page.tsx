@@ -47,7 +47,9 @@ export default async function TasksPage() {
   ]);
 
   const todoCount = tasks.filter((t) => t.status === "TODO").length;
-  const inProgressCount = tasks.filter((t) => t.status === "IN_PROGRESS").length;
+  const inProgressCount = tasks.filter(
+    (t) => t.status === "IN_PROGRESS",
+  ).length;
   const doneCount = tasks.filter((t) => t.status === "DONE").length;
 
   return (
@@ -63,10 +65,12 @@ export default async function TasksPage() {
             <p className="text-gray-500">Manage your tasks and to-dos</p>
           </div>
         </div>
-        <Button className="gap-2 bg-[#dc2626] hover:bg-[#b91c1c] text-white">
-          <Plus className="h-4 w-4" />
-          New Task
-        </Button>
+        {session.user.role !== "VIEWER" && (
+          <Button className="gap-2 bg-[#dc2626] hover:bg-[#b91c1c] text-white">
+            <Plus className="h-4 w-4" />
+            New Task
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -76,7 +80,9 @@ export default async function TasksPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">To Do</p>
-                <p className="mt-1 text-2xl font-bold text-gray-900">{todoCount}</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900">
+                  {todoCount}
+                </p>
               </div>
               <Circle className="h-5 w-5 text-gray-400" />
             </div>
@@ -87,7 +93,9 @@ export default async function TasksPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">In Progress</p>
-                <p className="mt-1 text-2xl font-bold text-gray-900">{inProgressCount}</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900">
+                  {inProgressCount}
+                </p>
               </div>
               <Clock className="h-5 w-5 text-blue-500" />
             </div>
@@ -98,7 +106,9 @@ export default async function TasksPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Completed</p>
-                <p className="mt-1 text-2xl font-bold text-gray-900">{doneCount}</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900">
+                  {doneCount}
+                </p>
               </div>
               <CheckCircle className="h-5 w-5 text-emerald-500" />
             </div>
@@ -109,9 +119,13 @@ export default async function TasksPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Overdue</p>
-                <p className="mt-1 text-2xl font-bold text-gray-900">{overdueCount}</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900">
+                  {overdueCount}
+                </p>
               </div>
-              <AlertTriangle className={`h-5 w-5 ${overdueCount > 0 ? "text-red-500" : "text-gray-400"}`} />
+              <AlertTriangle
+                className={`h-5 w-5 ${overdueCount > 0 ? "text-red-500" : "text-gray-400"}`}
+              />
             </div>
           </CardContent>
         </Card>
@@ -123,39 +137,69 @@ export default async function TasksPage() {
           {tasks.length === 0 ? (
             <div className="py-12 text-center">
               <CheckSquare className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-              <p className="text-gray-500">No tasks yet. Create one to get started.</p>
+              <p className="text-gray-500">
+                No tasks yet. Create one to get started.
+              </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="border-b border-gray-100 bg-gray-50/50">
-                  <TableHead className="text-xs font-medium text-gray-500">Status</TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500">Task</TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500">Priority</TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500">Assigned To</TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500">Related To</TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500">Due Date</TableHead>
-                  <TableHead className="text-xs font-medium text-gray-500">Actions</TableHead>
+                  <TableHead className="text-xs font-medium text-gray-500">
+                    Status
+                  </TableHead>
+                  <TableHead className="text-xs font-medium text-gray-500">
+                    Task
+                  </TableHead>
+                  <TableHead className="text-xs font-medium text-gray-500">
+                    Priority
+                  </TableHead>
+                  <TableHead className="text-xs font-medium text-gray-500">
+                    Assigned To
+                  </TableHead>
+                  <TableHead className="text-xs font-medium text-gray-500">
+                    Related To
+                  </TableHead>
+                  <TableHead className="text-xs font-medium text-gray-500">
+                    Due Date
+                  </TableHead>
+                  <TableHead className="text-xs font-medium text-gray-500">
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {tasks.map((task) => {
                   const StatusIcon = statusIcons[task.status] || Circle;
-                  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "DONE";
+                  const isOverdue =
+                    task.dueDate &&
+                    new Date(task.dueDate) < new Date() &&
+                    task.status !== "DONE";
 
                   return (
-                    <TableRow key={task.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <TableRow
+                      key={task.id}
+                      className="border-b border-gray-50 hover:bg-gray-50/50"
+                    >
                       <TableCell>
-                        <StatusIcon className={`h-4 w-4 ${
-                          task.status === "DONE" ? "text-emerald-500" :
-                          task.status === "IN_PROGRESS" ? "text-blue-500" :
-                          "text-gray-400"
-                        }`} />
+                        <StatusIcon
+                          className={`h-4 w-4 ${
+                            task.status === "DONE"
+                              ? "text-emerald-500"
+                              : task.status === "IN_PROGRESS"
+                                ? "text-blue-500"
+                                : "text-gray-400"
+                          }`}
+                        />
                       </TableCell>
                       <TableCell>
-                        <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {task.title}
+                        </p>
                         {task.description && (
-                          <p className="mt-0.5 text-xs text-gray-500 line-clamp-1">{task.description}</p>
+                          <p className="mt-0.5 text-xs text-gray-500 line-clamp-1">
+                            {task.description}
+                          </p>
                         )}
                       </TableCell>
                       <TableCell>
@@ -168,11 +212,17 @@ export default async function TasksPage() {
                       </TableCell>
                       <TableCell className="text-sm text-gray-600">
                         {task.lead ? (
-                          <Link href={`/leads/${task.lead.id}`} className="text-[#dc2626] hover:underline">
+                          <Link
+                            href={`/leads/${task.lead.id}`}
+                            className="text-[#dc2626] hover:underline"
+                          >
                             {task.lead.title}
                           </Link>
                         ) : task.deal ? (
-                          <Link href={`/deals/${task.deal.id}`} className="text-blue-600 hover:underline">
+                          <Link
+                            href={`/deals/${task.deal.id}`}
+                            className="text-blue-600 hover:underline"
+                          >
                             {task.deal.title}
                           </Link>
                         ) : (
@@ -181,7 +231,9 @@ export default async function TasksPage() {
                       </TableCell>
                       <TableCell>
                         {task.dueDate ? (
-                          <span className={`text-sm ${isOverdue ? "font-medium text-red-600" : "text-gray-600"}`}>
+                          <span
+                            className={`text-sm ${isOverdue ? "font-medium text-red-600" : "text-gray-600"}`}
+                          >
                             {new Date(task.dueDate).toLocaleDateString()}
                           </span>
                         ) : (

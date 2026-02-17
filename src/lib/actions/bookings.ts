@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { auth, type ExtendedSession } from "@/lib/auth";
-import type { BookingStatus, BookingOutcome, BookingType } from "@prisma/client";
+import type {
+  BookingStatus,
+  BookingOutcome,
+  BookingType,
+} from "@prisma/client";
 
 export interface BookingFormData {
   clientId: string;
@@ -17,7 +21,7 @@ export interface BookingFormData {
 
 // Get all bookings for calendar
 export async function getBookingsForCalendar(start: Date, end: Date) {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
   const where: Record<string, unknown> = {
@@ -55,7 +59,7 @@ export async function getFutureBookings(params?: {
   page?: number;
   limit?: number;
 }) {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
   const { agentId, page = 1, limit = 25 } = params || {};
@@ -82,7 +86,9 @@ export async function getFutureBookings(params?: {
       where,
       include: {
         client: { select: { id: true, firstName: true, lastName: true } },
-        property: { select: { id: true, name: true, pqtNumber: true, district: true } },
+        property: {
+          select: { id: true, name: true, pqtNumber: true, district: true },
+        },
         agent: { select: { id: true, firstName: true, lastName: true } },
       },
       orderBy: { bookingDate: "asc" },
@@ -92,12 +98,20 @@ export async function getFutureBookings(params?: {
     prisma.booking.count({ where }),
   ]);
 
-  return { bookings, total, pages: Math.ceil(total / limit), currentPage: page };
+  return {
+    bookings,
+    total,
+    pages: Math.ceil(total / limit),
+    currentPage: page,
+  };
 }
 
 // Get no-sales bookings
-export async function getNoSalesBookings(params?: { page?: number; limit?: number }) {
-  const session = await auth() as ExtendedSession | null;
+export async function getNoSalesBookings(params?: {
+  page?: number;
+  limit?: number;
+}) {
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
   const { page = 1, limit = 25 } = params || {};
@@ -132,12 +146,20 @@ export async function getNoSalesBookings(params?: { page?: number; limit?: numbe
     prisma.booking.count({ where }),
   ]);
 
-  return { bookings, total, pages: Math.ceil(total / limit), currentPage: page };
+  return {
+    bookings,
+    total,
+    pages: Math.ceil(total / limit),
+    currentPage: page,
+  };
 }
 
 // Get sales bookings
-export async function getSalesBookings(params?: { page?: number; limit?: number }) {
-  const session = await auth() as ExtendedSession | null;
+export async function getSalesBookings(params?: {
+  page?: number;
+  limit?: number;
+}) {
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
   const { page = 1, limit = 25 } = params || {};
@@ -173,12 +195,20 @@ export async function getSalesBookings(params?: { page?: number; limit?: number 
     prisma.booking.count({ where }),
   ]);
 
-  return { bookings, total, pages: Math.ceil(total / limit), currentPage: page };
+  return {
+    bookings,
+    total,
+    pages: Math.ceil(total / limit),
+    currentPage: page,
+  };
 }
 
 // Get pending bookings
-export async function getPendingBookings(params?: { page?: number; limit?: number }) {
-  const session = await auth() as ExtendedSession | null;
+export async function getPendingBookings(params?: {
+  page?: number;
+  limit?: number;
+}) {
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
   const { page = 1, limit = 25 } = params || {};
@@ -214,12 +244,20 @@ export async function getPendingBookings(params?: { page?: number; limit?: numbe
     prisma.booking.count({ where }),
   ]);
 
-  return { bookings, total, pages: Math.ceil(total / limit), currentPage: page };
+  return {
+    bookings,
+    total,
+    pages: Math.ceil(total / limit),
+    currentPage: page,
+  };
 }
 
 // Get need-to-close bookings (offers made)
-export async function getNeedToCloseBookings(params?: { page?: number; limit?: number }) {
-  const session = await auth() as ExtendedSession | null;
+export async function getNeedToCloseBookings(params?: {
+  page?: number;
+  limit?: number;
+}) {
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
   const { page = 1, limit = 25 } = params || {};
@@ -243,7 +281,15 @@ export async function getNeedToCloseBookings(params?: { page?: number; limit?: n
     prisma.booking.findMany({
       where,
       include: {
-        client: { select: { id: true, firstName: true, lastName: true, phone: true, email: true } },
+        client: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+            email: true,
+          },
+        },
         property: { select: { id: true, name: true, pqtNumber: true } },
         agent: { select: { id: true, firstName: true, lastName: true } },
       },
@@ -254,12 +300,17 @@ export async function getNeedToCloseBookings(params?: { page?: number; limit?: n
     prisma.booking.count({ where }),
   ]);
 
-  return { bookings, total, pages: Math.ceil(total / limit), currentPage: page };
+  return {
+    bookings,
+    total,
+    pages: Math.ceil(total / limit),
+    currentPage: page,
+  };
 }
 
 // Get booking stats
 export async function getBookingStats() {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
   const now = new Date();
@@ -292,7 +343,10 @@ export async function getBookingStats() {
       where: { ...baseWhere, bookingDate: { gte: thisMonthStart } },
     }),
     prisma.booking.count({
-      where: { ...baseWhere, bookingDate: { gte: lastMonthStart, lte: lastMonthEnd } },
+      where: {
+        ...baseWhere,
+        bookingDate: { gte: lastMonthStart, lte: lastMonthEnd },
+      },
     }),
     prisma.booking.count({
       where: { ...baseWhere, status: "COMPLETED" },
@@ -307,7 +361,8 @@ export async function getBookingStats() {
     }),
   ]);
 
-  const conversionRate = completedBookings > 0 ? (soldBookings / completedBookings) * 100 : 0;
+  const conversionRate =
+    completedBookings > 0 ? (soldBookings / completedBookings) * 100 : 0;
 
   return {
     totalBookings,
@@ -321,7 +376,7 @@ export async function getBookingStats() {
 
 // Create booking
 export async function createBooking(data: BookingFormData) {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
 
@@ -341,9 +396,11 @@ export async function createBooking(data: BookingFormData) {
 // Update booking
 export async function updateBooking(
   id: string,
-  data: Partial<BookingFormData & { outcome?: BookingOutcome; noSaleReason?: string }>
+  data: Partial<
+    BookingFormData & { outcome?: BookingOutcome; noSaleReason?: string }
+  >,
 ) {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
 
@@ -358,7 +415,7 @@ export async function updateBooking(
 
 // Update booking status
 export async function updateBookingStatus(id: string, status: BookingStatus) {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
 
@@ -375,9 +432,9 @@ export async function updateBookingStatus(id: string, status: BookingStatus) {
 export async function updateBookingOutcome(
   id: string,
   outcome: BookingOutcome,
-  noSaleReason?: string
+  noSaleReason?: string,
 ) {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
 
@@ -396,7 +453,7 @@ export async function updateBookingOutcome(
 
 // Get clients and properties for booking form
 export async function getBookingFormData() {
-  const session = await auth() as ExtendedSession | null;
+  const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
   const clientWhere: Record<string, unknown> = {};
@@ -426,7 +483,9 @@ export async function getBookingFormData() {
       where: {
         isActive: true,
         role: { in: ["SALES_AGENT", "SALES_MANAGER"] },
-        ...(session.user.role !== "SUPER_ADMIN" ? { office: session.user.office } : {}),
+        ...(session.user.role !== "SUPER_ADMIN"
+          ? { office: session.user.office }
+          : {}),
       },
       select: { id: true, firstName: true, lastName: true },
       orderBy: { firstName: "asc" },
@@ -434,4 +493,30 @@ export async function getBookingFormData() {
   ]);
 
   return { clients, properties, agents };
+}
+
+export async function deleteBooking(id: string) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role !== "SUPER_ADMIN")
+    throw new Error("Unauthorized: Only SUPER_ADMIN can delete bookings");
+
+  await prisma.booking.delete({
+    where: { id },
+  });
+
+  revalidatePath("/bookings");
+}
+
+export async function bulkDeleteBookings(ids: string[]) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role !== "SUPER_ADMIN")
+    throw new Error("Unauthorized: Only SUPER_ADMIN can bulk delete");
+
+  await prisma.booking.deleteMany({
+    where: { id: { in: ids } },
+  });
+
+  revalidatePath("/bookings");
 }

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { fetchPropertyBySlug } from "@/lib/api/external-properties";
 import type { DisplayProperty } from "@/lib/api/external-properties";
 import { getProperty } from "@/lib/actions/properties";
@@ -441,6 +442,7 @@ const bookingStatusColors: Record<
 };
 
 export default async function PropertyDetailPage({ params }: PageProps) {
+  const session = (await auth()) as ExtendedSession | null;
   const { id } = await params;
 
   // Try external API first (by slug or numeric id)
@@ -493,12 +495,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             )}
           </div>
         </div>
-        <Link href={`/properties/${property.id}/edit`}>
-          <Button>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Property
-          </Button>
-        </Link>
+        {session?.user?.role !== "VIEWER" && (
+          <Link href={`/properties/${property.id}/edit`}>
+            <Button>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Property
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -644,12 +648,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Bookings</CardTitle>
-          <Link href={`/bookings/create?propertyId=${property.id}`}>
-            <Button size="sm">
-              <Calendar className="mr-2 h-4 w-4" />
-              New Booking
-            </Button>
-          </Link>
+          {session?.user?.role !== "VIEWER" && (
+            <Link href={`/bookings/create?propertyId=${property.id}`}>
+              <Button size="sm">
+                <Calendar className="mr-2 h-4 w-4" />
+                New Booking
+              </Button>
+            </Link>
+          )}
         </CardHeader>
         <CardContent>
           {property.bookings.length === 0 ? (

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { getClient, getAgentsForAssignment } from "@/lib/actions/clients";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -141,6 +142,7 @@ const enquiryStatusLabels: Record<string, string> = {
 };
 
 export default async function ClientDetailPage({ params }: PageProps) {
+  const session = (await auth()) as ExtendedSession | null;
   const { id } = await params;
   const client = await getClient(id);
 
@@ -174,12 +176,14 @@ export default async function ClientDetailPage({ params }: PageProps) {
             </p>
           </div>
         </div>
-        <Link href={`/clients/${client.id}/edit`}>
-          <Button>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Client
-          </Button>
-        </Link>
+        {session?.user?.role !== "VIEWER" && (
+          <Link href={`/clients/${client.id}/edit`}>
+            <Button>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Client
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Overview Cards */}
@@ -412,15 +416,17 @@ export default async function ClientDetailPage({ params }: PageProps) {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Leads</CardTitle>
-              <Link href={`/leads/create`}>
-                <Button
-                  size="sm"
-                  className="bg-[#dc2626] hover:bg-[#b91c1c] text-white"
-                >
-                  <Target className="mr-2 h-4 w-4" />
-                  New Lead
-                </Button>
-              </Link>
+              {session?.user?.role !== "VIEWER" && (
+                <Link href={`/leads/create`}>
+                  <Button
+                    size="sm"
+                    className="bg-[#dc2626] hover:bg-[#b91c1c] text-white"
+                  >
+                    <Target className="mr-2 h-4 w-4" />
+                    New Lead
+                  </Button>
+                </Link>
+              )}
             </CardHeader>
             <CardContent>
               {client.leads.length === 0 ? (
@@ -499,15 +505,17 @@ export default async function ClientDetailPage({ params }: PageProps) {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Deals</CardTitle>
-              <Link href={`/deals/create`}>
-                <Button
-                  size="sm"
-                  className="bg-[#dc2626] hover:bg-[#b91c1c] text-white"
-                >
-                  <Handshake className="mr-2 h-4 w-4" />
-                  New Deal
-                </Button>
-              </Link>
+              {session?.user?.role !== "VIEWER" && (
+                <Link href={`/deals/create`}>
+                  <Button
+                    size="sm"
+                    className="bg-[#dc2626] hover:bg-[#b91c1c] text-white"
+                  >
+                    <Handshake className="mr-2 h-4 w-4" />
+                    New Deal
+                  </Button>
+                </Link>
+              )}
             </CardHeader>
             <CardContent>
               {client.deals.length === 0 ? (
@@ -594,12 +602,14 @@ export default async function ClientDetailPage({ params }: PageProps) {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Bookings</CardTitle>
-              <Link href={`/bookings/create?clientId=${client.id}`}>
-                <Button size="sm">
-                  <Calendar className="mr-2 h-4 w-4" />
-                  New Booking
-                </Button>
-              </Link>
+              {session?.user?.role !== "VIEWER" && (
+                <Link href={`/bookings/create?clientId=${client.id}`}>
+                  <Button size="sm">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    New Booking
+                  </Button>
+                </Link>
+              )}
             </CardHeader>
             <CardContent>
               {client.bookings.length === 0 ? (
@@ -825,10 +835,12 @@ export default async function ClientDetailPage({ params }: PageProps) {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Documents</CardTitle>
-              <Button size="sm">
-                <FileText className="mr-2 h-4 w-4" />
-                Upload Document
-              </Button>
+              {session?.user?.role !== "VIEWER" && (
+                <Button size="sm">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Upload Document
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {client.documents.length === 0 ? (

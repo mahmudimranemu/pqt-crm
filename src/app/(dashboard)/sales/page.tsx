@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { getSales, getSalesStats } from "@/lib/actions/sales";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,10 @@ import {
 import { Plus, DollarSign, TrendingUp, CheckCircle, Clock } from "lucide-react";
 import type { SaleStatus } from "@prisma/client";
 
-const statusColors: Record<SaleStatus, "default" | "secondary" | "success" | "warning" | "destructive"> = {
+const statusColors: Record<
+  SaleStatus,
+  "default" | "secondary" | "success" | "warning" | "destructive"
+> = {
   PENDING_DEPOSIT: "warning",
   DEPOSIT_RECEIVED: "default",
   CONTRACT_SIGNED: "secondary",
@@ -42,6 +46,7 @@ function formatCurrency(amount: number, currency = "USD") {
 }
 
 export default async function SalesPage() {
+  const session = (await auth()) as ExtendedSession | null;
   const [{ sales, total }, stats] = await Promise.all([
     getSales(),
     getSalesStats(),
@@ -83,24 +88,32 @@ export default async function SalesPage() {
             Manage property sales and track revenue
           </p>
         </div>
-        <Link href="/sales/create">
-          <Button className="bg-[#dc2626] hover:bg-[#dc2626]/90">
-            <Plus className="h-4 w-4 mr-2" />
-            Record Sale
-          </Button>
-        </Link>
+        {session?.user?.role !== "VIEWER" && (
+          <Link href="/sales/create">
+            <Button className="bg-[#dc2626] hover:bg-[#dc2626]/90">
+              <Plus className="h-4 w-4 mr-2" />
+              Record Sale
+            </Button>
+          </Link>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">{stat.description}</p>
+              <div className="text-2xl font-bold text-gray-900">
+                {stat.value}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {stat.description}
+              </p>
             </CardContent>
           </Card>
         ))}
@@ -166,7 +179,10 @@ export default async function SalesPage() {
                     </TableCell>
                     <TableCell>
                       {sale.commissionAmount
-                        ? formatCurrency(Number(sale.commissionAmount), sale.currency)
+                        ? formatCurrency(
+                            Number(sale.commissionAmount),
+                            sale.currency,
+                          )
                         : "-"}
                     </TableCell>
                     <TableCell>

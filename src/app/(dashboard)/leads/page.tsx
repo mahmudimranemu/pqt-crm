@@ -162,12 +162,14 @@ export default async function LeadsPage({ searchParams }: PageProps) {
               Table
             </Link>
           </div>
-          <Link href="/leads/create">
-            <Button className="gap-2 bg-[#dc2626] hover:bg-[#b91c1c] text-white">
-              <Plus className="h-4 w-4" />
-              New Lead
-            </Button>
-          </Link>
+          {session.user.role !== "VIEWER" && (
+            <Link href="/leads/create">
+              <Button className="gap-2 bg-[#dc2626] hover:bg-[#b91c1c] text-white">
+                <Plus className="h-4 w-4" />
+                New Lead
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -267,7 +269,11 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         </Suspense>
       ) : (
         <Suspense fallback={<TableSkeleton />}>
-          <LeadsTableWrapper searchParams={searchParams} agents={agents} />
+          <LeadsTableWrapper
+            searchParams={searchParams}
+            agents={agents}
+            userRole={session.user.role}
+          />
         </Suspense>
       )}
     </div>
@@ -282,9 +288,11 @@ async function KanbanWrapper() {
 async function LeadsTableWrapper({
   searchParams,
   agents,
+  userRole,
 }: {
   searchParams: PageProps["searchParams"];
   agents: { id: string; firstName: string; lastName: string }[];
+  userRole: string;
 }) {
   const params = await searchParams;
   const { leads, total, pages, currentPage } = await getLeads({
@@ -318,6 +326,7 @@ async function LeadsTableWrapper({
       total={total}
       pages={pages}
       currentPage={currentPage}
+      userRole={userRole}
     />
   );
 }

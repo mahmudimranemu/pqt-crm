@@ -886,3 +886,16 @@ export async function removeEnquiryFromPool(enquiryId: string) {
   revalidatePath("/clients/enquiries");
   revalidatePath("/settings/users");
 }
+
+export async function bulkDeleteEnquiries(ids: string[]) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role !== "SUPER_ADMIN")
+    throw new Error("Unauthorized: Only SUPER_ADMIN can bulk delete");
+
+  await prisma.enquiry.deleteMany({
+    where: { id: { in: ids } },
+  });
+
+  revalidatePath("/clients/enquiries");
+}

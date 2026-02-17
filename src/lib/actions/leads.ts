@@ -846,6 +846,19 @@ export async function assignLeadToPool(
   revalidatePath("/settings/users");
 }
 
+export async function bulkDeleteLeads(ids: string[]) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role !== "SUPER_ADMIN")
+    throw new Error("Unauthorized: Only SUPER_ADMIN can bulk delete");
+
+  await prisma.lead.deleteMany({
+    where: { id: { in: ids } },
+  });
+
+  revalidatePath("/leads");
+}
+
 export async function removeLeadFromPool(leadId: string) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");

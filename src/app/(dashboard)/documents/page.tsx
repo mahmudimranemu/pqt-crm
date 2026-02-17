@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { getDocuments, getDocumentStats } from "@/lib/actions/documents";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,18 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Plus,
-  FileText,
-  Download,
-  User,
-  Flag,
-  Folder,
-} from "lucide-react";
+import { Plus, FileText, Download, User, Flag, Folder } from "lucide-react";
 import type { DocumentCategory } from "@prisma/client";
 import { UploadDocumentDialog } from "./upload-document-dialog";
 
-const categoryColors: Record<DocumentCategory, "default" | "secondary" | "success" | "warning" | "destructive"> = {
+const categoryColors: Record<
+  DocumentCategory,
+  "default" | "secondary" | "success" | "warning" | "destructive"
+> = {
   PASSPORT: "default",
   TITLE_DEED: "success",
   POWER_OF_ATTORNEY: "warning",
@@ -58,6 +55,7 @@ const fileTypeIcons: Record<string, string> = {
 };
 
 export default async function DocumentsPage() {
+  const session = (await auth()) as ExtendedSession | null;
   const [{ documents, total }, stats] = await Promise.all([
     getDocuments(),
     getDocumentStats(),
@@ -72,17 +70,21 @@ export default async function DocumentsPage() {
             Manage client and application documents
           </p>
         </div>
-        <UploadDocumentDialog />
+        {session?.user?.role !== "VIEWER" && <UploadDocumentDialog />}
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Documents
+            </CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {stats.total}
+            </div>
           </CardContent>
         </Card>
         {stats.byCategory.slice(0, 3).map((cat) => (
@@ -94,7 +96,9 @@ export default async function DocumentsPage() {
               <Folder className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{cat._count.id}</div>
+              <div className="text-2xl font-bold text-gray-900">
+                {cat._count.id}
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -108,8 +112,10 @@ export default async function DocumentsPage() {
           {documents.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No documents uploaded yet.</p>
-              <UploadDocumentDialog />
+              <p className="text-muted-foreground">
+                No documents uploaded yet.
+              </p>
+              {session?.user?.role !== "VIEWER" && <UploadDocumentDialog />}
             </div>
           ) : (
             <Table>

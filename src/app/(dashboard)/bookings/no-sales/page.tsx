@@ -1,8 +1,11 @@
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { getNoSalesBookings } from "@/lib/actions/bookings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookingTable } from "../booking-table";
 
 export default async function NoSalesBookingsPage() {
+  const session = (await auth()) as ExtendedSession | null;
+  const userRole = session?.user?.role || "VIEWER";
   const { bookings, total } = await getNoSalesBookings();
 
   return (
@@ -25,6 +28,7 @@ export default async function NoSalesBookingsPage() {
             bookings={bookings}
             showOutcome
             showNoSaleReason
+            userRole={userRole}
           />
         </CardContent>
       </Card>

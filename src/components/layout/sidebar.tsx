@@ -248,19 +248,21 @@ export function Sidebar({
         </Link>
       </div>
 
-      {/* Quick Add */}
-      <div className="px-3 pb-2">
-        <Link
-          href="/clients/create"
-          className={cn(
-            "flex items-center gap-2 rounded-lg bg-white/20 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-white/30",
-            collapsed && "justify-center px-0",
-          )}
-        >
-          <Plus className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>Add Lead</span>}
-        </Link>
-      </div>
+      {/* Quick Add - hidden for VIEWER */}
+      {userRole !== "VIEWER" && (
+        <div className="px-3 pb-2">
+          <Link
+            href="/clients/create"
+            className={cn(
+              "flex items-center gap-2 rounded-lg bg-white/20 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-white/30",
+              collapsed && "justify-center px-0",
+            )}
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>Add Lead</span>}
+          </Link>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-1 scrollbar-thin">

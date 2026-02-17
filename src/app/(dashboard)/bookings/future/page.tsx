@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { getFutureBookings } from "@/lib/actions/bookings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, CalendarDays } from "lucide-react";
 import { BookingTable } from "../booking-table";
 
-async function FutureBookingsTable() {
+async function FutureBookingsTable({ userRole }: { userRole: string }) {
   const { bookings, total } = await getFutureBookings();
 
   return (
@@ -17,12 +18,14 @@ async function FutureBookingsTable() {
           {total} upcoming booking{total !== 1 ? "s" : ""}
         </p>
       </div>
-      <BookingTable bookings={bookings} />
+      <BookingTable bookings={bookings} userRole={userRole} />
     </>
   );
 }
 
-export default function FutureBookingsPage() {
+export default async function FutureBookingsPage() {
+  const session = (await auth()) as ExtendedSession | null;
+  const userRole = session?.user?.role || "VIEWER";
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -32,12 +35,14 @@ export default function FutureBookingsPage() {
             All upcoming property viewings and appointments
           </p>
         </div>
-        <Link href="/bookings/create">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            New Booking
-          </Button>
-        </Link>
+        {session?.user?.role !== "VIEWER" && (
+          <Link href="/bookings/create">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Booking
+            </Button>
+          </Link>
+        )}
       </div>
 
       <Card>
@@ -49,7 +54,7 @@ export default function FutureBookingsPage() {
         </CardHeader>
         <CardContent>
           <Suspense fallback={<Skeleton className="h-[400px] w-full" />}>
-            <FutureBookingsTable />
+            <FutureBookingsTable userRole={userRole} />
           </Suspense>
         </CardContent>
       </Card>

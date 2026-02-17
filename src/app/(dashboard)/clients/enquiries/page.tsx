@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { auth, type ExtendedSession } from "@/lib/auth";
 import {
   getEnquiries,
   getEnquiriesByStatus,
@@ -48,8 +49,10 @@ interface PageProps {
 
 async function EnquiriesTableWrapper({
   searchParams,
+  userRole,
 }: {
   searchParams: PageProps["searchParams"];
+  userRole: string;
 }) {
   const params = await searchParams;
   const [
@@ -91,6 +94,7 @@ async function EnquiriesTableWrapper({
       total={total}
       pages={pages}
       currentPage={currentPage}
+      userRole={userRole}
     />
   );
 }
@@ -108,6 +112,8 @@ function EnquiriesTableSkeleton() {
 }
 
 export default async function EnquiriesPage({ searchParams }: PageProps) {
+  const session = (await auth()) as ExtendedSession | null;
+  const userRole = session?.user?.role || "VIEWER";
   const params = await searchParams;
   const activeTab = params.tab || "all";
   const activeTag = params.tag || "";
@@ -274,7 +280,10 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
       ) : (
         <div className="rounded-lg border border-gray-200 bg-white">
           <Suspense fallback={<EnquiriesTableSkeleton />}>
-            <EnquiriesTableWrapper searchParams={searchParams} />
+            <EnquiriesTableWrapper
+              searchParams={searchParams}
+              userRole={userRole}
+            />
           </Suspense>
         </div>
       )}
