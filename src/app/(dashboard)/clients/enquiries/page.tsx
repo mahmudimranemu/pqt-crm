@@ -76,6 +76,11 @@ async function EnquiriesTableWrapper({
     createdAt: e.createdAt.toISOString(),
     updatedAt: undefined,
     nextCallDate: e.nextCallDate ? e.nextCallDate.toISOString() : null,
+    notes:
+      (e as any).notes?.map((n: any) => ({
+        ...n,
+        createdAt: n.createdAt.toISOString(),
+      })) || [],
   }));
 
   return (

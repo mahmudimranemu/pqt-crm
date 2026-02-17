@@ -3,9 +3,11 @@
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
 import {
   Card,
   CardContent,
@@ -72,7 +74,11 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(
-    error === "CredentialsSignin" ? "Invalid email or password" : null,
+    error === "CredentialsSignin"
+      ? "Invalid email or password"
+      : error
+        ? "An error occurred during sign in"
+        : null,
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,7 +94,21 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        setLoginError(result.error);
+        const errorCode = (result as any).code as string | undefined;
+        let errorMessage = "Invalid email or password";
+
+        if (errorCode === "ACCOUNT_DEACTIVATED") {
+          errorMessage =
+            "Your account is not activated. Contact crm@propertyquestturkey.com to activate your account.";
+        } else if (errorCode?.startsWith("ACCOUNT_LOCKED_")) {
+          const minutes = errorCode.replace("ACCOUNT_LOCKED_", "");
+          errorMessage = `Account locked. Try again in ${minutes} minute${minutes === "1" ? "" : "s"}.`;
+        } else if (errorCode === "TOO_MANY_ATTEMPTS") {
+          errorMessage =
+            "Too many failed attempts. Account locked for 30 minutes.";
+        }
+
+        setLoginError(errorMessage);
         setIsLoading(false);
       } else {
         router.push(callbackUrl);
@@ -111,12 +131,16 @@ function LoginForm() {
       <CardHeader className="space-y-1 text-center">
         <div className="flex justify-center mb-4">
           <div className="flex items-center gap-2 text-[#dc2626]">
-            <Building2 className="h-10 w-10" />
-            <span className="text-2xl font-bold">PropertyFlow</span>
+            <Image
+              src="./PQT_logo.svg"
+              alt="PQT Logo"
+              width={120}
+              height={120}
+            />
           </div>
         </div>
         <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
-        <CardDescription>Sign in to your PropertyFlow account</CardDescription>
+        <CardDescription>Sign in to your PQT CRM account</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">

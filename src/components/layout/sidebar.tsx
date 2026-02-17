@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Users,
@@ -35,6 +36,7 @@ import {
   GitBranch,
   FileSpreadsheet,
   Route,
+  Activity,
 } from "lucide-react";
 import type { UserRole } from "@prisma/client";
 
@@ -111,9 +113,30 @@ const navSections: NavSection[] = [
     label: "Analytics",
     items: [
       { title: "KPIs", href: "/kpis", icon: BarChart3 },
-      { title: "Reports", href: "/reports", icon: TrendingUp },
-      { title: "Campaigns", href: "/campaigns", icon: Megaphone },
-      { title: "Leaderboards", href: "/leaderboards", icon: Trophy },
+      {
+        title: "Agent Performance",
+        href: "/kpis/performance",
+        icon: Activity,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+      },
+      {
+        title: "Reports",
+        href: "/reports",
+        icon: TrendingUp,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+      },
+      {
+        title: "Campaigns",
+        href: "/campaigns",
+        icon: Megaphone,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+      },
+      {
+        title: "Leaderboards",
+        href: "/leaderboards",
+        icon: Trophy,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+      },
     ],
   },
   {
@@ -203,14 +226,24 @@ export function Sidebar({
     >
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 px-4">
-        <Link href="/dashboard" className="flex items-center gap-2 text-white">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">
-            <Building2 className="h-5 w-5 text-white" />
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
+            <Image
+              src="./favicon.svg"
+              alt="Propert Quest Turkey"
+              width={32}
+              height={32}
+            />
           </div>
           {!collapsed && (
-            <span className="text-lg font-bold tracking-tight">
-              Propert Quest Turkey
-            </span>
+            <div className="bg-white">
+              <Image
+                src="./PQT_logo.svg"
+                alt="Propert Quest Turkey"
+                width={120}
+                height={120}
+              />
+            </div>
           )}
         </Link>
       </div>

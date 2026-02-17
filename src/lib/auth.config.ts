@@ -1,6 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
 import type { UserRole, Office } from "@prisma/client";
-import Credentials from "next-auth/providers/credentials";
 
 // Extended types for our app
 export interface ExtendedUser {
@@ -18,22 +17,13 @@ export interface ExtendedSession {
 }
 
 // Edge-compatible auth config (no Prisma/Node.js-only imports)
-// The authorize() callback is added in auth.ts which only runs on the server
 export const authConfig = {
-  providers: [
-    Credentials({
-      credentials: {
-        email: {},
-        password: {},
-      },
-      // authorize is defined in auth.ts (server-only)
-      authorize: () => null,
-    }),
-  ],
+  providers: [], // Providers are added in auth.ts (server-only)
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isOnDashboard = nextUrl.pathname.startsWith("/dashboard") ||
+      const isOnDashboard =
+        nextUrl.pathname.startsWith("/dashboard") ||
         nextUrl.pathname.startsWith("/clients") ||
         nextUrl.pathname.startsWith("/properties") ||
         nextUrl.pathname.startsWith("/enquiries") ||
@@ -42,7 +32,18 @@ export const authConfig = {
         nextUrl.pathname.startsWith("/citizenship") ||
         nextUrl.pathname.startsWith("/calendar") ||
         nextUrl.pathname.startsWith("/reports") ||
-        nextUrl.pathname.startsWith("/settings");
+        nextUrl.pathname.startsWith("/settings") ||
+        nextUrl.pathname.startsWith("/leads") ||
+        nextUrl.pathname.startsWith("/deals") ||
+        nextUrl.pathname.startsWith("/tasks") ||
+        nextUrl.pathname.startsWith("/payments") ||
+        nextUrl.pathname.startsWith("/commissions") ||
+        nextUrl.pathname.startsWith("/campaigns") ||
+        nextUrl.pathname.startsWith("/notifications") ||
+        nextUrl.pathname.startsWith("/documents") ||
+        nextUrl.pathname.startsWith("/kpis") ||
+        nextUrl.pathname.startsWith("/interactions") ||
+        nextUrl.pathname.startsWith("/pipeline");
       const isOnLogin = nextUrl.pathname === "/login";
 
       if (isOnDashboard) {

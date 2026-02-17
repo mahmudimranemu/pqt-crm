@@ -170,6 +170,8 @@ export async function updateUser(
   data: {
     firstName?: string;
     lastName?: string;
+    email?: string;
+    phone?: string;
     role?: UserRole;
     office?: Office;
     isActive?: boolean;
@@ -181,6 +183,7 @@ export async function updateUser(
   // Users can update their own name, admins can update anything
   const isSelfUpdate = session.user.id === id;
   const isAdmin = ["SUPER_ADMIN", "ADMIN"].includes(session.user.role);
+  const isSuperAdmin = session.user.role === "SUPER_ADMIN";
 
   if (!isSelfUpdate && !isAdmin) {
     throw new Error("Unauthorized");
@@ -190,6 +193,21 @@ export async function updateUser(
   if (!isAdmin) {
     const { firstName, lastName } = data;
     data = { firstName, lastName };
+  }
+
+  // Only SUPER_ADMIN can change email
+  if (data.email && !isSuperAdmin) {
+    delete data.email;
+  }
+
+  // Check email uniqueness if changing email
+  if (data.email) {
+    const existing = await prisma.user.findUnique({
+      where: { email: data.email },
+    });
+    if (existing && existing.id !== id) {
+      throw new Error("A user with this email already exists");
+    }
   }
 
   const user = await prisma.user.update({
@@ -268,6 +286,36 @@ export async function reactivateUser(id: string) {
   });
 
   await auditLog("UPDATE", "User", id, { isActive: true });
+
+  revalidatePath("/settings/users");
+  return { success: true };
+}
+
+// Delete user — SUPER_ADMIN only
+export async function deleteUser(id: string) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role !== "SUPER_ADMIN") {
+    throw new Error("Unauthorized - Only Super Admin can delete users");
+  }
+
+  // Cannot delete yourself
+  if (session.user.id === id) {
+    throw new Error("Cannot delete your own account");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { email: true, firstName: true, lastName: true },
+  });
+  if (!user) throw new Error("User not found");
+
+  await auditLog("DELETE", "User", id, {
+    email: user.email,
+    name: `${user.firstName} ${user.lastName}`,
+  });
+
+  await prisma.user.delete({ where: { id } });
 
   revalidatePath("/settings/users");
   return { success: true };

@@ -7,11 +7,18 @@ export async function getConversionFunnel() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
+  const isAgent = session.user.role === "SALES_AGENT";
+  const userId = session.user.id;
+
   const [enquiries, leads, deals, wonDeals] = await Promise.all([
-    prisma.enquiry.count(),
-    prisma.lead.count(),
-    prisma.deal.count(),
-    prisma.deal.count({ where: { result: "WON" } }),
+    prisma.enquiry.count(
+      isAgent ? { where: { assignedAgentId: userId } } : undefined,
+    ),
+    prisma.lead.count(isAgent ? { where: { ownerId: userId } } : undefined),
+    prisma.deal.count(isAgent ? { where: { ownerId: userId } } : undefined),
+    prisma.deal.count({
+      where: { result: "WON", ...(isAgent ? { ownerId: userId } : {}) },
+    }),
   ]);
 
   return [
@@ -26,8 +33,11 @@ export async function getSourceBreakdown() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
+  const isAgent = session.user.role === "SALES_AGENT";
+
   const sources = await prisma.lead.groupBy({
     by: ["source"],
+    where: isAgent ? { ownerId: session.user.id } : undefined,
     _count: { id: true },
     orderBy: { _count: { id: "desc" } },
   });
@@ -42,6 +52,7 @@ export async function getWonVsLost() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
+  const isAgent = session.user.role === "SALES_AGENT";
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -49,6 +60,7 @@ export async function getWonVsLost() {
     where: {
       result: { in: ["WON", "LOST"] },
       updatedAt: { gte: sixMonthsAgo },
+      ...(isAgent ? { ownerId: session.user.id } : {}),
     },
     select: { result: true, updatedAt: true },
   });
@@ -86,11 +98,15 @@ export async function getRevenueTrend() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
+  const isAgent = session.user.role === "SALES_AGENT";
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
   const sales = await prisma.sale.findMany({
-    where: { createdAt: { gte: sixMonthsAgo } },
+    where: {
+      createdAt: { gte: sixMonthsAgo },
+      ...(isAgent ? { agentId: session.user.id } : {}),
+    },
     select: { salePrice: true, createdAt: true },
   });
 

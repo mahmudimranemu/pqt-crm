@@ -1,9 +1,25 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import prisma from "./prisma";
 import { authConfig, type ExtendedUser } from "./auth.config";
 import type { UserRole, Office } from "@prisma/client";
+
+class AccountDeactivatedError extends CredentialsSignin {
+  code = "ACCOUNT_DEACTIVATED";
+}
+
+class AccountLockedError extends CredentialsSignin {
+  code: string;
+  constructor(minutes: number) {
+    super();
+    this.code = `ACCOUNT_LOCKED_${minutes}`;
+  }
+}
+
+class TooManyAttemptsError extends CredentialsSignin {
+  code = "TOO_MANY_ATTEMPTS";
+}
 
 // Re-export types from auth.config
 export type { ExtendedUser, ExtendedSession } from "./auth.config";
@@ -27,7 +43,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         if (!user.isActive) {
-          throw new Error("Your account has been deactivated");
+          throw new AccountDeactivatedError();
         }
 
         // Check account lockout
@@ -35,9 +51,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const minutesLeft = Math.ceil(
             (user.lockedUntil.getTime() - Date.now()) / 60000,
           );
-          throw new Error(
-            `Account locked. Try again in ${minutesLeft} minute${minutesLeft > 1 ? "s" : ""}.`,
-          );
+          throw new AccountLockedError(minutesLeft);
         }
 
         const isPasswordValid = await bcrypt.compare(
@@ -62,9 +76,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
 
           if (failedAttempts >= 5) {
-            throw new Error(
-              "Too many failed attempts. Account locked for 30 minutes.",
-            );
+            throw new TooManyAttemptsError();
           }
 
           throw new Error("Invalid email or password");

@@ -113,6 +113,18 @@ export async function getEnquiries(params?: {
         convertedClient: {
           select: { id: true, firstName: true, lastName: true },
         },
+        notes: {
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+            agent: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+          orderBy: { createdAt: "desc" as const },
+          take: 1,
+        },
       },
       orderBy: { createdAt: "desc" },
       skip,
@@ -219,7 +231,7 @@ export async function getEnquiry(id: string) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  return prisma.enquiry.findUnique({
+  const enquiry = await prisma.enquiry.findUnique({
     where: { id },
     include: {
       assignedAgent: {
@@ -239,6 +251,17 @@ export async function getEnquiry(id: string) {
       },
     },
   });
+
+  // SALES_AGENT can only view enquiries assigned to them
+  if (
+    session.user.role === "SALES_AGENT" &&
+    enquiry?.assignedAgentId &&
+    enquiry.assignedAgentId !== session.user.id
+  ) {
+    throw new Error("Unauthorized");
+  }
+
+  return enquiry;
 }
 
 export interface CreateEnquiryData {
@@ -382,6 +405,19 @@ export async function updateEnquiryStatus(
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  // SALES_AGENT can only update enquiries assigned to them
+  if (session.user.role === "SALES_AGENT") {
+    const existing = await prisma.enquiry.findUnique({
+      where: { id: enquiryId },
+      select: { assignedAgentId: true },
+    });
+    if (
+      !existing ||
+      (existing.assignedAgentId && existing.assignedAgentId !== session.user.id)
+    )
+      throw new Error("Unauthorized");
+  }
 
   const enquiry = await prisma.enquiry.update({
     where: { id: enquiryId },
@@ -556,6 +592,19 @@ export async function updateEnquiryField(
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
 
+  // SALES_AGENT can only update enquiries assigned to them
+  if (session.user.role === "SALES_AGENT") {
+    const existing = await prisma.enquiry.findUnique({
+      where: { id: enquiryId },
+      select: { assignedAgentId: true },
+    });
+    if (
+      !existing ||
+      (existing.assignedAgentId && existing.assignedAgentId !== session.user.id)
+    )
+      throw new Error("Unauthorized");
+  }
+
   const allowedFields = [
     "called",
     "spoken",
@@ -607,6 +656,19 @@ export async function markAsSpam(enquiryId: string) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  // SALES_AGENT can only mark their own enquiries as spam
+  if (session.user.role === "SALES_AGENT") {
+    const existing = await prisma.enquiry.findUnique({
+      where: { id: enquiryId },
+      select: { assignedAgentId: true },
+    });
+    if (
+      !existing ||
+      (existing.assignedAgentId && existing.assignedAgentId !== session.user.id)
+    )
+      throw new Error("Unauthorized");
+  }
 
   const enquiry = await prisma.enquiry.update({
     where: { id: enquiryId },
@@ -749,6 +811,19 @@ export async function updateEnquiryTags(enquiryId: string, tags: string[]) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  // SALES_AGENT can only update tags on enquiries assigned to them
+  if (session.user.role === "SALES_AGENT") {
+    const existing = await prisma.enquiry.findUnique({
+      where: { id: enquiryId },
+      select: { assignedAgentId: true },
+    });
+    if (
+      !existing ||
+      (existing.assignedAgentId && existing.assignedAgentId !== session.user.id)
+    )
+      throw new Error("Unauthorized");
+  }
 
   const enquiry = await prisma.enquiry.update({
     where: { id: enquiryId },

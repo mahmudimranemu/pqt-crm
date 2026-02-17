@@ -71,7 +71,11 @@ export async function getLeads(params?: {
     tag,
   } = params || {};
   const where: any = {};
-  if (ownerId) {
+
+  // SALES_AGENT can only see their own leads
+  if (session.user.role === "SALES_AGENT") {
+    where.ownerId = session.user.id;
+  } else if (ownerId) {
     where.ownerId = ownerId;
   }
 
@@ -177,6 +181,11 @@ export async function getLeadsByStage() {
 
   const where: any = {};
 
+  // SALES_AGENT can only see their own leads
+  if (session.user.role === "SALES_AGENT") {
+    where.ownerId = session.user.id;
+  }
+
   const leads = await prisma.lead.findMany({
     where,
     include: {
@@ -243,6 +252,11 @@ export async function getLeadById(id: string) {
   });
 
   if (!lead) throw new Error("Lead not found");
+
+  // SALES_AGENT can only view their own leads
+  if (session.user.role === "SALES_AGENT" && lead.ownerId !== session.user.id) {
+    throw new Error("Unauthorized");
+  }
 
   return lead;
 }
@@ -316,6 +330,16 @@ export async function updateLead(data: UpdateLeadData) {
 
   const { id, slaDeadline, ...rest } = data;
 
+  // SALES_AGENT can only update their own leads
+  if (session.user.role === "SALES_AGENT") {
+    const existing = await prisma.lead.findUnique({
+      where: { id },
+      select: { ownerId: true },
+    });
+    if (!existing || existing.ownerId !== session.user.id)
+      throw new Error("Unauthorized");
+  }
+
   const lead = await prisma.lead.update({
     where: { id },
     data: {
@@ -337,6 +361,16 @@ export async function updateLeadField(
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  // SALES_AGENT can only update their own leads
+  if (session.user.role === "SALES_AGENT") {
+    const existing = await prisma.lead.findUnique({
+      where: { id: leadId },
+      select: { ownerId: true },
+    });
+    if (!existing || existing.ownerId !== session.user.id)
+      throw new Error("Unauthorized");
+  }
 
   const allowedFields = [
     "called",
@@ -407,6 +441,16 @@ export async function updateLeadTags(leadId: string, tags: string[]) {
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role === "VIEWER") throw new Error("Unauthorized");
 
+  // SALES_AGENT can only update their own leads
+  if (session.user.role === "SALES_AGENT") {
+    const existing = await prisma.lead.findUnique({
+      where: { id: leadId },
+      select: { ownerId: true },
+    });
+    if (!existing || existing.ownerId !== session.user.id)
+      throw new Error("Unauthorized");
+  }
+
   const lead = await prisma.lead.update({
     where: { id: leadId },
     data: { tags },
@@ -420,6 +464,16 @@ export async function updateLeadTags(leadId: string, tags: string[]) {
 export async function updateLeadStage(id: string, stage: LeadStage) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
+
+  // SALES_AGENT can only update their own leads
+  if (session.user.role === "SALES_AGENT") {
+    const existing = await prisma.lead.findUnique({
+      where: { id },
+      select: { ownerId: true },
+    });
+    if (!existing || existing.ownerId !== session.user.id)
+      throw new Error("Unauthorized");
+  }
 
   const lead = await prisma.lead.update({
     where: { id },
@@ -495,6 +549,11 @@ export async function getLeadAnalytics() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
+  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
+    session.user.role,
+  );
+  const ownerFilter: any = viewAll ? {} : { ownerId: session.user.id };
+
   const now = new Date();
   const monthNames = [
     "Jan",
@@ -531,10 +590,14 @@ export async function getLeadAnalytics() {
 
     const [leads, conversions] = await Promise.all([
       prisma.lead.count({
-        where: { createdAt: { gte: monthStart, lte: monthEnd } },
+        where: {
+          ...ownerFilter,
+          createdAt: { gte: monthStart, lte: monthEnd },
+        },
       }),
       prisma.lead.count({
         where: {
+          ...ownerFilter,
           createdAt: { gte: monthStart, lte: monthEnd },
           stage: { in: ["WON", "OFFER_MADE", "NEGOTIATING"] },
         },

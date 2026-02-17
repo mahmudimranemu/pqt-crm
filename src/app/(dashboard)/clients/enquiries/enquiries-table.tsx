@@ -71,6 +71,12 @@ interface EnquiryRow {
   email: string;
   phone: string;
   message: string | null;
+  notes: {
+    id: string;
+    content: string;
+    createdAt: string;
+    agent: { firstName: string; lastName: string };
+  }[];
   source: string;
   status: string;
   budget: string | null;
@@ -457,7 +463,7 @@ export function EnquiriesTable({
                 Country
               </TableHead>
               <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap">
-                Notes
+                Notes & Contact Log
               </TableHead>
               <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap text-center">
                 Called
@@ -556,8 +562,28 @@ export function EnquiriesTable({
                   </TableCell>
 
                   {/* Notes */}
-                  <TableCell className="text-xs text-gray-500 max-w-[140px] truncate">
-                    {enquiry.message || "—"}
+                  <TableCell className="text-xs text-gray-500 max-w-[200px]">
+                    {enquiry.notes && enquiry.notes.length > 0 ? (
+                      <div className="space-y-0.5">
+                        <p className="truncate font-medium text-gray-700">
+                          {enquiry.notes[0].content}
+                        </p>
+                        <p className="text-[10px] text-gray-400">
+                          {enquiry.notes[0].agent.firstName}{" "}
+                          {enquiry.notes[0].agent.lastName} &middot;{" "}
+                          {new Date(
+                            enquiry.notes[0].createdAt,
+                          ).toLocaleDateString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                          })}
+                        </p>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">
+                        {enquiry.message || "—"}
+                      </span>
+                    )}
                   </TableCell>
 
                   {/* Called */}
