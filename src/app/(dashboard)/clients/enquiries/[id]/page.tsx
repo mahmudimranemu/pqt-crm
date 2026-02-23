@@ -189,8 +189,25 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
         </Card>
       </div>
 
+      {/* Lead Management - Full Width */}
+      <EnquiryDetailFields
+        enquiry={{
+          id: enquiry.id,
+          called: enquiry.called,
+          spoken: enquiry.spoken,
+          segment: enquiry.segment,
+          leadStatus: enquiry.leadStatus,
+          priority: enquiry.priority,
+          nextCallDate: enquiry.nextCallDate?.toISOString() || null,
+          snooze: enquiry.snooze,
+          assignedAgentId: enquiry.assignedAgentId,
+          tags: enquiry.tags,
+        }}
+        agents={agents}
+      />
+
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column: Details + Editable Fields */}
+        {/* Left Column: Details */}
         <div className="lg:col-span-1 space-y-6">
           {/* Enquiry Details */}
           <Card>
@@ -259,23 +276,6 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
             enquiryId={enquiry.id}
             currentProperty={enquiry.interestedProperty}
             properties={properties}
-          />
-
-          {/* Editable Fields */}
-          <EnquiryDetailFields
-            enquiry={{
-              id: enquiry.id,
-              called: enquiry.called,
-              spoken: enquiry.spoken,
-              segment: enquiry.segment,
-              leadStatus: enquiry.leadStatus,
-              priority: enquiry.priority,
-              nextCallDate: enquiry.nextCallDate?.toISOString() || null,
-              snooze: enquiry.snooze,
-              assignedAgentId: enquiry.assignedAgentId,
-              tags: enquiry.tags,
-            }}
-            agents={agents}
           />
         </div>
 

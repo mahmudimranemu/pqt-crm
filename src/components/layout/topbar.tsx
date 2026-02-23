@@ -2,7 +2,6 @@
 
 import { signOut } from "next-auth/react";
 import {
-  Bell,
   LogOut,
   User,
   Settings,
@@ -23,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getInitials } from "@/lib/utils";
 import { TodayDropdown } from "./today-dropdown";
+import { NotificationDropdown } from "./notification-dropdown";
 import type { UserRole, Office } from "@prisma/client";
 
 interface TopbarProps {
@@ -101,16 +101,7 @@ export function Topbar({ user, unreadNotifications = 0 }: TopbarProps) {
         </DropdownMenu>
 
         {/* Notifications */}
-        <a href="/notifications">
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5 text-gray-500" />
-            {unreadNotifications > 0 && (
-              <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#dc2626] text-[10px] text-white">
-                {unreadNotifications > 9 ? "9+" : unreadNotifications}
-              </span>
-            )}
-          </Button>
-        </a>
+        <NotificationDropdown unreadCount={unreadNotifications} />
 
         {/* User Menu */}
         <DropdownMenu>

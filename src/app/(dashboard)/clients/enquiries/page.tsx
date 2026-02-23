@@ -13,6 +13,7 @@ import { EnquiriesTable } from "./enquiries-table";
 import { EnquiryKanban } from "./enquiry-kanban";
 import { AddEnquiryDialog } from "./add-enquiry-dialog";
 import { ImportLeads } from "./import-leads";
+import { SyncButton } from "./sync-button";
 import type { EnquiryStatus, EnquirySource } from "@prisma/client";
 
 const TAGS = [
@@ -187,6 +188,9 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
               Table
             </Link>
           </div>
+          {["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(userRole) && (
+            <SyncButton />
+          )}
           <ImportLeads />
           <AddEnquiryDialog agents={agents} properties={properties} />
         </div>

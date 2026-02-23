@@ -9,7 +9,7 @@ import type {
   Currency,
   PropertyType,
 } from "@prisma/client";
-import { notify } from "@/lib/notifications";
+import { notify, notifySuperAdmins, notifyUserAndAdmins } from "@/lib/notifications";
 import { auditLog } from "@/lib/audit";
 
 interface CreateDealData {
@@ -238,6 +238,26 @@ export async function createDeal(data: CreateDealData) {
   });
 
   await auditLog("CREATE", "Deal", deal.id, { title: data.title });
+
+  // Notify assigned owner + super admins
+  const ownerId = data.ownerId || session.user.id;
+  if (ownerId !== session.user.id) {
+    await notifyUserAndAdmins(
+      ownerId,
+      "DEAL_STAGE_CHANGED",
+      "New Deal Created",
+      `Deal "${data.title}" (${dealNumber}) has been created and assigned to you`,
+      `/deals/${deal.id}`,
+    );
+  } else {
+    await notifySuperAdmins(
+      "DEAL_STAGE_CHANGED",
+      "New Deal Created",
+      `Deal "${data.title}" (${dealNumber}) created by ${session.user.firstName} ${session.user.lastName}`,
+      `/deals/${deal.id}`,
+    );
+  }
+
   revalidatePath("/deals");
   return deal;
 }
@@ -308,10 +328,17 @@ export async function updateDealStage(id: string, stage: DealStage) {
     },
   });
 
-  // Notify deal owner of stage change
+  // Notify deal owner + super admins of stage change
   if (deal.ownerId !== session.user.id) {
-    await notify(
+    await notifyUserAndAdmins(
       deal.ownerId,
+      "DEAL_STAGE_CHANGED",
+      "Deal Stage Updated",
+      `Deal stage changed to ${stage.replace(/_/g, " ")}`,
+      `/deals/${id}`,
+    );
+  } else {
+    await notifySuperAdmins(
       "DEAL_STAGE_CHANGED",
       "Deal Stage Updated",
       `Deal stage changed to ${stage.replace(/_/g, " ")}`,

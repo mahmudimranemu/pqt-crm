@@ -11,6 +11,7 @@ import type {
   PropertyType,
 } from "@prisma/client";
 import { auditLog } from "@/lib/audit";
+import { notify, notifySuperAdmins, notifyUserAndAdmins } from "@/lib/notifications";
 
 export async function getEnquiries(params?: {
   status?: EnquiryStatus;
@@ -62,8 +63,20 @@ export async function getEnquiries(params?: {
 
   // Tab-based filtering
   const now = new Date();
+  const past48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
   if (tab === "48h") {
-    where.createdAt = { gte: new Date(now.getTime() - 48 * 60 * 60 * 1000) };
+    // Show enquiries with activity within last 48 hours:
+    // notes added, nextCallDate falls in window, or newly created
+    where.AND = [
+      ...(where.AND || []),
+      {
+        OR: [
+          { nextCallDate: { gte: past48h, lte: now } },
+          { notes: { some: { createdAt: { gte: past48h } } } },
+          { createdAt: { gte: past48h } },
+        ],
+      },
+    ];
   } else if (tab === "today") {
     where.nextCallDate = {
       gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
@@ -126,7 +139,14 @@ export async function getEnquiries(params?: {
           take: 1,
         },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy:
+        tab === "today" || tab === "future"
+          ? { nextCallDate: "asc" as const }
+          : tab === "previous"
+            ? { nextCallDate: "desc" as const }
+            : tab === "48h"
+              ? { updatedAt: "desc" as const }
+              : { createdAt: "desc" as const },
       skip,
       take: limit,
     }),
@@ -328,6 +348,25 @@ export async function createEnquiry(data: CreateEnquiryData) {
     clientId: data.email,
   });
 
+  // Notify super admins about new enquiry
+  await notifySuperAdmins(
+    "SYSTEM_ALERT",
+    "New Enquiry Received",
+    `${data.firstName} ${data.lastName} (${data.email}) submitted an enquiry`,
+    "/clients/enquiries",
+  );
+
+  // Notify assigned agent if any
+  if (assignedAgentId && assignedAgentId !== session.user.id) {
+    await notify(
+      assignedAgentId,
+      "LEAD_ASSIGNED",
+      "Enquiry Assigned to You",
+      `New enquiry from ${data.firstName} ${data.lastName}`,
+      "/clients/enquiries",
+    );
+  }
+
   revalidatePath("/clients/enquiries");
   return enquiry;
 }
@@ -393,6 +432,17 @@ export async function assignEnquiry(enquiryId: string, agentId: string) {
   });
 
   await auditLog("ASSIGN", "Enquiry", enquiryId, { assignedAgentId: agentId });
+
+  // Notify the assigned agent
+  if (agentId !== session.user.id) {
+    await notify(
+      agentId,
+      "LEAD_ASSIGNED",
+      "Enquiry Assigned to You",
+      `An enquiry has been assigned to you`,
+      `/clients/enquiries`,
+    );
+  }
 
   revalidatePath("/clients/enquiries");
   return enquiry;
@@ -552,6 +602,14 @@ export async function convertToClientAndLead(
 
     return { client, lead };
   });
+
+  // Notify super admins about conversion
+  await notifySuperAdmins(
+    "DEAL_STAGE_CHANGED",
+    "Enquiry Converted to Client & Lead",
+    `${enquiry.firstName} ${enquiry.lastName} has been converted to a client and lead`,
+    `/leads/${result.lead.id}`,
+  );
 
   revalidatePath("/clients/enquiries");
   revalidatePath("/clients");
@@ -898,4 +956,243 @@ export async function bulkDeleteEnquiries(ids: string[]) {
   });
 
   revalidatePath("/clients/enquiries");
+}
+
+/**
+ * Sync form submissions from the website (Payload CMS).
+ * Fetches recent submissions and creates CRM enquiries for new ones.
+ */
+export async function syncWebsiteSubmissions(): Promise<{
+  success: boolean;
+  created: number;
+  skipped: number;
+  errors: number;
+  message: string;
+}> {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (!["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(session.user.role)) {
+    throw new Error("Unauthorized: Insufficient permissions");
+  }
+
+  const PAYLOAD_URL =
+    process.env.PAYLOAD_CMS_URL || "https://propertyquestturkey.com";
+  const PAYLOAD_API_KEY = process.env.PAYLOAD_CMS_API_KEY || "";
+
+  // Fetch submissions from Payload CMS
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (PAYLOAD_API_KEY) {
+    headers["Authorization"] = `users API-Key ${PAYLOAD_API_KEY}`;
+  }
+
+  let data: {
+    docs: Array<{
+      id: number;
+      form: { id: number; title: string } | number;
+      submissionData: { field: string; value: string }[];
+      createdAt: string;
+    }>;
+  };
+
+  try {
+    const res = await fetch(
+      `${PAYLOAD_URL}/api/form-submissions?limit=50&sort=-createdAt&depth=1`,
+      { headers, cache: "no-store" },
+    );
+
+    if (!res.ok) {
+      // Try without auth (some Payload configs allow public read)
+      const publicRes = await fetch(
+        `${PAYLOAD_URL}/api/form-submissions?limit=50&sort=-createdAt&depth=1`,
+        { cache: "no-store" },
+      );
+      if (!publicRes.ok) {
+        return {
+          success: false,
+          created: 0,
+          skipped: 0,
+          errors: 0,
+          message: `Cannot access Payload CMS API (${publicRes.status}). Check PAYLOAD_CMS_API_KEY in .env`,
+        };
+      }
+      data = await publicRes.json();
+    } else {
+      data = await res.json();
+    }
+  } catch (err) {
+    return {
+      success: false,
+      created: 0,
+      skipped: 0,
+      errors: 0,
+      message: `Failed to connect to website CMS: ${err}`,
+    };
+  }
+
+  let created = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  for (const submission of data.docs) {
+    try {
+      const formId =
+        typeof submission.form === "object"
+          ? submission.form.id
+          : submission.form;
+      const fields = submission.submissionData || [];
+
+      // Extract fields based on form ID
+      let firstName = "";
+      let lastName = "";
+      let email = "";
+      let phone = "";
+      let message = "";
+      let sourceUrl = "";
+
+      const getVal = (...names: string[]) => {
+        for (const name of names) {
+          const f = fields.find(
+            (x) => x.field.toLowerCase() === name.toLowerCase(),
+          );
+          if (f?.value) return f.value;
+        }
+        return "";
+      };
+
+      switch (formId) {
+        case 1: {
+          const fullName = getVal("full-name", "fullname", "name");
+          const parts = fullName.trim().split(/\s+/);
+          firstName = parts[0] || "";
+          lastName = parts.slice(1).join(" ");
+          email = getVal("email");
+          phone = getVal("phone");
+          message = getVal("message");
+          break;
+        }
+        case 2: {
+          firstName = getVal("firstname", "first-name", "name");
+          lastName = getVal("surname", "last-name", "lastname");
+          email = getVal("email");
+          phone = getVal("phone");
+          message = getVal("message");
+          sourceUrl = getVal("pageURL", "pageurl", "page-url");
+          break;
+        }
+        case 3: {
+          firstName = getVal("name", "firstname", "first-name");
+          lastName = getVal("surname", "last-name", "lastname");
+          email = getVal("email");
+          phone = getVal("phone");
+          break;
+        }
+        default: {
+          firstName = getVal("firstname", "first-name", "name", "full-name");
+          lastName = getVal("surname", "last-name", "lastname");
+          email = getVal("email");
+          phone = getVal("phone");
+          message = getVal("message");
+          sourceUrl = getVal("pageURL", "pageurl");
+          if (!lastName && firstName.includes(" ")) {
+            const parts = firstName.trim().split(/\s+/);
+            firstName = parts[0];
+            lastName = parts.slice(1).join(" ");
+          }
+          break;
+        }
+      }
+
+      firstName = firstName.trim();
+      lastName = lastName.trim();
+      email = email.toLowerCase().trim();
+      phone = phone.trim();
+
+      if (!firstName || !email) {
+        skipped++;
+        continue;
+      }
+
+      // Check if already synced
+      const existingByRef = await prisma.enquiry.findFirst({
+        where: {
+          sourceUrl: { contains: `submission:${submission.id}` },
+        },
+      });
+      if (existingByRef) {
+        skipped++;
+        continue;
+      }
+
+      // Also check by email + timestamp window
+      const submissionDate = new Date(submission.createdAt);
+      const windowStart = new Date(submissionDate.getTime() - 60000);
+      const windowEnd = new Date(submissionDate.getTime() + 60000);
+      const existingByTime = await prisma.enquiry.findFirst({
+        where: {
+          email,
+          source: "WEBSITE_FORM",
+          createdAt: { gte: windowStart, lte: windowEnd },
+        },
+      });
+      if (existingByTime) {
+        skipped++;
+        continue;
+      }
+
+      // Create enquiry
+      const enquiry = await prisma.enquiry.create({
+        data: {
+          firstName,
+          lastName: lastName || "-",
+          email,
+          phone: phone || "-",
+          message: message.trim() || null,
+          source: "WEBSITE_FORM",
+          sourceUrl: sourceUrl
+            ? `${sourceUrl} | submission:${submission.id}`
+            : `submission:${submission.id}`,
+          status: "NEW",
+          segment: "Buyer",
+          priority: "Medium",
+        },
+      });
+
+      // Auto-assign
+      try {
+        const { autoAssignEnquiry } = await import("@/lib/lead-routing");
+        await autoAssignEnquiry(enquiry.id);
+      } catch {
+        // Non-critical
+      }
+
+      created++;
+    } catch {
+      errors++;
+    }
+  }
+
+  // Notify admins if new enquiries were created
+  if (created > 0) {
+    await notifySuperAdmins(
+      "SYSTEM_ALERT",
+      `Synced ${created} Website Enquiries`,
+      `${created} new enquiries imported from the website by ${session.user.firstName}.`,
+      "/clients/enquiries",
+    );
+  }
+
+  revalidatePath("/clients/enquiries");
+
+  return {
+    success: true,
+    created,
+    skipped,
+    errors,
+    message:
+      created > 0
+        ? `Successfully synced ${created} new enquiries`
+        : `No new enquiries found (${skipped} already synced)`,
+  };
 }

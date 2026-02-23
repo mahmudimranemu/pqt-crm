@@ -12,7 +12,7 @@ import type {
   PropertyType,
 } from "@prisma/client";
 import { updateLeadScore, getSlaDeadline } from "@/lib/scoring";
-import { notify } from "@/lib/notifications";
+import { notify, notifySuperAdmins, notifyUserAndAdmins } from "@/lib/notifications";
 import { auditLog } from "@/lib/audit";
 
 interface CreateLeadData {
@@ -99,8 +99,21 @@ export async function getLeads(params?: {
 
   // Tab-based filtering
   const now = new Date();
+  const past48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
   if (tab === "48h") {
-    where.createdAt = { gte: new Date(now.getTime() - 48 * 60 * 60 * 1000) };
+    // Show leads with activity within last 48 hours:
+    // activity logs, notes added, nextCallDate falls in window, or newly created
+    where.AND = [
+      ...(where.AND || []),
+      {
+        OR: [
+          { nextCallDate: { gte: past48h, lte: now } },
+          { activities: { some: { createdAt: { gte: past48h } } } },
+          { notes: { some: { createdAt: { gte: past48h } } } },
+          { createdAt: { gte: past48h } },
+        ],
+      },
+    ];
   } else if (tab === "today") {
     where.nextCallDate = {
       gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
@@ -152,7 +165,14 @@ export async function getLeads(params?: {
         },
         _count: { select: { activities: true, tasks: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy:
+        tab === "today" || tab === "future"
+          ? { nextCallDate: "asc" as const }
+          : tab === "previous"
+            ? { nextCallDate: "desc" as const }
+            : tab === "48h"
+              ? { updatedAt: "desc" as const }
+              : { createdAt: "desc" as const },
       skip: (page - 1) * limit,
       take: limit,
     }),
@@ -399,9 +419,15 @@ export async function updateLeadField(
     throw new Error(`Field '${field}' is not editable`);
   }
 
+  // Convert date strings to proper DateTime for Prisma
+  let finalValue = value;
+  if (field === "nextCallDate" && typeof value === "string") {
+    finalValue = new Date(value).toISOString();
+  }
+
   const lead = await prisma.lead.update({
     where: { id: leadId },
-    data: { [field]: value },
+    data: { [field]: finalValue },
   });
 
   // Re-score when scoring-relevant fields change
@@ -500,6 +526,15 @@ export async function updateLeadStage(id: string, stage: LeadStage) {
   });
 
   await auditLog("STAGE_CHANGE", "Lead", id, { stage });
+
+  // Notify super admins about lead stage change
+  await notifySuperAdmins(
+    "LEAD_ASSIGNED",
+    "Lead Stage Changed",
+    `Lead "${lead.title || lead.leadNumber}" stage changed to ${stage.replace(/_/g, " ")}`,
+    `/leads/${id}`,
+  );
+
   revalidatePath("/leads");
   return lead;
 }
@@ -820,6 +855,15 @@ export async function convertLeadToDeal(
       userId: session.user.id,
     },
   });
+
+  // Notify lead owner + super admins
+  await notifyUserAndAdmins(
+    lead.ownerId,
+    "DEAL_STAGE_CHANGED",
+    "Lead Converted to Deal",
+    `Lead has been converted to deal ${dealNumber}`,
+    `/deals/${deal.id}`,
+  );
 
   revalidatePath("/leads");
   revalidatePath("/deals");

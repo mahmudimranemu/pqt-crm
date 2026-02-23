@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { auth, type ExtendedSession } from "@/lib/auth";
 import type { TaskStatus, TaskPriority } from "@prisma/client";
 import { auditLog } from "@/lib/audit";
+import { notifyUserAndAdmins } from "@/lib/notifications";
 
 export async function getTasks(params?: {
   search?: string;
@@ -135,6 +136,18 @@ export async function createTaskAction(data: {
     title: data.title,
     priority: data.priority,
   });
+
+  // Notify assignee (+ super admins)
+  const assigneeId = data.assigneeId || session.user.id;
+  if (assigneeId !== session.user.id) {
+    await notifyUserAndAdmins(
+      assigneeId,
+      "TASK_ASSIGNED",
+      "New Task Assigned",
+      `You have been assigned: "${data.title}"`,
+      "/tasks",
+    );
+  }
 
   revalidatePath("/tasks");
   return task;

@@ -165,8 +165,24 @@ export default async function LeadDetailPage({
         </Card>
       </div>
 
+      {/* Lead Management - Full Width */}
+      <LeadDetailFields
+        lead={{
+          id: lead.id,
+          stage: lead.stage,
+          segment: lead.segment,
+          priority: lead.priority,
+          nextCallDate: lead.nextCallDate?.toISOString() || null,
+          snooze: lead.snooze,
+          ownerId: lead.ownerId,
+          temperature: lead.temperature,
+          tags: lead.tags,
+        }}
+        agents={agents}
+      />
+
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left Column: Editable Fields */}
+        {/* Left Column */}
         <div className="lg:col-span-1 space-y-6">
           {/* Tags */}
           <Card>
@@ -190,22 +206,6 @@ export default async function LeadDetailPage({
             leadId={lead.id}
             currentProperty={lead.interestedProperty}
             properties={properties}
-          />
-
-          {/* Editable Fields */}
-          <LeadDetailFields
-            lead={{
-              id: lead.id,
-              stage: lead.stage,
-              segment: lead.segment,
-              priority: lead.priority,
-              nextCallDate: lead.nextCallDate?.toISOString() || null,
-              snooze: lead.snooze,
-              ownerId: lead.ownerId,
-              temperature: lead.temperature,
-              tags: lead.tags,
-            }}
-            agents={agents}
           />
 
           {/* Client Info */}

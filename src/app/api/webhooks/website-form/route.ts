@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { notifySuperAdmins } from "@/lib/notifications";
 
 /**
  * Webhook endpoint for Payload CMS form submissions.
@@ -8,48 +9,44 @@ import prisma from "@/lib/prisma";
  * Form 1 (Contact Form):  full-name, email, phone, message
  * Form 2 (Enquiry Form):  firstname, surname, email, phone, message, pageURL
  * Form 3 (Home Contact):  name, surname, email, phone
+ *
+ * Expected payload from Payload CMS afterChange hook:
+ * {
+ *   source: "website",
+ *   formTitle: "Enquiry Form",
+ *   formId: 2,
+ *   submissionId: 45,
+ *   submissionData: [{ field: "firstname", value: "John" }, ...],
+ *   submittedAt: "2026-02-24T..."
+ * }
+ *
+ * Also supports legacy formats:
+ * - { doc: { form, submissionData, ... } }
+ * - { form, submissionData: [...] }
  */
 
 const WEBHOOK_SECRET = process.env.WEBSITE_WEBHOOK_SECRET;
 
-interface FormSubmissionField {
+interface FormField {
   field: string;
   value: string;
 }
 
-interface PayloadFormSubmission {
-  form?: number | { id: number; title?: string };
-  submissionData?: FormSubmissionField[];
-  // Direct field format (alternative payload shape)
-  [key: string]: unknown;
-}
-
-function getFieldValue(
-  fields: FormSubmissionField[],
-  ...names: string[]
-): string {
+function getFieldValue(fields: FormField[], ...names: string[]): string {
   for (const name of names) {
     const field = fields.find(
-      (f) => f.field.toLowerCase() === name.toLowerCase()
+      (f) => f.field.toLowerCase() === name.toLowerCase(),
     );
     if (field?.value) return field.value;
   }
   return "";
 }
 
-function splitFullName(fullName: string): {
-  firstName: string;
-  lastName: string;
-} {
+function splitFullName(fullName: string) {
   const trimmed = fullName.trim();
   const parts = trimmed.split(/\s+/);
-  if (parts.length === 1) {
-    return { firstName: parts[0], lastName: "" };
-  }
-  return {
-    firstName: parts[0],
-    lastName: parts.slice(1).join(" "),
-  };
+  if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
 }
 
 export async function POST(request: NextRequest) {
@@ -61,24 +58,91 @@ export async function POST(request: NextRequest) {
       authHeader?.replace("Bearer ", "") || secretParam || "";
 
     if (providedSecret !== WEBHOOK_SECRET) {
+      console.error("[WEBHOOK] Unauthorized: invalid secret");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
 
   try {
-    const body: PayloadFormSubmission = await request.json();
+    const rawBody = await request.text();
+    console.log("[WEBHOOK] Received payload:", rawBody.substring(0, 1000));
 
-    // Extract form ID
-    const formId =
-      typeof body.form === "object" ? body.form?.id : body.form;
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      console.error("[WEBHOOK] Invalid JSON body");
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 },
+      );
+    }
 
-    // Extract submission fields
-    const fields: FormSubmissionField[] = body.submissionData || [];
+    // Handle multiple payload formats:
+    // 1. Our afterChange hook: { source, formId, submissionId, submissionData, formTitle }
+    // 2. Payload afterChange doc wrapper: { doc: { form, submissionData, ... } }
+    // 3. Direct form-builder format: { form, submissionData: [...] }
+
+    // Extract form ID - check all possible locations
+    const formId: number | undefined =
+      (body.formId as number) || // Our hook format
+      (() => {
+        const doc = body.doc as Record<string, unknown> | undefined;
+        const formRef = doc?.form ?? body.form;
+        if (typeof formRef === "number") return formRef;
+        if (typeof formRef === "object" && formRef !== null)
+          return (formRef as { id: number }).id;
+        return undefined;
+      })();
+
+    // Extract submission ID
+    const submissionId: number | null =
+      (body.submissionId as number) || // Our hook format
+      (body.doc as Record<string, unknown>)?.id as number ||
+      (body.id as number) ||
+      null;
+
+    // Extract formTitle if provided
+    const formTitle = (body.formTitle as string) || "";
+
+    // Extract submission fields - try multiple locations
+    let fields: FormField[] = [];
+
+    if (Array.isArray(body.submissionData)) {
+      fields = body.submissionData as FormField[];
+    } else if (
+      body.doc &&
+      Array.isArray((body.doc as Record<string, unknown>).submissionData)
+    ) {
+      fields = (body.doc as Record<string, unknown>)
+        .submissionData as FormField[];
+    }
+
+    // Fallback: try to build fields from top-level keys
+    if (fields.length === 0) {
+      const knownKeys = [
+        "firstname",
+        "surname",
+        "email",
+        "phone",
+        "message",
+        "full-name",
+        "name",
+        "pageURL",
+      ];
+      for (const key of knownKeys) {
+        const val = (body[key] as string);
+        if (val) {
+          fields.push({ field: key, value: val });
+        }
+      }
+    }
 
     if (fields.length === 0) {
+      console.error("[WEBHOOK] No submission data found in payload");
       return NextResponse.json(
         { error: "No submission data found" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -89,13 +153,17 @@ export async function POST(request: NextRequest) {
     let phone = "";
     let message = "";
     let sourceUrl = "";
-    let formName = "Website";
+    let formName = formTitle || "Website";
 
     switch (formId) {
       case 1: {
-        // Contact Form: full-name, email, phone, message
-        formName = "Contact Form";
-        const fullName = getFieldValue(fields, "full-name", "fullname", "name");
+        if (!formName || formName === "Website") formName = "Contact Form";
+        const fullName = getFieldValue(
+          fields,
+          "full-name",
+          "fullname",
+          "name",
+        );
         const split = splitFullName(fullName);
         firstName = split.firstName;
         lastName = split.lastName;
@@ -105,8 +173,7 @@ export async function POST(request: NextRequest) {
         break;
       }
       case 2: {
-        // Enquiry Form: firstname, surname, email, phone, message, pageURL
-        formName = "Enquiry Form";
+        if (!formName || formName === "Website") formName = "Enquiry Form";
         firstName = getFieldValue(fields, "firstname", "first-name", "name");
         lastName = getFieldValue(fields, "surname", "last-name", "lastname");
         email = getFieldValue(fields, "email");
@@ -116,8 +183,7 @@ export async function POST(request: NextRequest) {
         break;
       }
       case 3: {
-        // Home Contact: name, surname, email, phone
-        formName = "Home Contact";
+        if (!formName || formName === "Website") formName = "Home Contact";
         firstName = getFieldValue(fields, "name", "firstname", "first-name");
         lastName = getFieldValue(fields, "surname", "last-name", "lastname");
         email = getFieldValue(fields, "email");
@@ -125,14 +191,14 @@ export async function POST(request: NextRequest) {
         break;
       }
       default: {
-        // Generic fallback: try common field names
-        formName = `Website Form #${formId || "unknown"}`;
+        if (!formName || formName === "Website")
+          formName = `Website Form #${formId || "unknown"}`;
         firstName = getFieldValue(
           fields,
           "firstname",
           "first-name",
           "name",
-          "full-name"
+          "full-name",
         );
         lastName = getFieldValue(fields, "surname", "last-name", "lastname");
         email = getFieldValue(fields, "email");
@@ -140,7 +206,6 @@ export async function POST(request: NextRequest) {
         message = getFieldValue(fields, "message");
         sourceUrl = getFieldValue(fields, "pageURL", "pageurl");
 
-        // Handle full-name splitting for fallback
         if (!lastName && firstName.includes(" ")) {
           const split = splitFullName(firstName);
           firstName = split.firstName;
@@ -150,19 +215,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    firstName = firstName.trim();
+    lastName = lastName.trim();
+    email = email.toLowerCase().trim();
+    phone = phone.trim();
+
     // Validate required fields
     if (!firstName || !email) {
+      console.error(
+        `[WEBHOOK] Missing required fields. firstName="${firstName}", email="${email}"`,
+      );
       return NextResponse.json(
-        { error: "Missing required fields: firstName and email are required" },
-        { status: 400 }
+        {
+          error:
+            "Missing required fields: firstName and email are required",
+        },
+        { status: 400 },
       );
     }
 
-    // Check for duplicate submissions (same email within last 5 minutes)
+    // Check for duplicate (by submission ID reference or by email + time)
+    if (submissionId) {
+      const existingByRef = await prisma.enquiry.findFirst({
+        where: { sourceUrl: { contains: `submission:${submissionId}` } },
+      });
+      if (existingByRef) {
+        return NextResponse.json(
+          {
+            message: "Already synced",
+            enquiryId: existingByRef.id,
+          },
+          { status: 200 },
+        );
+      }
+    }
+
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     const duplicate = await prisma.enquiry.findFirst({
       where: {
-        email: email.toLowerCase().trim(),
+        email,
         createdAt: { gte: fiveMinutesAgo },
         source: "WEBSITE_FORM",
       },
@@ -170,28 +261,35 @@ export async function POST(request: NextRequest) {
 
     if (duplicate) {
       return NextResponse.json(
-        { message: "Duplicate submission detected", enquiryId: duplicate.id },
-        { status: 200 }
+        {
+          message: "Duplicate submission detected",
+          enquiryId: duplicate.id,
+        },
+        { status: 200 },
       );
     }
 
     // Create the enquiry
     const enquiry = await prisma.enquiry.create({
       data: {
-        firstName: firstName.trim(),
-        lastName: lastName.trim() || "-",
-        email: email.toLowerCase().trim(),
-        phone: phone.trim() || "-",
+        firstName,
+        lastName: lastName || "-",
+        email,
+        phone: phone || "-",
         message: message.trim() || null,
         source: "WEBSITE_FORM",
-        sourceUrl: sourceUrl.trim() || null,
+        sourceUrl: submissionId
+          ? sourceUrl
+            ? `${sourceUrl} | submission:${submissionId}`
+            : `submission:${submissionId}`
+          : sourceUrl || null,
         status: "NEW",
         segment: "Buyer",
         priority: "Medium",
       },
     });
 
-    // Try auto-assign via lead routing (non-critical)
+    // Try auto-assign (non-critical)
     try {
       const { autoAssignEnquiry } = await import("@/lib/lead-routing");
       await autoAssignEnquiry(enquiry.id);
@@ -199,8 +297,16 @@ export async function POST(request: NextRequest) {
       // Lead routing is non-critical
     }
 
+    // Notify super admins
+    await notifySuperAdmins(
+      "SYSTEM_ALERT",
+      `New Website Enquiry (${formName})`,
+      `${firstName} ${lastName} (${email}) submitted a form on the website`,
+      "/clients/enquiries",
+    );
+
     console.log(
-      `[WEBHOOK] New enquiry created from ${formName}: ${enquiry.id} - ${firstName} ${lastName} (${email})`
+      `[WEBHOOK] New enquiry created from ${formName}: ${enquiry.id} - ${firstName} ${lastName} (${email})`,
     );
 
     return NextResponse.json(
@@ -209,26 +315,27 @@ export async function POST(request: NextRequest) {
         enquiryId: enquiry.id,
         message: `Enquiry created from ${formName}`,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error("[WEBHOOK] Failed to process form submission:", error);
     return NextResponse.json(
       { error: "Failed to process form submission" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
-// Also handle GET for health check
+// Health check
 export async function GET() {
   return NextResponse.json({
     status: "ok",
     endpoint: "Website Form Webhook",
     forms: [
-      { id: 1, name: "Contact Form" },
-      { id: 2, name: "Enquiry Form" },
-      { id: 3, name: "Home Contact" },
+      { id: 1, name: "Contact Form", fields: "full-name, email, phone, message" },
+      { id: 2, name: "Enquiry Form", fields: "firstname, surname, email, phone, message, pageURL" },
+      { id: 3, name: "Home Contact", fields: "name, surname, email, phone" },
     ],
+    usage: "POST to this endpoint with Payload CMS form submission data",
   });
 }
