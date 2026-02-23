@@ -1,9 +1,10 @@
 import { auth, type ExtendedSession } from "@/lib/auth";
 import { getTasks, getOverdueTasksCount } from "@/lib/actions/tasks";
-import { getUsers } from "@/lib/actions/users";
+import { getAgents } from "@/lib/actions/enquiries";
+import { getLeads } from "@/lib/actions/leads";
+import { getDeals } from "@/lib/actions/deals";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -14,7 +15,6 @@ import {
 } from "@/components/ui/table";
 import {
   CheckSquare,
-  Plus,
   AlertTriangle,
   Clock,
   CheckCircle,
@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { TaskActions } from "./task-actions";
+import { CreateTaskDialog } from "./create-task-dialog";
 
 const priorityColors: Record<string, string> = {
   LOW: "bg-gray-100 text-gray-700",
@@ -41,9 +42,12 @@ export default async function TasksPage() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) return null;
 
-  const [{ tasks, total }, overdueCount] = await Promise.all([
+  const [{ tasks, total }, overdueCount, users, { leads }, { deals }] = await Promise.all([
     getTasks({ limit: 50 }),
     getOverdueTasksCount(),
+    getAgents(),
+    getLeads({ limit: 100 }),
+    getDeals({ limit: 100 }),
   ]);
 
   const todoCount = tasks.filter((t) => t.status === "TODO").length;
@@ -66,10 +70,11 @@ export default async function TasksPage() {
           </div>
         </div>
         {session.user.role !== "VIEWER" && (
-          <Button className="gap-2 bg-[#dc2626] hover:bg-[#b91c1c] text-white">
-            <Plus className="h-4 w-4" />
-            New Task
-          </Button>
+          <CreateTaskDialog
+            users={users}
+            leads={leads.map((l) => ({ id: l.id, title: l.title }))}
+            deals={deals.map((d) => ({ id: d.id, title: d.title }))}
+          />
         )}
       </div>
 

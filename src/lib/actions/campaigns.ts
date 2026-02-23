@@ -47,6 +47,7 @@ export async function getCampaignById(id: string) {
 export async function createCampaign(data: {
   name: string;
   description?: string;
+  status?: CampaignStatus;
   source?: LeadSource;
   channel?: SourceChannel;
   budget?: number;
@@ -64,6 +65,7 @@ export async function createCampaign(data: {
     data: {
       name: data.name,
       description: data.description,
+      status: data.status || "DRAFT",
       source: data.source,
       channel: data.channel,
       budget: data.budget,

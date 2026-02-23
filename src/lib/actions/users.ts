@@ -97,6 +97,9 @@ export async function getUserById(id: string) {
       role: true,
       office: true,
       isActive: true,
+      phone: true,
+      avatar: true,
+      twoFactorEnabled: true,
       createdAt: true,
       updatedAt: true,
       _count: {
@@ -172,6 +175,7 @@ export async function updateUser(
     lastName?: string;
     email?: string;
     phone?: string;
+    avatar?: string;
     role?: UserRole;
     office?: Office;
     isActive?: boolean;
@@ -189,10 +193,10 @@ export async function updateUser(
     throw new Error("Unauthorized");
   }
 
-  // Non-admins can only update firstName/lastName
+  // Non-admins can only update their own profile fields
   if (!isAdmin) {
-    const { firstName, lastName } = data;
-    data = { firstName, lastName };
+    const { firstName, lastName, phone, avatar } = data;
+    data = { firstName, lastName, phone, avatar };
   }
 
   // Only SUPER_ADMIN can change email

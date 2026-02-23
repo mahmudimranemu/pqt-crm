@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Flag, Clock, CheckCircle, Award, Users } from "lucide-react";
-import type { CitizenshipStage } from "@prisma/client";
+import type { CitizenshipStage, MilestoneStatus } from "@prisma/client";
 
 const stageColors: Record<
   CitizenshipStage,
@@ -48,6 +48,30 @@ const stageLabels: Record<CitizenshipStage, string> = {
   PASSPORT_ISSUED: "Passport Issued",
   REJECTED: "Rejected",
 };
+
+function MiniProgressBar({
+  milestones,
+}: {
+  milestones: { id: string; status: MilestoneStatus }[];
+}) {
+  const total = milestones.length;
+  const completed = milestones.filter((m) => m.status === "COMPLETED").length;
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  return (
+    <div className="flex items-center gap-2 min-w-[120px]">
+      <div className="flex-1 bg-gray-200 rounded-full h-2">
+        <div
+          className="bg-[#dc2626] h-2 rounded-full transition-all duration-300"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+        {completed}/{total}
+      </span>
+    </div>
+  );
+}
 
 export default async function CitizenshipPage() {
   const session = (await auth()) as ExtendedSession | null;
@@ -129,16 +153,20 @@ export default async function CitizenshipPage() {
                   <TableHead>Agent</TableHead>
                   <TableHead>Family</TableHead>
                   <TableHead>Stage</TableHead>
+                  <TableHead>Progress</TableHead>
                   <TableHead>Started</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {applications.map((app) => (
-                  <TableRow key={app.id}>
+                  <TableRow
+                    key={app.id}
+                    className="cursor-pointer hover:bg-red-50/50 transition-colors"
+                  >
                     <TableCell>
                       <Link
                         href={`/citizenship/${app.id}`}
-                        className="font-medium text-gray-900 hover:underline"
+                        className="font-medium text-[#dc2626] hover:underline"
                       >
                         {app.applicationNumber ||
                           app.id.slice(0, 8).toUpperCase()}
@@ -170,6 +198,9 @@ export default async function CitizenshipPage() {
                       <Badge variant={stageColors[app.stage]}>
                         {stageLabels[app.stage]}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <MiniProgressBar milestones={app.milestones} />
                     </TableCell>
                     <TableCell>
                       {new Date(app.startDate).toLocaleDateString()}

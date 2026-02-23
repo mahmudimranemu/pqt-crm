@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { getCitizenshipById } from "@/lib/actions/citizenship";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,15 +10,11 @@ import {
   User,
   Building,
   Calendar,
-  CheckCircle,
-  Clock,
   Users,
-  FileText,
-  Flag,
 } from "lucide-react";
-import type { CitizenshipStage, MilestoneStatus } from "@prisma/client";
+import type { CitizenshipStage } from "@prisma/client";
 import { StageActions } from "./stage-actions";
-import { MilestoneList } from "./milestone-list";
+import { CitizenshipProgressTracker } from "./citizenship-progress-tracker";
 import { FamilyMembersList } from "./family-members-list";
 
 const stageColors: Record<CitizenshipStage, "default" | "secondary" | "success" | "warning" | "destructive"> = {
@@ -48,19 +45,6 @@ const stageLabels: Record<CitizenshipStage, string> = {
   REJECTED: "Rejected",
 };
 
-const allStages: CitizenshipStage[] = [
-  "DOCUMENT_COLLECTION",
-  "PROPERTY_VALUATION",
-  "APPLICATION_FILED",
-  "BIOMETRICS_SCHEDULED",
-  "BIOMETRICS_COMPLETED",
-  "UNDER_REVIEW",
-  "INTERVIEW_SCHEDULED",
-  "INTERVIEW_COMPLETED",
-  "APPROVED",
-  "PASSPORT_ISSUED",
-];
-
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -75,6 +59,8 @@ interface CitizenshipDetailPageProps {
 
 export default async function CitizenshipDetailPage({ params }: CitizenshipDetailPageProps) {
   const { id } = await params;
+  const session = (await auth()) as ExtendedSession | null;
+  const isViewer = session?.user?.role === "VIEWER";
 
   let application;
   try {
@@ -83,10 +69,9 @@ export default async function CitizenshipDetailPage({ params }: CitizenshipDetai
     notFound();
   }
 
-  const currentStageIndex = allStages.indexOf(application.stage);
-
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/citizenship">
           <Button variant="ghost" size="icon">
@@ -101,209 +86,157 @@ export default async function CitizenshipDetailPage({ params }: CitizenshipDetai
             {application.client.firstName} {application.client.lastName}
           </p>
         </div>
-        <Badge variant={stageColors[application.stage]} className="text-sm px-3 py-1">
-          {stageLabels[application.stage]}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant={stageColors[application.stage]} className="text-sm px-3 py-1">
+            {stageLabels[application.stage]}
+          </Badge>
+          {!isViewer && (
+            <StageActions applicationId={application.id} currentStage={application.stage} />
+          )}
+        </div>
       </div>
 
-      {/* Progress Tracker */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Application Progress</span>
-            <StageActions applicationId={application.id} currentStage={application.stage} />
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="relative">
-            <div className="flex items-center justify-between">
-              {allStages.slice(0, 5).map((stage, index) => (
-                <div key={stage} className="flex flex-col items-center flex-1">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs ${
-                      index <= currentStageIndex
-                        ? "bg-[#dc2626] text-white"
-                        : "bg-gray-200 text-gray-500"
-                    }`}
-                  >
-                    {index < currentStageIndex ? (
-                      <CheckCircle className="h-4 w-4" />
-                    ) : (
-                      index + 1
-                    )}
-                  </div>
-                  <span className="text-xs mt-1 text-center max-w-[60px]">
-                    {stageLabels[stage].split(" ")[0]}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-between mt-4">
-              {allStages.slice(5).map((stage, index) => (
-                <div key={stage} className="flex flex-col items-center flex-1">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs ${
-                      index + 5 <= currentStageIndex
-                        ? "bg-[#dc2626] text-white"
-                        : "bg-gray-200 text-gray-500"
-                    }`}
-                  >
-                    {index + 5 < currentStageIndex ? (
-                      <CheckCircle className="h-4 w-4" />
-                    ) : (
-                      index + 6
-                    )}
-                  </div>
-                  <span className="text-xs mt-1 text-center max-w-[60px]">
-                    {stageLabels[stage].split(" ")[0]}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* Info Cards Row */}
+      <div className="grid gap-6 md:grid-cols-3">
         {/* Client Info */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <User className="h-4 w-4 text-[#dc2626]" />
               Main Applicant
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <CardContent className="space-y-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Name</p>
+              <Link
+                href={`/clients/${application.client.id}`}
+                className="font-medium text-gray-900 hover:underline text-sm"
+              >
+                {application.client.firstName} {application.client.lastName}
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-sm text-muted-foreground">Name</p>
-                <Link
-                  href={`/clients/${application.client.id}`}
-                  className="font-medium text-gray-900 hover:underline"
-                >
-                  {application.client.firstName} {application.client.lastName}
-                </Link>
+                <p className="text-xs text-muted-foreground">Nationality</p>
+                <p className="font-medium text-sm">{application.client.nationality || "-"}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Nationality</p>
-                <p className="font-medium">{application.client.nationality || "-"}</p>
+                <p className="text-xs text-muted-foreground">Passport</p>
+                <p className="font-medium text-sm">{application.client.passportNumber || "-"}</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Passport</p>
-                <p className="font-medium">{application.client.passportNumber || "-"}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Email</p>
-                <p className="font-medium">{application.client.email || "-"}</p>
-              </div>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Email</p>
+              <p className="font-medium text-sm">{application.client.email || "-"}</p>
             </div>
           </CardContent>
         </Card>
 
         {/* Property & Sale Info */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building className="h-5 w-5" />
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Building className="h-4 w-4 text-[#dc2626]" />
               Property & Investment
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             <div>
-              <p className="text-sm text-muted-foreground">Property</p>
+              <p className="text-xs text-muted-foreground">Property</p>
               <Link
                 href={`/properties/${application.sale.property.id}`}
-                className="font-medium text-gray-900 hover:underline"
+                className="font-medium text-gray-900 hover:underline text-sm"
               >
                 {application.sale.property.name}
               </Link>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Investment Amount</p>
-                <p className="font-semibold text-lg text-[#dc2626]">
-                  {formatCurrency(Number(application.sale.salePrice))}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Sales Agent</p>
-                <p className="font-medium">
-                  {application.sale.agent.firstName} {application.sale.agent.lastName}
-                </p>
-              </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Investment Amount</p>
+              <p className="font-semibold text-lg text-[#dc2626]">
+                {formatCurrency(Number(application.sale.salePrice))}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Sales Agent</p>
+              <p className="font-medium text-sm">
+                {application.sale.agent.firstName} {application.sale.agent.lastName}
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Timeline Info */}
+        {/* Timeline & Family */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Calendar className="h-4 w-4 text-[#dc2626]" />
               Timeline
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-sm text-muted-foreground">Start Date</p>
-                <p className="font-medium">
+                <p className="text-xs text-muted-foreground">Start Date</p>
+                <p className="font-medium text-sm">
                   {new Date(application.startDate).toLocaleDateString()}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Est. Completion</p>
-                <p className="font-medium">
+                <p className="text-xs text-muted-foreground">Est. Completion</p>
+                <p className="font-medium text-sm">
                   {application.estimatedCompletionDate
                     ? new Date(application.estimatedCompletionDate).toLocaleDateString()
                     : "-"}
                 </p>
               </div>
-              {application.actualCompletionDate && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Actual Completion</p>
-                  <p className="font-medium text-green-600">
-                    {new Date(application.actualCompletionDate).toLocaleDateString()}
-                  </p>
-                </div>
-              )}
+            </div>
+            {application.actualCompletionDate && (
+              <div>
+                <p className="text-xs text-muted-foreground">Actual Completion</p>
+                <p className="font-medium text-sm text-green-600">
+                  {new Date(application.actualCompletionDate).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+            <div className="pt-2 border-t">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">
+                  {application.familyMembers.length} family member{application.familyMembers.length !== 1 ? "s" : ""}
+                </span>
+              </div>
             </div>
             {application.notes && (
-              <div>
-                <p className="text-sm text-muted-foreground">Notes</p>
-                <p className="font-medium whitespace-pre-wrap">{application.notes}</p>
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground">Notes</p>
+                <p className="text-sm whitespace-pre-wrap">{application.notes}</p>
               </div>
             )}
           </CardContent>
         </Card>
-
-        {/* Family Members */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Family Members ({application.familyMembers.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <FamilyMembersList
-              applicationId={application.id}
-              members={application.familyMembers}
-            />
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Milestones */}
+      {/* Progress Tracker - The main feature */}
+      <CitizenshipProgressTracker
+        applicationId={application.id}
+        milestones={application.milestones}
+        isViewer={isViewer}
+      />
+
+      {/* Family Members */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Flag className="h-5 w-5" />
-            Milestones
+            <Users className="h-5 w-5 text-[#dc2626]" />
+            Family Members ({application.familyMembers.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <MilestoneList milestones={application.milestones} />
+          <FamilyMembersList
+            applicationId={application.id}
+            members={application.familyMembers}
+          />
         </CardContent>
       </Card>
     </div>

@@ -706,6 +706,9 @@ enum SourceChannel {
   REFERRAL
   DIRECT
   EMAIL_CAMPAIGN
+  EMAIL
+  WHATSAPP
+  SMS
   PARTNER
   EVENT
 }

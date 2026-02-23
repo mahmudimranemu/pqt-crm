@@ -200,6 +200,58 @@ export async function deleteTaskAction(id: string) {
   revalidatePath("/tasks");
 }
 
+export async function getTodayAgenda() {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+
+  const today = new Date();
+  const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(session.user.role);
+
+  const taskWhere: any = {
+    dueDate: { gte: startOfDay, lt: endOfDay },
+    status: { in: ["TODO", "IN_PROGRESS"] },
+  };
+  if (!viewAll) taskWhere.assigneeId = session.user.id;
+
+  const bookingWhere: any = {
+    bookingDate: { gte: startOfDay, lt: endOfDay },
+  };
+  if (!viewAll) bookingWhere.agentId = session.user.id;
+
+  const [tasks, bookings, overdueTasks] = await Promise.all([
+    prisma.task.findMany({
+      where: taskWhere,
+      include: {
+        assignee: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: [{ priority: "desc" }, { dueDate: "asc" }],
+      take: 5,
+    }),
+    prisma.booking.findMany({
+      where: bookingWhere,
+      include: {
+        client: { select: { firstName: true, lastName: true } },
+        property: { select: { name: true } },
+        agent: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { bookingDate: "asc" },
+      take: 5,
+    }),
+    prisma.task.count({
+      where: {
+        ...(viewAll ? {} : { assigneeId: session.user.id }),
+        status: { in: ["TODO", "IN_PROGRESS"] },
+        dueDate: { lt: startOfDay },
+      },
+    }),
+  ]);
+
+  return { tasks, bookings, overdueTasks };
+}
+
 export async function getOverdueTasksCount() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");

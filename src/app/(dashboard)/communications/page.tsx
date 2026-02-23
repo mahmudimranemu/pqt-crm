@@ -1,5 +1,6 @@
+import { Suspense } from "react";
 import { auth, type ExtendedSession } from "@/lib/auth";
-import { getCallLogs, getCallStats } from "@/lib/actions/communications";
+import { getCallLogs, getCallStats, getAgentsList } from "@/lib/actions/communications";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,10 +17,11 @@ import {
   PhoneOutgoing,
   Clock,
   CheckCircle,
-  XCircle,
+  ShieldAlert,
 } from "lucide-react";
-import type { CallType, CallOutcome } from "@prisma/client";
+import type { CallOutcome } from "@prisma/client";
 import { LogCallDialog } from "./log-call-dialog";
+import { AgentFilter } from "./agent-filter";
 import Link from "next/link";
 
 const outcomeColors: Record<
@@ -48,11 +50,47 @@ function formatDuration(seconds: number) {
   return `${mins}m ${secs}s`;
 }
 
-export default async function CommunicationsPage() {
+interface PageProps {
+  searchParams: Promise<{
+    agentId?: string;
+  }>;
+}
+
+export default async function CommunicationsPage({ searchParams }: PageProps) {
   const session = (await auth()) as ExtendedSession | null;
-  const [{ calls, total }, stats] = await Promise.all([
-    getCallLogs(),
+
+  // Role check: only SUPER_ADMIN and ADMIN can access this page
+  if (
+    !session?.user?.role ||
+    !["SUPER_ADMIN", "ADMIN"].includes(session.user.role)
+  ) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="border border-gray-200 max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mx-auto mb-4">
+              <ShieldAlert className="h-6 w-6 text-[#dc2626]" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              Access Denied
+            </h2>
+            <p className="text-sm text-gray-500">
+              You don&apos;t have permission to access this page. Only
+              administrators can view communications.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const params = await searchParams;
+  const agentId = params.agentId || undefined;
+
+  const [{ calls, total }, stats, agents] = await Promise.all([
+    getCallLogs({ agentId }),
     getCallStats(),
+    getAgentsList(),
   ]);
 
   const statCards = [
@@ -91,7 +129,12 @@ export default async function CommunicationsPage() {
             Track calls and client communications
           </p>
         </div>
-        {session?.user?.role !== "VIEWER" && <LogCallDialog />}
+        <div className="flex items-center gap-3">
+          <Suspense fallback={null}>
+            <AgentFilter agents={agents} />
+          </Suspense>
+          <LogCallDialog />
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -117,14 +160,25 @@ export default async function CommunicationsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent Calls ({total})</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Recent Calls ({total})</CardTitle>
+            {agentId && (
+              <Badge variant="secondary" className="text-xs">
+                Filtered by agent
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {calls.length === 0 ? (
             <div className="text-center py-12">
               <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No calls logged yet.</p>
-              {session?.user?.role !== "VIEWER" && <LogCallDialog />}
+              <p className="text-muted-foreground">
+                {agentId
+                  ? "No calls found for this agent."
+                  : "No calls logged yet."}
+              </p>
+              <LogCallDialog />
             </div>
           ) : (
             <Table>

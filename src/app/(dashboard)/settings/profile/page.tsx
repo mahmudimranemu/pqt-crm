@@ -1,9 +1,12 @@
 import { auth, type ExtendedSession } from "@/lib/auth";
 import { getUserById } from "@/lib/actions/users";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Settings, User, Bell, Palette, Shield, Globe } from "lucide-react";
 import { ProfileForm } from "./profile-form";
+import { NotificationsTab } from "./notifications-tab";
+import { AppearanceTab } from "./appearance-tab";
+import { SecurityTab } from "./security-tab";
+import { PreferencesTab } from "./preferences-tab";
 import Link from "next/link";
 
 const settingsTabs = [
@@ -34,11 +37,17 @@ const settingsTabs = [
   },
 ];
 
-export default async function ProfilePage() {
+interface PageProps {
+  searchParams: Promise<{ tab?: string }>;
+}
+
+export default async function ProfilePage({ searchParams }: PageProps) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) return null;
 
   const user = await getUserById(session.user.id);
+  const params = await searchParams;
+  const activeTab = params.tab || "profile";
 
   return (
     <div className="space-y-6">
@@ -60,8 +69,8 @@ export default async function ProfilePage() {
             key={tab.key}
             href={tab.href}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors ${
-              tab.key === "profile"
-                ? "border-b-2 border-gray-900 text-gray-900"
+              tab.key === activeTab
+                ? "border-b-2 border-[#dc2626] text-[#dc2626]"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -71,92 +80,31 @@ export default async function ProfilePage() {
         ))}
       </div>
 
-      {/* Profile Settings */}
-      <Card className="border border-gray-200">
-        <CardContent className="p-6">
-          <h2 className="mb-6 text-lg font-semibold text-gray-900">
-            Profile Settings
-          </h2>
-
-          {/* Avatar Section */}
-          <div className="mb-8 flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-200 text-xl font-bold text-gray-500">
-              {user.firstName[0]}
-              {user.lastName[0]}
-            </div>
-            <div>
-              <Button
-                size="sm"
-                className="bg-[#dc2626] hover:bg-[#b91c1c] text-white"
-              >
-                Change Avatar
-              </Button>
-              <p className="mt-1 text-xs text-gray-500">
-                JPG, PNG or GIF. Max 2MB.
-              </p>
-            </div>
-          </div>
-
-          {/* Profile Fields */}
-          <div className="space-y-6">
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">
-                  First Name
-                </label>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900">
-                  {user.firstName}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">
-                  Last Name
-                </label>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900">
-                  {user.lastName}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">
-                  Email
-                </label>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900">
-                  {user.email}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">
-                  Phone
-                </label>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900">
-                  +1 (555) 123-4567
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-gray-700">Bio</label>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 min-h-[80px]">
-                Senior Real Estate Consultant with 10+ years of experience.
-              </div>
-            </div>
-          </div>
-
-          {/* Hidden editable form for actual updates */}
-          <div className="mt-6">
+      {/* Tab Content */}
+      {activeTab === "profile" && (
+        <Card className="border border-gray-200">
+          <CardContent className="p-6">
+            <h2 className="mb-6 text-lg font-semibold text-gray-900">
+              Profile Settings
+            </h2>
             <ProfileForm
               userId={user.id}
               initialData={{
                 firstName: user.firstName,
                 lastName: user.lastName,
+                email: user.email,
+                phone: user.phone || "",
+                avatar: user.avatar || "",
               }}
             />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === "notifications" && <NotificationsTab />}
+      {activeTab === "appearance" && <AppearanceTab />}
+      {activeTab === "security" && <SecurityTab />}
+      {activeTab === "preferences" && <PreferencesTab />}
     </div>
   );
 }

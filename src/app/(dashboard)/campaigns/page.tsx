@@ -2,7 +2,6 @@ import { auth, type ExtendedSession } from "@/lib/auth";
 import { getCampaigns, getCampaignStats } from "@/lib/actions/campaigns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -11,8 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Megaphone, Plus, Target, TrendingUp, DollarSign } from "lucide-react";
-import Link from "next/link";
+import { Megaphone } from "lucide-react";
+import NewCampaignDialog from "./new-campaign-dialog";
 
 const statusColors: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-700",
@@ -20,6 +19,20 @@ const statusColors: Record<string, string> = {
   PAUSED: "bg-yellow-100 text-yellow-700",
   COMPLETED: "bg-blue-100 text-blue-700",
   CANCELLED: "bg-red-100 text-red-700",
+};
+
+const channelLabels: Record<string, string> = {
+  EMAIL: "Email",
+  WHATSAPP: "WhatsApp",
+  SMS: "SMS",
+  EMAIL_CAMPAIGN: "Email Campaign",
+  SOCIAL_MEDIA: "Social Media",
+  PAID_SEARCH: "Paid Search",
+  DIRECT: "Direct",
+  ORGANIC: "Organic",
+  REFERRAL: "Referral",
+  PARTNER: "Partner",
+  EVENT: "Event",
 };
 
 export default async function CampaignsPage() {
@@ -44,10 +57,7 @@ export default async function CampaignsPage() {
           </div>
         </div>
         {["SUPER_ADMIN", "ADMIN"].includes(session.user.role) && (
-          <Button className="gap-2 bg-[#dc2626] hover:bg-[#b91c1c] text-white">
-            <Plus className="h-4 w-4" />
-            New Campaign
-          </Button>
+          <NewCampaignDialog />
         )}
       </div>
 
@@ -113,7 +123,9 @@ export default async function CampaignsPage() {
                       <Badge className={statusColors[campaign.status]}>{campaign.status}</Badge>
                     </TableCell>
                     <TableCell className="text-sm text-gray-600">
-                      {campaign.channel?.replace(/_/g, " ") || "—"}
+                      {campaign.channel
+                        ? channelLabels[campaign.channel] || campaign.channel.replace(/_/g, " ")
+                        : "—"}
                     </TableCell>
                     <TableCell className="text-sm text-gray-600">
                       {campaign.budget ? `$${Number(campaign.budget).toLocaleString()}` : "—"}

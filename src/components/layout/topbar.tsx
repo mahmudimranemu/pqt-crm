@@ -7,7 +7,6 @@ import {
   User,
   Settings,
   Search,
-  Calendar,
   Plus,
   ChevronDown,
 } from "lucide-react";
@@ -23,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getInitials } from "@/lib/utils";
+import { TodayDropdown } from "./today-dropdown";
 import type { UserRole, Office } from "@prisma/client";
 
 interface TopbarProps {
@@ -64,11 +64,7 @@ export function Topbar({ user, unreadNotifications = 0 }: TopbarProps) {
       {/* Right Side Actions */}
       <div className="flex items-center gap-3">
         {/* Today Button */}
-        <Button variant="outline" size="sm" className="gap-2 text-gray-600">
-          <Calendar className="h-4 w-4" />
-          Today
-          <ChevronDown className="h-3 w-3" />
-        </Button>
+        <TodayDropdown />
 
         {/* Add New Button */}
         <DropdownMenu>

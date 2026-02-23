@@ -611,7 +611,15 @@ export function ClientForm({ agents, properties, client }: ClientFormProps) {
                 Maximum Budget *
               </Label>
               <Select
-                value={watch("budgetMax")?.toString()}
+                value={(() => {
+                  const max = watch("budgetMax");
+                  if (max <= 250000) return "under-250k";
+                  if (max <= 500000) return "250k-500k";
+                  if (max <= 750000) return "500k-750k";
+                  if (max <= 1000000) return "750k-1m";
+                  if (max <= 1500000) return "1m-1.5m";
+                  return "1.5m-plus";
+                })()}
                 onValueChange={(value) => {
                   const budgetMap: Record<string, [number, number]> = {
                     "under-250k": [0, 250000],

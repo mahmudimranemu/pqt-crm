@@ -44,7 +44,7 @@ export async function getCitizenshipApplications(params?: {
             agent: { select: { id: true, firstName: true, lastName: true } },
           },
         },
-        milestones: { orderBy: { createdAt: "desc" }, take: 1 },
+        milestones: { orderBy: { createdAt: "asc" } },
         familyMembers: { select: { id: true } },
       },
       orderBy: { updatedAt: "desc" },
@@ -167,14 +167,19 @@ export async function createCitizenshipApplication(data: {
     },
   });
 
-  // Create initial milestones
+  // Create initial milestones (12-step Turkish citizenship by investment process)
   const defaultMilestones = [
-    "Document Collection",
-    "Property Valuation Certificate",
-    "Application Filing",
-    "Biometrics Appointment",
-    "Government Review",
-    "Final Approval",
+    "Client Onboarding & KYC",
+    "Property Selection & Reservation",
+    "Property Valuation",
+    "Title Deed (TAPU) Transfer",
+    "Conformity Certificate",
+    "Document Collection & Preparation",
+    "Residence Permit Application",
+    "Citizenship Application Submission",
+    "Security & Background Check",
+    "Ministry Review & Approval",
+    "Citizenship Granted",
     "Passport Issuance",
   ];
 
@@ -262,6 +267,142 @@ export async function updateFamilyMemberStatus(id: string, status: FamilyMemberS
 
   revalidatePath("/citizenship");
   return member;
+}
+
+// Toggle milestone completion (for the step-by-step checklist)
+export async function toggleMilestoneCompletion(
+  milestoneId: string,
+  completed: boolean,
+  completedDate?: string
+) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  const milestone = await prisma.citizenshipMilestone.update({
+    where: { id: milestoneId },
+    data: {
+      status: completed ? "COMPLETED" : "PENDING",
+      completedDate: completed
+        ? completedDate
+          ? new Date(completedDate)
+          : new Date()
+        : null,
+    },
+  });
+
+  // Update the parent application's stage based on completed milestones
+  const allMilestones = await prisma.citizenshipMilestone.findMany({
+    where: { applicationId: milestone.applicationId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  // Map milestone names to CitizenshipStage enum values
+  const milestoneToStage: Record<string, CitizenshipStage> = {
+    "Client Onboarding & KYC": "DOCUMENT_COLLECTION",
+    "Property Selection & Reservation": "DOCUMENT_COLLECTION",
+    "Property Valuation": "PROPERTY_VALUATION",
+    "Title Deed (TAPU) Transfer": "PROPERTY_VALUATION",
+    "Conformity Certificate": "APPLICATION_FILED",
+    "Document Collection & Preparation": "APPLICATION_FILED",
+    "Residence Permit Application": "BIOMETRICS_SCHEDULED",
+    "Citizenship Application Submission": "BIOMETRICS_COMPLETED",
+    "Security & Background Check": "UNDER_REVIEW",
+    "Ministry Review & Approval": "INTERVIEW_COMPLETED",
+    "Citizenship Granted": "APPROVED",
+    "Passport Issuance": "PASSPORT_ISSUED",
+  };
+
+  // Find the highest completed milestone
+  let highestStage: CitizenshipStage = "DOCUMENT_COLLECTION";
+  for (const m of allMilestones) {
+    if (m.status === "COMPLETED" && milestoneToStage[m.milestone]) {
+      highestStage = milestoneToStage[m.milestone];
+    }
+  }
+
+  const allCompleted = allMilestones.every((m) => m.status === "COMPLETED");
+
+  await prisma.citizenshipApplication.update({
+    where: { id: milestone.applicationId },
+    data: {
+      stage: highestStage,
+      ...(allCompleted ? { actualCompletionDate: new Date() } : { actualCompletionDate: null }),
+    },
+  });
+
+  revalidatePath("/citizenship");
+  revalidatePath(`/citizenship/${milestone.applicationId}`);
+  return milestone;
+}
+
+// Update milestone completion date only
+export async function updateMilestoneDate(milestoneId: string, completedDate: string) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  const milestone = await prisma.citizenshipMilestone.update({
+    where: { id: milestoneId },
+    data: {
+      completedDate: new Date(completedDate),
+    },
+  });
+
+  revalidatePath("/citizenship");
+  revalidatePath(`/citizenship/${milestone.applicationId}`);
+  return milestone;
+}
+
+// Initialize 12-step milestones for existing applications that have old milestones
+export async function reinitializeMilestones(applicationId: string) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  const newMilestoneNames = [
+    "Client Onboarding & KYC",
+    "Property Selection & Reservation",
+    "Property Valuation",
+    "Title Deed (TAPU) Transfer",
+    "Conformity Certificate",
+    "Document Collection & Preparation",
+    "Residence Permit Application",
+    "Citizenship Application Submission",
+    "Security & Background Check",
+    "Ministry Review & Approval",
+    "Citizenship Granted",
+    "Passport Issuance",
+  ];
+
+  // Check existing milestones
+  const existing = await prisma.citizenshipMilestone.findMany({
+    where: { applicationId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const existingNames = existing.map((m) => m.milestone);
+  const hasNewFormat = newMilestoneNames.some((name) => existingNames.includes(name));
+
+  // Only reinitialize if the milestones are in the old format
+  if (!hasNewFormat) {
+    // Delete old milestones
+    await prisma.citizenshipMilestone.deleteMany({
+      where: { applicationId },
+    });
+
+    // Create new milestones
+    await prisma.citizenshipMilestone.createMany({
+      data: newMilestoneNames.map((milestone) => ({
+        applicationId,
+        milestone,
+        status: "PENDING" as MilestoneStatus,
+      })),
+    });
+  }
+
+  revalidatePath("/citizenship");
+  revalidatePath(`/citizenship/${applicationId}`);
 }
 
 // Get eligible sales for new applications

@@ -125,8 +125,13 @@ export async function getDealsByStage() {
     orderBy: { updatedAt: "desc" },
   });
 
-  const stages: Record<string, typeof deals> = {};
-  for (const deal of deals) {
+  const serializedDeals = deals.map((deal) => ({
+    ...deal,
+    dealValue: deal.dealValue ? Number(deal.dealValue) : null,
+  }));
+
+  const stages: Record<string, typeof serializedDeals> = {};
+  for (const deal of serializedDeals) {
     if (!stages[deal.stage]) stages[deal.stage] = [];
     stages[deal.stage].push(deal);
   }
@@ -181,7 +186,19 @@ export async function getDealById(id: string) {
     throw new Error("Access denied");
   }
 
-  return deal;
+  return {
+    ...deal,
+    dealValue: Number(deal.dealValue),
+    payments: deal.payments.map((p) => ({
+      ...p,
+      amount: Number(p.amount),
+    })),
+    commissions: deal.commissions.map((c) => ({
+      ...c,
+      amount: Number(c.amount),
+      percentage: c.percentage ? Number(c.percentage) : null,
+    })),
+  };
 }
 
 export async function createDeal(data: CreateDealData) {

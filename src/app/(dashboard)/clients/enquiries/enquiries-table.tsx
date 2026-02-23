@@ -298,14 +298,31 @@ export function EnquiriesTable({
     if (!reallocateEnquiry || !reallocateAgentId) return;
     setReallocateLoading(true);
     try {
-      await updateEnquiryField(
-        reallocateEnquiry.id,
-        "assignedAgentId",
-        reallocateAgentId,
-      );
+      const isPool = reallocateAgentId.startsWith("POOL_");
+      if (isPool) {
+        // Assign to pool: clear agent and add pool tag
+        await updateEnquiryField(
+          reallocateEnquiry.id,
+          "assignedAgentId",
+          "",
+        );
+        await updateEnquiryField(
+          reallocateEnquiry.id,
+          "tags",
+          [...(reallocateEnquiry.tags || []).filter((t: string) => !t.startsWith("POOL_")), reallocateAgentId],
+        );
+      } else {
+        await updateEnquiryField(
+          reallocateEnquiry.id,
+          "assignedAgentId",
+          reallocateAgentId,
+        );
+      }
       toast({
         title: "Lead reallocated",
-        description: `${reallocateEnquiry.firstName} ${reallocateEnquiry.lastName} has been reassigned.`,
+        description: isPool
+          ? `${reallocateEnquiry.firstName} ${reallocateEnquiry.lastName} has been moved to ${reallocateAgentId.replace("_", " ")}.`
+          : `${reallocateEnquiry.firstName} ${reallocateEnquiry.lastName} has been reassigned.`,
       });
       setReallocateOpen(false);
       startTransition(() => router.refresh());
@@ -954,6 +971,35 @@ export function EnquiriesTable({
             Showing {(currentPage - 1) * 25 + 1} to{" "}
             {Math.min(currentPage * 25, total)} of {total} enquiries
           </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage <= 1}
+              onClick={() => {
+                const params = new URLSearchParams(window.location.search);
+                params.set("page", String(currentPage - 1));
+                router.push(`/clients/enquiries?${params.toString()}`);
+              }}
+            >
+              Previous
+            </Button>
+            <span className="text-xs text-gray-500">
+              Page {currentPage} of {pages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= pages}
+              onClick={() => {
+                const params = new URLSearchParams(window.location.search);
+                params.set("page", String(currentPage + 1));
+                router.push(`/clients/enquiries?${params.toString()}`);
+              }}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
 
@@ -981,15 +1027,18 @@ export function EnquiriesTable({
             </div>
 
             <div className="space-y-2">
-              <Label>New Consultant</Label>
+              <Label>New Consultant / Pool</Label>
               <Select
                 value={reallocateAgentId}
                 onValueChange={setReallocateAgentId}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select consultant" />
+                  <SelectValue placeholder="Select consultant or pool" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="POOL_1">Pool 1 (Unassigned)</SelectItem>
+                  <SelectItem value="POOL_2">Pool 2 (Unassigned)</SelectItem>
+                  <SelectItem value="POOL_3">Pool 3 (Unassigned)</SelectItem>
                   {agents
                     .filter((a) => a.id !== reallocateEnquiry?.assignedAgentId)
                     .map((agent) => (

@@ -1,8 +1,8 @@
 import { auth, type ExtendedSession } from "@/lib/auth";
 import { getTeams } from "@/lib/actions/teams";
+import { getUsers } from "@/lib/actions/users";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -11,7 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UsersRound, Plus, Building2 } from "lucide-react";
+import { UsersRound, Building2 } from "lucide-react";
+import { CreateTeamDialog } from "./create-team-dialog";
 
 export default async function TeamsPage() {
   const session = (await auth()) as ExtendedSession | null;
@@ -25,7 +26,10 @@ export default async function TeamsPage() {
     );
   }
 
-  const teams = await getTeams();
+  const [teams, { users }] = await Promise.all([
+    getTeams(),
+    getUsers({ limit: 100 }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -39,10 +43,7 @@ export default async function TeamsPage() {
             <p className="text-gray-500">Manage teams and member assignments</p>
           </div>
         </div>
-        <Button className="gap-2 bg-[#dc2626] hover:bg-[#b91c1c] text-white">
-          <Plus className="h-4 w-4" />
-          New Team
-        </Button>
+        <CreateTeamDialog users={users} />
       </div>
 
       <Card className="border border-gray-200">

@@ -75,7 +75,7 @@ export async function getEnquiries(params?: {
     };
   } else if (tab === "future") {
     where.nextCallDate = {
-      gt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
+      gte: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
     };
   } else if (tab === "new") {
     where.status = "NEW";
@@ -586,7 +586,7 @@ export async function convertToClient(
 export async function updateEnquiryField(
   enquiryId: string,
   field: string,
-  value: string | boolean | Date | null,
+  value: string | string[] | boolean | Date | null,
 ) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");

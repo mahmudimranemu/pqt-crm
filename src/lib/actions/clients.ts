@@ -188,9 +188,22 @@ export async function createClient(data: ClientFormData) {
 
   const client = await prisma.client.create({
     data: {
-      ...data,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      phone: data.phone,
+      whatsapp: data.whatsapp || null,
+      nationality: data.nationality,
+      country: data.country,
+      city: data.city || null,
       budgetMin: data.budgetMin,
       budgetMax: data.budgetMax,
+      preferredDistricts: data.preferredDistricts || [],
+      preferredPropertyType: data.preferredPropertyType || null,
+      investmentPurpose: data.investmentPurpose,
+      source: data.source,
+      status: data.status,
+      notes: data.notes || null,
       assignedAgentId: data.assignedAgentId || session.user.id,
     },
   });

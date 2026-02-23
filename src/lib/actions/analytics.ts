@@ -102,13 +102,24 @@ export async function getRevenueTrend() {
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  const sales = await prisma.sale.findMany({
-    where: {
-      createdAt: { gte: sixMonthsAgo },
-      ...(isAgent ? { agentId: session.user.id } : {}),
-    },
-    select: { salePrice: true, createdAt: true },
-  });
+  // Query won deals for revenue (primary source) + sales for legacy data
+  const [deals, sales] = await Promise.all([
+    prisma.deal.findMany({
+      where: {
+        result: "WON",
+        updatedAt: { gte: sixMonthsAgo },
+        ...(isAgent ? { ownerId: session.user.id } : {}),
+      },
+      select: { dealValue: true, updatedAt: true },
+    }),
+    prisma.sale.findMany({
+      where: {
+        createdAt: { gte: sixMonthsAgo },
+        ...(isAgent ? { agentId: session.user.id } : {}),
+      },
+      select: { salePrice: true, createdAt: true },
+    }),
+  ]);
 
   const months: Record<string, number> = {};
   const now = new Date();
@@ -121,6 +132,18 @@ export async function getRevenueTrend() {
     months[key] = 0;
   }
 
+  // Add deal revenue
+  deals.forEach((deal) => {
+    const key = deal.updatedAt.toLocaleDateString("en-US", {
+      month: "short",
+      year: "2-digit",
+    });
+    if (months[key]) {
+      months[key] += Number(deal.dealValue || 0);
+    }
+  });
+
+  // Add legacy sale revenue
   sales.forEach((sale) => {
     const key = sale.createdAt.toLocaleDateString("en-US", {
       month: "short",

@@ -31,12 +31,15 @@ const sourceOptions = [
 ];
 
 const channelOptions = [
-  { value: "ORGANIC", label: "Organic" },
-  { value: "PAID_SEARCH", label: "Paid Search" },
+  { value: "EMAIL", label: "Email" },
+  { value: "WHATSAPP", label: "WhatsApp" },
+  { value: "SMS", label: "SMS" },
+  { value: "EMAIL_CAMPAIGN", label: "Email Campaign (Drip)" },
   { value: "SOCIAL_MEDIA", label: "Social Media" },
-  { value: "REFERRAL", label: "Referral" },
+  { value: "PAID_SEARCH", label: "Paid Search" },
   { value: "DIRECT", label: "Direct" },
-  { value: "EMAIL_CAMPAIGN", label: "Email Campaign" },
+  { value: "ORGANIC", label: "Organic" },
+  { value: "REFERRAL", label: "Referral" },
   { value: "PARTNER", label: "Partner" },
   { value: "EVENT", label: "Event" },
 ];

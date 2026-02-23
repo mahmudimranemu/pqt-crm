@@ -8,22 +8,26 @@ import type { CallType, CallOutcome } from "@prisma/client";
 // Get call logs
 export async function getCallLogs(params?: {
   clientId?: string;
+  agentId?: string;
   page?: number;
   limit?: number;
 }) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const { clientId, page = 1, limit = 25 } = params || {};
+  const { clientId, agentId, page = 1, limit = 25 } = params || {};
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {};
 
   if (clientId) where.clientId = clientId;
 
-  if (session.user.role === "SALES_AGENT") {
+  // If a specific agentId filter is provided (by admins), use that
+  if (agentId) {
+    where.agentId = agentId;
+  } else if (session.user.role === "SALES_AGENT") {
     where.agentId = session.user.id;
-  } else if (session.user.role !== "SUPER_ADMIN") {
+  } else if (session.user.role !== "SUPER_ADMIN" && session.user.role !== "ADMIN") {
     const officeAgents = await prisma.user.findMany({
       where: { office: session.user.office },
       select: { id: true },
@@ -176,6 +180,24 @@ export async function getCallLogFormData() {
   return prisma.client.findMany({
     where: clientWhere,
     select: { id: true, firstName: true, lastName: true, phone: true },
+    orderBy: { firstName: "asc" },
+  });
+}
+
+// Get agents list for filter dropdown (admin only)
+export async function getAgentsList() {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+
+  if (!["SUPER_ADMIN", "ADMIN"].includes(session.user.role)) {
+    throw new Error("Unauthorized");
+  }
+
+  return prisma.user.findMany({
+    where: {
+      role: { in: ["SALES_AGENT", "SALES_MANAGER", "ADMIN", "SUPER_ADMIN"] },
+    },
+    select: { id: true, firstName: true, lastName: true },
     orderBy: { firstName: "asc" },
   });
 }

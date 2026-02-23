@@ -227,21 +227,22 @@ export function Sidebar({
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 px-4">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white overflow-hidden">
             <Image
-              src="./favicon.svg"
-              alt="Propert Quest Turkey"
-              width={32}
-              height={32}
+              src="/favicon.svg"
+              alt="Property Quest Turkey"
+              width={28}
+              height={28}
             />
           </div>
           {!collapsed && (
-            <div className="bg-white">
+            <div className="overflow-hidden rounded bg-white px-1">
               <Image
-                src="./PQT_logo.svg"
-                alt="Propert Quest Turkey"
+                src="/PQT_logo.svg"
+                alt="Property Quest Turkey"
                 width={120}
-                height={120}
+                height={40}
+                className="h-10 w-auto object-contain"
               />
             </div>
           )}

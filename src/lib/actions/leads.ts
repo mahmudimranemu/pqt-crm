@@ -197,8 +197,13 @@ export async function getLeadsByStage() {
     orderBy: { updatedAt: "desc" },
   });
 
-  const stages: Record<string, typeof leads> = {};
-  for (const lead of leads) {
+  const serializedLeads = leads.map((lead) => ({
+    ...lead,
+    estimatedValue: lead.estimatedValue ? Number(lead.estimatedValue) : null,
+  }));
+
+  const stages: Record<string, typeof serializedLeads> = {};
+  for (const lead of serializedLeads) {
     if (!stages[lead.stage]) stages[lead.stage] = [];
     stages[lead.stage].push(lead);
   }
@@ -258,7 +263,10 @@ export async function getLeadById(id: string) {
     throw new Error("Unauthorized");
   }
 
-  return lead;
+  return {
+    ...lead,
+    estimatedValue: lead.estimatedValue ? Number(lead.estimatedValue) : null,
+  };
 }
 
 export async function createLead(data: CreateLeadData) {
