@@ -228,8 +228,23 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
                   <p className="text-xs text-gray-500 uppercase tracking-wide">
                     Source URL
                   </p>
-                  <p className="text-sm mt-1 truncate text-[#dc2626]">
-                    {enquiry.sourceUrl}
+                  <p className="text-sm mt-1 break-all">
+                    {(() => {
+                      const url = enquiry.sourceUrl.split(" | ")[0].trim();
+                      if (url.startsWith("http")) {
+                        return (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#dc2626] hover:underline"
+                          >
+                            {url}
+                          </a>
+                        );
+                      }
+                      return <span className="text-gray-700">{enquiry.sourceUrl}</span>;
+                    })()}
                   </p>
                 </div>
               )}
