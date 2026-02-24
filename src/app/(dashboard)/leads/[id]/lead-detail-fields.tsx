@@ -53,9 +53,12 @@ function MiniCalendar({
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear] = useState(today.getFullYear());
 
-  const todayStr = today.toISOString().split("T")[0];
+  const toLocalDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  const todayStr = toLocalDateStr(today);
   const selectedStr = selectedDate
-    ? new Date(selectedDate).toISOString().split("T")[0]
+    ? toLocalDateStr(new Date(selectedDate))
     : "";
 
   const firstDay = new Date(viewYear, viewMonth, 1);
@@ -190,14 +193,17 @@ export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
   const selectClass =
     "mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#dc2626]/20 focus:border-[#dc2626]";
 
+  const toDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
   const currentDate = lead.nextCallDate
-    ? new Date(lead.nextCallDate).toISOString().slice(0, 10)
+    ? toDateStr(new Date(lead.nextCallDate))
     : "";
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = toDateStr(new Date());
   const tomorrowDate = new Date();
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
-  const nextMondayStr = getNextMonday().toISOString().slice(0, 10);
+  const tomorrowStr = toDateStr(tomorrowDate);
+  const nextMondayStr = toDateStr(getNextMonday());
 
   const activeClass =
     "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:text-white";
@@ -368,7 +374,7 @@ export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
               onSelect={(date) =>
                 handleChange(
                   "nextCallDate",
-                  date.toISOString().slice(0, 10),
+                  toDateStr(date),
                 )
               }
             />
@@ -381,7 +387,7 @@ export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
                 onClick={() =>
                   handleChange(
                     "nextCallDate",
-                    new Date().toISOString().slice(0, 10),
+                    toDateStr(new Date()),
                   )
                 }
               >
@@ -397,7 +403,7 @@ export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
                   tomorrow.setDate(tomorrow.getDate() + 1);
                   handleChange(
                     "nextCallDate",
-                    tomorrow.toISOString().slice(0, 10),
+                    toDateStr(tomorrow),
                   );
                 }}
               >
@@ -411,7 +417,7 @@ export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
                 onClick={() =>
                   handleChange(
                     "nextCallDate",
-                    getNextMonday().toISOString().slice(0, 10),
+                    toDateStr(getNextMonday()),
                   )
                 }
               >
@@ -432,7 +438,7 @@ export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
               onSelect={(date) =>
                 handleChange(
                   "nextCallDate",
-                  date.toISOString().slice(0, 10),
+                  toDateStr(date),
                 )
               }
             />
@@ -446,7 +452,7 @@ export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
               onClick={() =>
                 handleChange(
                   "nextCallDate",
-                  new Date().toISOString().slice(0, 10),
+                  toDateStr(new Date()),
                 )
               }
             >
@@ -462,7 +468,7 @@ export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
                 tomorrow.setDate(tomorrow.getDate() + 1);
                 handleChange(
                   "nextCallDate",
-                  tomorrow.toISOString().slice(0, 10),
+                  toDateStr(tomorrow),
                 );
               }}
             >
@@ -476,7 +482,7 @@ export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
               onClick={() =>
                 handleChange(
                   "nextCallDate",
-                  getNextMonday().toISOString().slice(0, 10),
+                  toDateStr(getNextMonday()),
                 )
               }
             >

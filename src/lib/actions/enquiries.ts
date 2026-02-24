@@ -269,6 +269,15 @@ export async function getEnquiry(id: string) {
         },
         orderBy: { createdAt: "desc" },
       },
+      activities: {
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        include: {
+          user: {
+            select: { firstName: true, lastName: true },
+          },
+        },
+      },
     },
   });
 
@@ -687,12 +696,33 @@ export async function updateEnquiryField(
     data: { [field]: value },
   });
 
+  // Log activity for nextCallDate changes
+  if (field === "nextCallDate") {
+    const dateDisplay = value
+      ? new Date(value as string | Date).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "cleared";
+    await prisma.activity.create({
+      data: {
+        type: "FOLLOW_UP",
+        title: "Next Call Date Updated",
+        description: `Next call date ${value ? `set to ${dateDisplay}` : "cleared"}`,
+        enquiryId,
+        userId: session.user.id,
+      },
+    });
+  }
+
   await auditLog("UPDATE", "Enquiry", enquiryId, { [field]: value } as Record<
     string,
     unknown
   >);
 
   revalidatePath("/clients/enquiries");
+  revalidatePath(`/clients/enquiries/${enquiryId}`);
   return enquiry;
 }
 

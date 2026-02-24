@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Mail, Phone, Globe, DollarSign, Tag } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Globe, DollarSign, Tag, MessageSquare } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 import { EnquiryDetailFields } from "./enquiry-detail-fields";
 import { EnquiryNotes } from "./enquiry-notes";
@@ -294,9 +294,49 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
           />
         </div>
 
-        {/* Right Column: Notes Timeline */}
-        <div className="lg:col-span-2">
+        {/* Right Column: Notes + Activity Log */}
+        <div className="lg:col-span-2 space-y-6">
           <EnquiryNotes enquiryId={enquiry.id} notes={serializedNotes} />
+
+          {/* Activity Log */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Activity Log ({enquiry.activities.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {enquiry.activities.length === 0 ? (
+                <p className="text-sm text-gray-500">No activity yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {enquiry.activities.map((activity) => (
+                    <div
+                      key={activity.id}
+                      className="flex gap-3 border-l-2 border-gray-200 pl-4"
+                    >
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">
+                          {activity.title}
+                        </p>
+                        {activity.description && (
+                          <p className="text-sm text-gray-500">
+                            {activity.description}
+                          </p>
+                        )}
+                        <p className="mt-1 text-xs text-gray-400">
+                          {activity.user.firstName} {activity.user.lastName}
+                          {" "}&middot;{" "}
+                          {new Date(activity.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

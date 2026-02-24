@@ -430,6 +430,26 @@ export async function updateLeadField(
     data: { [field]: finalValue },
   });
 
+  // Log activity for nextCallDate changes
+  if (field === "nextCallDate") {
+    const dateDisplay = value
+      ? new Date(value as string | Date).toLocaleDateString("en-GB", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "cleared";
+    await prisma.activity.create({
+      data: {
+        type: "FOLLOW_UP",
+        title: "Next Call Date Updated",
+        description: `Next call date ${value ? `set to ${dateDisplay}` : "cleared"}`,
+        leadId,
+        userId: session.user.id,
+      },
+    });
+  }
+
   // Re-score when scoring-relevant fields change
   const scoringFields = [
     "called",

@@ -81,9 +81,12 @@ function MiniCalendar({
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [viewYear, setViewYear] = useState(today.getFullYear());
 
-  const todayStr = today.toISOString().split("T")[0];
+  const toLocalDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  const todayStr = toLocalDateStr(today);
   const selectedStr = selectedDate
-    ? new Date(selectedDate).toISOString().split("T")[0]
+    ? toLocalDateStr(new Date(selectedDate))
     : "";
 
   const firstDay = new Date(viewYear, viewMonth, 1);
@@ -233,14 +236,17 @@ export function EnquiryDetailFields({
   const selectClass =
     "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#dc2626]/20 focus:border-[#dc2626]";
 
+  const toDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
   const currentDate = enquiry.nextCallDate
-    ? new Date(enquiry.nextCallDate).toISOString().split("T")[0]
+    ? toDateStr(new Date(enquiry.nextCallDate))
     : "";
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = toDateStr(new Date());
   const tomorrowDate = new Date();
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrowStr = tomorrowDate.toISOString().split("T")[0];
-  const nextMondayStr = getNextMonday().toISOString().split("T")[0];
+  const tomorrowStr = toDateStr(tomorrowDate);
+  const nextMondayStr = toDateStr(getNextMonday());
 
   const activeClass =
     "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:text-white";

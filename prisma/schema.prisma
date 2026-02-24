@@ -407,6 +407,7 @@ model Enquiry {
   convertedClient    Client?        @relation(fields: [convertedClientId], references: [id])
   interestedProperty Property?      @relation(fields: [interestedPropertyId], references: [id])
   notes              EnquiryNote[]
+  activities         Activity[]
 
   @@index([status])
   @@index([assignedAgentId])
@@ -1104,18 +1105,21 @@ model Activity {
   leadId      String?
   dealId      String?
   clientId    String?
+  enquiryId   String?
   userId      String
   createdAt   DateTime     @default(now())
 
   // Relations
-  lead   Lead?   @relation(fields: [leadId], references: [id])
-  deal   Deal?   @relation(fields: [dealId], references: [id])
-  client Client? @relation(fields: [clientId], references: [id])
-  user   User    @relation(fields: [userId], references: [id])
+  lead    Lead?    @relation(fields: [leadId], references: [id])
+  deal    Deal?    @relation(fields: [dealId], references: [id])
+  client  Client?  @relation(fields: [clientId], references: [id])
+  enquiry Enquiry? @relation(fields: [enquiryId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
 
   @@index([leadId])
   @@index([dealId])
   @@index([clientId])
+  @@index([enquiryId])
   @@index([userId])
   @@index([createdAt])
   @@map("activities")
