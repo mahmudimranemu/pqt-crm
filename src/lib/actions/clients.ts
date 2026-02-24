@@ -288,7 +288,25 @@ export async function deleteClient(id: string) {
     throw new Error("Unauthorized");
   }
 
-  await prisma.client.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    // Delete related records that reference this client
+    await tx.activity.deleteMany({ where: { clientId: id } });
+    await tx.payment.deleteMany({ where: { deal: { clientId: id } } });
+    await tx.deal.deleteMany({ where: { clientId: id } });
+    await tx.lead.deleteMany({ where: { clientId: id } });
+    await tx.communication.deleteMany({ where: { clientId: id } });
+    await tx.document.deleteMany({ where: { clientId: id } });
+    await tx.sale.deleteMany({ where: { clientId: id } });
+    await tx.booking.deleteMany({ where: { clientId: id } });
+    await tx.citizenshipApplication.deleteMany({ where: { clientId: id } });
+    await tx.handover.deleteMany({ where: { clientId: id } });
+    await tx.enquiry.updateMany({
+      where: { convertedClientId: id },
+      data: { convertedClientId: null, status: "CLOSED" },
+    });
+    await tx.client.delete({ where: { id } });
+  });
+
   await auditLog("DELETE", "Client", id);
   revalidatePath("/clients");
 }
@@ -369,8 +387,23 @@ export async function bulkDeleteClients(ids: string[]) {
   if (session.user.role !== "SUPER_ADMIN")
     throw new Error("Unauthorized: Only SUPER_ADMIN can bulk delete");
 
-  await prisma.client.deleteMany({
-    where: { id: { in: ids } },
+  await prisma.$transaction(async (tx) => {
+    const where = { clientId: { in: ids } };
+    await tx.activity.deleteMany({ where });
+    await tx.payment.deleteMany({ where: { deal: { clientId: { in: ids } } } });
+    await tx.deal.deleteMany({ where });
+    await tx.lead.deleteMany({ where });
+    await tx.communication.deleteMany({ where });
+    await tx.document.deleteMany({ where });
+    await tx.sale.deleteMany({ where });
+    await tx.booking.deleteMany({ where });
+    await tx.citizenshipApplication.deleteMany({ where });
+    await tx.handover.deleteMany({ where });
+    await tx.enquiry.updateMany({
+      where: { convertedClientId: { in: ids } },
+      data: { convertedClientId: null, status: "CLOSED" },
+    });
+    await tx.client.deleteMany({ where: { id: { in: ids } } });
   });
 
   revalidatePath("/clients");
