@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   CheckCircle,
   CheckCheck,
+  Mail,
 } from "lucide-react";
 import { markAsRead, markAllAsRead } from "@/lib/actions/notifications";
 import Link from "next/link";
@@ -27,6 +28,8 @@ const typeIcons: Record<string, React.ElementType> = {
   COMMISSION_APPROVED: CheckCircle,
   SYSTEM_ALERT: Bell,
   MENTION: Bell,
+  EMAIL_CHANGE_REQUEST: Mail,
+  EMAIL_CHANGED: Mail,
 };
 
 const typeColors: Record<string, string> = {
@@ -38,6 +41,8 @@ const typeColors: Record<string, string> = {
   COMMISSION_APPROVED: "text-amber-600 bg-amber-50",
   SYSTEM_ALERT: "text-gray-600 bg-gray-100",
   MENTION: "text-indigo-600 bg-indigo-50",
+  EMAIL_CHANGE_REQUEST: "text-orange-600 bg-orange-50",
+  EMAIL_CHANGED: "text-emerald-600 bg-emerald-50",
 };
 
 interface Notification {

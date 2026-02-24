@@ -319,23 +319,6 @@ export function Sidebar({
 
       {/* Bottom Section */}
       <div className="mt-auto border-t border-white/20 px-3 py-3 space-y-2">
-        {/* Notifications */}
-        <Link
-          href="/notifications"
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/15",
-            collapsed && "justify-center px-0",
-          )}
-        >
-          <div className="relative">
-            <Bell className="h-4 w-4 shrink-0" />
-            <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white text-[8px] font-bold text-[#dc2626]">
-              3
-            </span>
-          </div>
-          {!collapsed && <span>Notifications</span>}
-        </Link>
-
         {/* User Profile */}
         <div
           className={cn(

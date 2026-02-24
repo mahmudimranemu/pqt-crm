@@ -785,6 +785,8 @@ enum NotificationType {
   COMMISSION_APPROVED
   SYSTEM_ALERT
   MENTION
+  EMAIL_CHANGE_REQUEST
+  EMAIL_CHANGED
 }
 
 enum ActivityType {

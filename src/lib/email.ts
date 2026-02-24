@@ -93,3 +93,83 @@ export function passwordResetTemplate(
     `,
   };
 }
+
+export function emailChangeRequestTemplate(
+  requesterName: string,
+  requesterRole: string,
+  currentEmail: string,
+  newEmail: string,
+): { subject: string; html: string } {
+  const usersUrl = `${APP_URL}/settings/users`;
+  return {
+    subject: `Email Change Request — ${requesterName} — PropertyQuestTurkey CRM`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #dc2626; padding: 24px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">PropertyQuestTurkey CRM</h1>
+        </div>
+        <div style="padding: 32px; background: #fff; border: 1px solid #e5e7eb;">
+          <h2 style="margin-top: 0;">Email Change Request</h2>
+          <p>A user has requested an email address change:</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+            <tr>
+              <td style="padding: 8px; font-weight: bold; color: #374151; width: 140px;">User</td>
+              <td style="padding: 8px; color: #111827;">${requesterName}</td>
+            </tr>
+            <tr style="background: #f9fafb;">
+              <td style="padding: 8px; font-weight: bold; color: #374151;">Role</td>
+              <td style="padding: 8px; color: #111827;">${requesterRole}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; font-weight: bold; color: #374151;">Current Email</td>
+              <td style="padding: 8px; color: #111827;">${currentEmail}</td>
+            </tr>
+            <tr style="background: #f9fafb;">
+              <td style="padding: 8px; font-weight: bold; color: #374151;">Requested Email</td>
+              <td style="padding: 8px; color: #dc2626; font-weight: bold;">${newEmail}</td>
+            </tr>
+          </table>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="${usersUrl}" style="background: #dc2626; color: white; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+              Manage Users
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 14px;">Log in and navigate to Settings &rarr; Users to update this user's email address.</p>
+        </div>
+      </div>
+    `,
+  };
+}
+
+export function emailChangedConfirmationTemplate(
+  name: string,
+  oldEmail: string,
+  newEmail: string,
+): { subject: string; html: string } {
+  return {
+    subject: "Your Email Address Has Been Updated — PropertyQuestTurkey CRM",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #dc2626; padding: 24px; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">PropertyQuestTurkey CRM</h1>
+        </div>
+        <div style="padding: 32px; background: #fff; border: 1px solid #e5e7eb;">
+          <h2 style="margin-top: 0;">Email Address Updated</h2>
+          <p>Hi ${name},</p>
+          <p>Your email address has been successfully changed.</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+            <tr>
+              <td style="padding: 8px; font-weight: bold; color: #374151; width: 140px;">Previous Email</td>
+              <td style="padding: 8px; color: #6b7280;">${oldEmail}</td>
+            </tr>
+            <tr style="background: #f9fafb;">
+              <td style="padding: 8px; font-weight: bold; color: #374151;">New Email</td>
+              <td style="padding: 8px; color: #111827; font-weight: bold;">${newEmail}</td>
+            </tr>
+          </table>
+          <p style="color: #6b7280; font-size: 14px;">If you did not request this change, please contact your administrator immediately.</p>
+        </div>
+      </div>
+    `,
+  };
+}

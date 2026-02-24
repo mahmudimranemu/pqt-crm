@@ -11,7 +11,10 @@ import {
   sendEmail,
   emailVerificationTemplate,
   passwordResetTemplate,
+  emailChangeRequestTemplate,
+  emailChangedConfirmationTemplate,
 } from "@/lib/email";
+import { notifySuperAdmins, notify } from "@/lib/notifications";
 
 // Password validation: min 8 chars, 1 uppercase, 1 number, 1 special char
 function validatePassword(password: string): string | null {
@@ -211,12 +214,21 @@ export async function updateUser(
   }
 
   // Check email uniqueness if changing email
+  let oldEmail: string | null = null;
   if (data.email) {
     const existing = await prisma.user.findUnique({
       where: { email: data.email },
     });
     if (existing && existing.id !== id) {
       throw new Error("A user with this email already exists");
+    }
+    // Capture old email before update for change detection
+    const currentUser = await prisma.user.findUnique({
+      where: { id },
+      select: { email: true },
+    });
+    if (currentUser && currentUser.email !== data.email) {
+      oldEmail = currentUser.email;
     }
   }
 
@@ -226,6 +238,26 @@ export async function updateUser(
   });
 
   await auditLog("UPDATE", "User", id, data as Record<string, unknown>);
+
+  // If email was changed by admin, notify the user and send confirmation email
+  if (oldEmail && data.email) {
+    await notify(
+      id,
+      "EMAIL_CHANGED",
+      "Email Address Updated",
+      `Your email has been successfully changed from ${oldEmail} to ${data.email}`,
+      "/settings/profile",
+    );
+
+    const { subject, html } = emailChangedConfirmationTemplate(
+      `${user.firstName} ${user.lastName}`,
+      oldEmail,
+      data.email,
+    );
+    sendEmail(data.email, subject, html).catch((err) =>
+      console.error("[EMAIL] Failed to send email changed confirmation:", err),
+    );
+  }
 
   revalidatePath("/settings/users");
   revalidatePath("/settings/profile");
@@ -419,6 +451,77 @@ export async function requestEmailChange(newEmail: string) {
       "Failed to send verification email. Check SMTP settings in .env",
     );
   }
+
+  return { success: true };
+}
+
+// Request email change (any authenticated non-super-admin user)
+// Notifies all SUPER_ADMINs via in-app notification and email
+export async function requestEmailChangeByUser(newEmail: string) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+
+  const normalizedEmail = newEmail.toLowerCase().trim();
+
+  if (!normalizedEmail || !normalizedEmail.includes("@")) {
+    throw new Error("Please enter a valid email address");
+  }
+
+  if (normalizedEmail === session.user.email.toLowerCase()) {
+    throw new Error("This is already your current email address");
+  }
+
+  // Check the new email is not already taken
+  const existing = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: { id: true },
+  });
+  if (existing) {
+    throw new Error("A user with this email already exists");
+  }
+
+  const roleLabels: Record<string, string> = {
+    ADMIN: "Admin",
+    SALES_MANAGER: "Sales Manager",
+    SALES_AGENT: "Sales Agent",
+    VIEWER: "Viewer",
+  };
+  const roleLabel = roleLabels[session.user.role] ?? session.user.role;
+  const fullName = `${session.user.firstName} ${session.user.lastName}`;
+
+  const message =
+    `[${fullName}] [${roleLabel}] sent a request to change [${session.user.email}] to [${normalizedEmail}]`;
+
+  // In-app notifications for all SUPER_ADMINs
+  await notifySuperAdmins(
+    "EMAIL_CHANGE_REQUEST",
+    "Email Change Request",
+    message,
+    "/settings/users",
+  );
+
+  // Send email to all active SUPER_ADMINs
+  const superAdmins = await prisma.user.findMany({
+    where: { role: "SUPER_ADMIN", isActive: true },
+    select: { email: true },
+  });
+
+  const { subject, html } = emailChangeRequestTemplate(
+    fullName,
+    roleLabel,
+    session.user.email,
+    normalizedEmail,
+  );
+
+  await Promise.allSettled(
+    superAdmins.map((admin) => sendEmail(admin.email, subject, html)),
+  );
+
+  await auditLog("UPDATE", "User", session.user.id, {
+    action: "email_change_requested",
+    currentEmail: session.user.email,
+    requestedEmail: normalizedEmail,
+  });
 
   return { success: true };
 }

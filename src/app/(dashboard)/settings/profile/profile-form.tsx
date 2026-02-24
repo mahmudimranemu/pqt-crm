@@ -6,7 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { updateUser, requestEmailChange } from "@/lib/actions/users";
+import { updateUser, requestEmailChange, requestEmailChangeByUser } from "@/lib/actions/users";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { CheckCircle, Upload, Loader2 } from "lucide-react";
 import Image from "next/image";
 
@@ -36,6 +44,15 @@ export function ProfileForm({ userId, userRole, initialData }: ProfileFormProps)
   const [showEmailChange, setShowEmailChange] = useState(false);
   const [emailPending, startEmailTransition] = useTransition();
   const [emailStatus, setEmailStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  // Non-admin email change request state
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [requestEmail, setRequestEmail] = useState("");
+  const [requestPending, startRequestTransition] = useTransition();
+  const [requestStatus, setRequestStatus] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
@@ -126,6 +143,29 @@ export function ProfileForm({ userId, userRole, initialData }: ProfileFormProps)
           type: "error",
           message:
             err instanceof Error ? err.message : "Failed to request email change",
+        });
+      }
+    });
+  };
+
+  const handleRequestEmailChange = () => {
+    if (!requestEmail.trim()) return;
+    setRequestStatus(null);
+
+    startRequestTransition(async () => {
+      try {
+        await requestEmailChangeByUser(requestEmail.trim());
+        setRequestStatus({
+          type: "success",
+          message:
+            "Your request has been sent to an administrator. You will be notified once your email has been updated.",
+        });
+        setRequestEmail("");
+      } catch (err) {
+        setRequestStatus({
+          type: "error",
+          message:
+            err instanceof Error ? err.message : "Failed to send request",
         });
       }
     });
@@ -295,9 +335,97 @@ export function ProfileForm({ userId, userRole, initialData }: ProfileFormProps)
               )}
             </div>
           ) : (
-            <p className="text-xs text-gray-400">
-              Contact an admin to change your email.
-            </p>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setRequestEmail("");
+                  setRequestStatus(null);
+                  setRequestDialogOpen(true);
+                }}
+                className="text-xs text-[#dc2626] hover:underline cursor-pointer"
+              >
+                Request email change
+              </button>
+
+              <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Request Email Change</DialogTitle>
+                    <DialogDescription>
+                      Enter your new email address. An administrator will be
+                      notified and will update your email on your behalf.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-4 py-2">
+                    {requestStatus && (
+                      <div
+                        className={`rounded-lg border p-3 text-sm ${
+                          requestStatus.type === "success"
+                            ? "border-green-200 bg-green-50 text-green-700"
+                            : "border-red-200 bg-red-50 text-red-700"
+                        }`}
+                      >
+                        {requestStatus.message}
+                      </div>
+                    )}
+
+                    {(!requestStatus || requestStatus.type === "error") && (
+                      <div className="space-y-2">
+                        <Label htmlFor="request-new-email">New Email Address</Label>
+                        <Input
+                          id="request-new-email"
+                          type="email"
+                          value={requestEmail}
+                          onChange={(e) => setRequestEmail(e.target.value)}
+                          placeholder="Enter your new email address"
+                          disabled={requestPending}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleRequestEmailChange();
+                            }
+                          }}
+                        />
+                        <p className="text-xs text-gray-400">
+                          Current email:{" "}
+                          <span className="font-medium">{formData.email}</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setRequestDialogOpen(false)}
+                      disabled={requestPending}
+                    >
+                      {requestStatus?.type === "success" ? "Close" : "Cancel"}
+                    </Button>
+                    {(!requestStatus || requestStatus.type === "error") && (
+                      <Button
+                        type="button"
+                        onClick={handleRequestEmailChange}
+                        disabled={requestPending || !requestEmail.trim()}
+                        className="bg-[#dc2626] hover:bg-[#b91c1c] text-white"
+                      >
+                        {requestPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          "Send Request"
+                        )}
+                      </Button>
+                    )}
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
           )}
         </div>
         <div className="space-y-2">

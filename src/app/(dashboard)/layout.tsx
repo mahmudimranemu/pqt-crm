@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth, type ExtendedSession } from "@/lib/auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { getUnreadNotificationCount } from "@/lib/actions/notifications";
+import prisma from "@/lib/prisma";
 
 export default async function DashboardRootLayout({
   children,
@@ -14,6 +15,12 @@ export default async function DashboardRootLayout({
     redirect("/login");
   }
 
+  // Fetch fresh email from DB so topbar stays in sync after email changes
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { email: true },
+  });
+
   const unreadCount = await getUnreadNotificationCount();
 
   return (
@@ -21,7 +28,7 @@ export default async function DashboardRootLayout({
       user={{
         firstName: session.user.firstName,
         lastName: session.user.lastName,
-        email: session.user.email,
+        email: dbUser?.email ?? session.user.email,
         role: session.user.role,
         office: session.user.office,
       }}
