@@ -156,7 +156,7 @@ export function AddEnquiryDialog({
         className="gap-2 bg-[#dc2626] hover:bg-[#b91c1c] text-white"
       >
         <Plus className="h-4 w-4" />
-        New Lead
+        Add Enquiry
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

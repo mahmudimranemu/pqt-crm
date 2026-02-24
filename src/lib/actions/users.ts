@@ -397,7 +397,7 @@ export async function deleteUser(id: string) {
         twoFactorSecret: null,
       },
     });
-  });
+  }, { timeout: 30000 });
 
   revalidatePath("/settings/users");
   return { success: true };

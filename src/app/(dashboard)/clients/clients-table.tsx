@@ -57,6 +57,35 @@ const statusLabels: Record<ClientStatus, string> = {
   INACTIVE: "Inactive",
 };
 
+function buildPageUrl(
+  page: number,
+  params: { search?: string; status?: string; agent?: string; source?: string }
+) {
+  const qs = new URLSearchParams();
+  if (page > 1) qs.set("page", String(page));
+  if (params.search) qs.set("search", params.search);
+  if (params.status) qs.set("status", params.status);
+  if (params.agent) qs.set("agent", params.agent);
+  if (params.source) qs.set("source", params.source);
+  const str = qs.toString();
+  return `/clients${str ? `?${str}` : ""}`;
+}
+
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "...")[] = [];
+  if (current <= 4) {
+    for (let i = 1; i <= 5; i++) pages.push(i);
+    pages.push("...", total);
+  } else if (current >= total - 3) {
+    pages.push(1, "...");
+    for (let i = total - 4; i <= total; i++) pages.push(i);
+  } else {
+    pages.push(1, "...", current - 1, current, current + 1, "...", total);
+  }
+  return pages;
+}
+
 interface Client {
   id: string;
   firstName: string;
@@ -263,34 +292,81 @@ export function ClientsTableContent({
       </Table>
 
       {/* Pagination */}
-      {pages > 1 && (
-        <div className="flex items-center justify-between px-2 py-4">
-          <p className="text-sm text-muted-foreground">
-            Showing {(currentPage - 1) * 25 + 1} to{" "}
-            {Math.min(currentPage * 25, total)} of {total} clients
-          </p>
-          <div className="flex gap-2">
-            {currentPage > 1 && (
-              <Link
-                href={`/clients?page=${currentPage - 1}${searchParams.search ? `&search=${searchParams.search}` : ""}${searchParams.status ? `&status=${searchParams.status}` : ""}`}
+      <div className="flex items-center justify-between px-2 py-4 border-t">
+        <p className="text-sm text-muted-foreground">
+          Showing{" "}
+          <span className="font-medium text-gray-900">
+            {(currentPage - 1) * 25 + 1}
+          </span>{" "}
+          to{" "}
+          <span className="font-medium text-gray-900">
+            {Math.min(currentPage * 25, total)}
+          </span>{" "}
+          of{" "}
+          <span className="font-medium text-gray-900">{total}</span> clients
+        </p>
+        {pages > 1 && (
+          <div className="flex items-center gap-1">
+            <Link href={buildPageUrl(1, searchParams)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                className="h-8 w-8 p-0"
               >
-                <Button variant="outline" size="sm">
-                  Previous
-                </Button>
-              </Link>
-            )}
-            {currentPage < pages && (
-              <Link
-                href={`/clients?page=${currentPage + 1}${searchParams.search ? `&search=${searchParams.search}` : ""}${searchParams.status ? `&status=${searchParams.status}` : ""}`}
+                &laquo;
+              </Button>
+            </Link>
+            <Link href={buildPageUrl(Math.max(1, currentPage - 1), searchParams)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                className="h-8 px-3"
               >
-                <Button variant="outline" size="sm">
-                  Next
-                </Button>
-              </Link>
+                Previous
+              </Button>
+            </Link>
+            {getPageNumbers(currentPage, pages).map((p, i) =>
+              p === "..." ? (
+                <span key={`dots-${i}`} className="px-1 text-muted-foreground">
+                  ...
+                </span>
+              ) : (
+                <Link key={p} href={buildPageUrl(p as number, searchParams)}>
+                  <Button
+                    variant={currentPage === p ? "default" : "outline"}
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                  >
+                    {p}
+                  </Button>
+                </Link>
+              )
             )}
+            <Link href={buildPageUrl(Math.min(pages, currentPage + 1), searchParams)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === pages}
+                className="h-8 px-3"
+              >
+                Next
+              </Button>
+            </Link>
+            <Link href={buildPageUrl(pages, searchParams)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === pages}
+                className="h-8 w-8 p-0"
+              >
+                &raquo;
+              </Button>
+            </Link>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Single Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>

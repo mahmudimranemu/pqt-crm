@@ -97,8 +97,15 @@ function ImportCSVDialog({
         phone: row.phone,
         message: row.message || undefined,
         source: row.source || undefined,
+        sourceUrl: row.sourceurl || undefined,
         budget: row.budget || undefined,
         country: row.country || undefined,
+        tags: row.tags || undefined,
+        segment: row.segment || undefined,
+        leadStatus: row.leadstatus || undefined,
+        priority: row.priority || undefined,
+        nextCallDate: row.nextcalldate || undefined,
+        snooze: row.snooze || undefined,
       });
     }
 
@@ -142,8 +149,8 @@ function ImportCSVDialog({
   };
 
   const handleDownloadTemplate = () => {
-    const headers = "firstName,lastName,email,phone,message,source,budget,country";
-    const example = "John,Doe,john@example.com,+1234567890,Interested in villas,WEBSITE_FORM,$500k - $1M,United Kingdom";
+    const headers = "firstName,lastName,email,phone,message,source,sourceUrl,budget,country,tags,segment,leadStatus,priority,nextCallDate,snooze";
+    const example = "John,Doe,john@example.com,+1234567890,Interested in villas,WEBSITE_FORM,https://example.com/form,$500k - $1M,United Kingdom,Cash Buyer;Investor,Buyer,New,High,2026-03-01,Active";
     const csv = `${headers}\n${example}`;
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);

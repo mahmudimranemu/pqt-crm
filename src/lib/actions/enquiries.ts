@@ -388,8 +388,15 @@ export async function bulkCreateEnquiries(
     phone: string;
     message?: string;
     source?: string;
+    sourceUrl?: string;
     budget?: string;
     country?: string;
+    tags?: string;
+    segment?: string;
+    leadStatus?: string;
+    priority?: string;
+    nextCallDate?: string;
+    snooze?: string;
   }>,
 ) {
   const session = (await auth()) as ExtendedSession | null;
@@ -407,6 +414,10 @@ export async function bulkCreateEnquiries(
     "PARTNER_REFERRAL",
   ];
 
+  const validPriorities = ["High", "Medium", "Low"];
+  const validSegments = ["Buyer", "Investor", "Renter", "Other"];
+  const validSnooze = ["Active", "1 Day", "3 Days", "1 Week", "1 Month"];
+
   const data = rows.map((row) => ({
     firstName: row.firstName.trim(),
     lastName: row.lastName.trim(),
@@ -416,8 +427,15 @@ export async function bulkCreateEnquiries(
     source: (validSources.includes(row.source || "")
       ? row.source
       : "WEBSITE_FORM") as EnquirySource,
+    sourceUrl: row.sourceUrl?.trim() || null,
     budget: row.budget?.trim() || null,
     country: row.country?.trim() || null,
+    tags: row.tags ? row.tags.split(";").map((t) => t.trim()).filter(Boolean) : [],
+    segment: row.segment?.trim() && validSegments.includes(row.segment.trim()) ? row.segment.trim() : "Buyer",
+    leadStatus: row.leadStatus?.trim() || "New",
+    priority: row.priority?.trim() && validPriorities.includes(row.priority.trim()) ? row.priority.trim() : "Medium",
+    nextCallDate: row.nextCallDate?.trim() ? new Date(row.nextCallDate.trim()) : null,
+    snooze: row.snooze?.trim() && validSnooze.includes(row.snooze.trim()) ? row.snooze.trim() : "Active",
     status: "NEW" as const,
   }));
 
@@ -774,7 +792,11 @@ export async function deleteEnquiry(id: string) {
     throw new Error("Unauthorized");
   }
 
-  await prisma.enquiry.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.activity.deleteMany({ where: { enquiryId: id } });
+    await tx.enquiryNote.deleteMany({ where: { enquiryId: id } });
+    await tx.enquiry.delete({ where: { id } });
+  }, { timeout: 30000 });
   await auditLog("DELETE", "Enquiry", id);
   revalidatePath("/clients/enquiries");
 }
@@ -981,9 +1003,11 @@ export async function bulkDeleteEnquiries(ids: string[]) {
   if (session.user.role !== "SUPER_ADMIN")
     throw new Error("Unauthorized: Only SUPER_ADMIN can bulk delete");
 
-  await prisma.enquiry.deleteMany({
-    where: { id: { in: ids } },
-  });
+  await prisma.$transaction(async (tx) => {
+    await tx.activity.deleteMany({ where: { enquiryId: { in: ids } } });
+    await tx.enquiryNote.deleteMany({ where: { enquiryId: { in: ids } } });
+    await tx.enquiry.deleteMany({ where: { id: { in: ids } } });
+  }, { timeout: 30000 });
 
   revalidatePath("/clients/enquiries");
 }

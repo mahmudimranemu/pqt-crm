@@ -63,6 +63,7 @@ import {
 import { createBooking } from "@/lib/actions/bookings";
 import { createSale } from "@/lib/actions/sales";
 import { generateCSV, downloadCSV } from "@/lib/export";
+import { AddEnquiryDialog } from "./add-enquiry-dialog";
 
 interface Agent {
   id: string;
@@ -489,6 +490,9 @@ export function EnquiriesTable({
     return (
       <div className="py-12 text-center">
         <p className="text-gray-500">No enquiries found.</p>
+        <div className="mt-4">
+          <AddEnquiryDialog agents={agents} properties={properties} />
+        </div>
       </div>
     );
   }
