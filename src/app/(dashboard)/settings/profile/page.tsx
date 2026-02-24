@@ -89,6 +89,7 @@ export default async function ProfilePage({ searchParams }: PageProps) {
             </h2>
             <ProfileForm
               userId={user.id}
+              userRole={session.user.role}
               initialData={{
                 firstName: user.firstName,
                 lastName: user.lastName,

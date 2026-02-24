@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { updateUser } from "@/lib/actions/users";
+import { updateUser, requestEmailChange } from "@/lib/actions/users";
 import { CheckCircle, Upload, Loader2 } from "lucide-react";
 import Image from "next/image";
 
 interface ProfileFormProps {
   userId: string;
+  userRole: string;
   initialData: {
     firstName: string;
     lastName: string;
@@ -21,7 +22,7 @@ interface ProfileFormProps {
   };
 }
 
-export function ProfileForm({ userId, initialData }: ProfileFormProps) {
+export function ProfileForm({ userId, userRole, initialData }: ProfileFormProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -30,18 +31,27 @@ export function ProfileForm({ userId, initialData }: ProfileFormProps) {
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState(initialData);
 
+  // Email change state
+  const [newEmail, setNewEmail] = useState("");
+  const [showEmailChange, setShowEmailChange] = useState(false);
+  const [emailPending, startEmailTransition] = useTransition();
+  const [emailStatus, setEmailStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const isSuperAdmin = userRole === "SUPER_ADMIN";
+
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
       setError("Please select a JPG, PNG, GIF, or WebP image.");
       return;
     }
 
-    // Validate file size (2MB)
     if (file.size > 2 * 1024 * 1024) {
       setError("Image must be less than 2MB.");
       return;
@@ -91,11 +101,34 @@ export function ProfileForm({ userId, initialData }: ProfileFormProps) {
       router.refresh();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to update profile"
+        err instanceof Error ? err.message : "Failed to update profile",
       );
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleEmailChange = () => {
+    if (!newEmail.trim()) return;
+    setEmailStatus(null);
+
+    startEmailTransition(async () => {
+      try {
+        await requestEmailChange(newEmail.trim());
+        setEmailStatus({
+          type: "success",
+          message: `Verification email sent to ${newEmail.trim()}. Check your inbox to confirm the change.`,
+        });
+        setNewEmail("");
+        setShowEmailChange(false);
+      } catch (err) {
+        setEmailStatus({
+          type: "error",
+          message:
+            err instanceof Error ? err.message : "Failed to request email change",
+        });
+      }
+    });
   };
 
   return (
@@ -201,9 +234,71 @@ export function ProfileForm({ userId, initialData }: ProfileFormProps) {
             disabled
             className="bg-gray-50 text-gray-500"
           />
-          <p className="text-xs text-gray-400">
-            Contact an admin to change your email.
-          </p>
+          {isSuperAdmin ? (
+            <div>
+              {!showEmailChange ? (
+                <button
+                  type="button"
+                  onClick={() => setShowEmailChange(true)}
+                  className="text-xs text-[#dc2626] hover:underline"
+                >
+                  Change email address
+                </button>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="Enter new email address"
+                      className="text-sm"
+                      disabled={emailPending}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleEmailChange}
+                      disabled={emailPending || !newEmail.trim()}
+                      className="bg-[#dc2626] hover:bg-[#b91c1c] text-white shrink-0"
+                    >
+                      {emailPending ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : null}
+                      {emailPending ? "Sending..." : "Verify Email"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setShowEmailChange(false);
+                        setNewEmail("");
+                        setEmailStatus(null);
+                      }}
+                      disabled={emailPending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    A verification email will be sent to the new address.
+                  </p>
+                </div>
+              )}
+              {emailStatus && (
+                <p
+                  className={`text-xs mt-1 ${emailStatus.type === "success" ? "text-green-600" : "text-red-600"}`}
+                >
+                  {emailStatus.message}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400">
+              Contact an admin to change your email.
+            </p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="phone">Phone</Label>

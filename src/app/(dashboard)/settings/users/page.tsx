@@ -617,7 +617,7 @@ function SettingsTab() {
                 Company Name
               </label>
               <Input
-                defaultValue="PropertyFlow CRM"
+                defaultValue="PropertyQuestTurkey CRM"
                 className="bg-white"
                 disabled
               />

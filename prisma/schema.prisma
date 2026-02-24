@@ -257,6 +257,11 @@ model User {
   lockedUntil         DateTime?
   twoFactorEnabled    Boolean   @default(false)
   twoFactorSecret     String?
+  emailVerifyToken    String?
+  emailVerifyNewEmail String?
+  emailVerifyExpires  DateTime?
+  passwordResetToken  String?
+  passwordResetExpires DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 

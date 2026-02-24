@@ -3,9 +3,15 @@
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { auth, type ExtendedSession } from "@/lib/auth";
-import { hash } from "bcryptjs";
+import { hash, compare } from "bcryptjs";
+import { randomBytes } from "crypto";
 import type { UserRole, Office } from "@prisma/client";
 import { auditLog } from "@/lib/audit";
+import {
+  sendEmail,
+  emailVerificationTemplate,
+  passwordResetTemplate,
+} from "@/lib/email";
 
 // Password validation: min 8 chars, 1 uppercase, 1 number, 1 special char
 function validatePassword(password: string): string | null {
@@ -322,5 +328,215 @@ export async function deleteUser(id: string) {
   await prisma.user.delete({ where: { id } });
 
   revalidatePath("/settings/users");
+  return { success: true };
+}
+
+// Change password (with current password verification)
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+
+  // Fetch user with password hash
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { password: true },
+  });
+  if (!user) throw new Error("User not found");
+
+  // Verify current password
+  const isValid = await compare(currentPassword, user.password);
+  if (!isValid) {
+    throw new Error("Current password is incorrect");
+  }
+
+  // Validate new password strength
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    throw new Error(passwordError);
+  }
+
+  const hashedPassword = await hash(newPassword, 12);
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: { password: hashedPassword },
+  });
+
+  await auditLog("UPDATE", "User", session.user.id, {
+    action: "password_changed",
+  });
+
+  return { success: true };
+}
+
+// Request email change (SUPER_ADMIN only) — sends verification to new email
+export async function requestEmailChange(newEmail: string) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role !== "SUPER_ADMIN") {
+    throw new Error("Only Super Admin can change email");
+  }
+
+  const normalizedEmail = newEmail.toLowerCase().trim();
+
+  // Check if email already exists
+  const existing = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+  });
+  if (existing && existing.id !== session.user.id) {
+    throw new Error("A user with this email already exists");
+  }
+  if (existing && existing.id === session.user.id) {
+    throw new Error("This is already your current email");
+  }
+
+  // Generate token
+  const token = randomBytes(32).toString("hex");
+  const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: {
+      emailVerifyToken: token,
+      emailVerifyNewEmail: normalizedEmail,
+      emailVerifyExpires: expires,
+    },
+  });
+
+  // Send verification email to the NEW address
+  const { subject, html } = emailVerificationTemplate(
+    session.user.firstName,
+    normalizedEmail,
+    token,
+  );
+  const sent = await sendEmail(normalizedEmail, subject, html);
+
+  if (!sent) {
+    throw new Error(
+      "Failed to send verification email. Check SMTP settings in .env",
+    );
+  }
+
+  return { success: true };
+}
+
+// Verify email change (called via API route when user clicks link)
+export async function verifyEmailChange(token: string) {
+  const user = await prisma.user.findFirst({
+    where: {
+      emailVerifyToken: token,
+      emailVerifyExpires: { gt: new Date() },
+    },
+    select: {
+      id: true,
+      email: true,
+      emailVerifyNewEmail: true,
+    },
+  });
+
+  if (!user || !user.emailVerifyNewEmail) {
+    throw new Error("Invalid or expired verification link");
+  }
+
+  // Check the new email isn't taken by someone else since the request
+  const conflict = await prisma.user.findUnique({
+    where: { email: user.emailVerifyNewEmail },
+  });
+  if (conflict && conflict.id !== user.id) {
+    throw new Error("This email is already in use by another account");
+  }
+
+  const oldEmail = user.email;
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      email: user.emailVerifyNewEmail,
+      emailVerifyToken: null,
+      emailVerifyNewEmail: null,
+      emailVerifyExpires: null,
+    },
+  });
+
+  await auditLog("UPDATE", "User", user.id, {
+    action: "email_changed",
+    oldEmail,
+    newEmail: user.emailVerifyNewEmail,
+  });
+
+  return { success: true, newEmail: user.emailVerifyNewEmail };
+}
+
+// Request password reset (public — no auth required)
+export async function requestPasswordReset(email: string) {
+  const normalizedEmail = email.toLowerCase().trim();
+
+  // Always return success to prevent email enumeration
+  const user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: { id: true, firstName: true, isActive: true },
+  });
+
+  if (!user || !user.isActive) {
+    // Don't reveal whether the email exists
+    return { success: true };
+  }
+
+  const token = randomBytes(32).toString("hex");
+  const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordResetToken: token,
+      passwordResetExpires: expires,
+    },
+  });
+
+  const { subject, html } = passwordResetTemplate(user.firstName, token);
+  await sendEmail(normalizedEmail, subject, html);
+
+  return { success: true };
+}
+
+// Reset password using token (public — no auth required)
+export async function resetPassword(token: string, newPassword: string) {
+  const user = await prisma.user.findFirst({
+    where: {
+      passwordResetToken: token,
+      passwordResetExpires: { gt: new Date() },
+    },
+    select: { id: true },
+  });
+
+  if (!user) {
+    throw new Error("Invalid or expired reset link");
+  }
+
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    throw new Error(passwordError);
+  }
+
+  const hashedPassword = await hash(newPassword, 12);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: hashedPassword,
+      passwordResetToken: null,
+      passwordResetExpires: null,
+      failedLoginAttempts: 0,
+      lockedUntil: null,
+    },
+  });
+
+  await auditLog("UPDATE", "User", user.id, {
+    action: "password_reset",
+  });
+
   return { success: true };
 }

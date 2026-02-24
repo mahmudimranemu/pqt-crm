@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -164,7 +165,15 @@ function LoginForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-[#dc2626] hover:text-[#b91c1c] hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <Input
               id="password"
               type="password"
@@ -248,11 +257,11 @@ function LoginFormFallback() {
         <div className="flex justify-center mb-4">
           <div className="flex items-center gap-2 text-[#dc2626]">
             <Building2 className="h-10 w-10" />
-            <span className="text-2xl font-bold">PropertyFlow</span>
+            <span className="text-2xl font-bold">PropertyQuestTurkey</span>
           </div>
         </div>
         <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
-        <CardDescription>Sign in to your PropertyFlow account</CardDescription>
+        <CardDescription>Sign in to your PropertyQuestTurkey account</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex justify-center py-8">
