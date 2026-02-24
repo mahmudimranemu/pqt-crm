@@ -262,6 +262,7 @@ model User {
   emailVerifyExpires  DateTime?
   passwordResetToken  String?
   passwordResetExpires DateTime?
+  lastSeen            DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 

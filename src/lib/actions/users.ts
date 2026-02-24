@@ -43,7 +43,10 @@ export async function getUsers(params?: {
   const { role, office, page = 1, limit = 25 } = params || {};
   const skip = (page - 1) * limit;
 
-  const where: Record<string, unknown> = {};
+  const where: Record<string, unknown> = {
+    // Hide soft-deleted users
+    NOT: { email: { startsWith: "deleted_" } },
+  };
   if (role) where.role = role;
   if (office) where.office = office;
 
@@ -64,6 +67,7 @@ export async function getUsers(params?: {
         role: true,
         office: true,
         isActive: true,
+        lastSeen: true,
         createdAt: true,
         _count: {
           select: {
@@ -334,6 +338,8 @@ export async function reactivateUser(id: string) {
 }
 
 // Delete user — SUPER_ADMIN only
+// Soft-deletes (deactivates) the user and cleans up non-critical data.
+// Business records (bookings, sales, deals, leads) are preserved for history.
 export async function deleteUser(id: string) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
@@ -357,7 +363,41 @@ export async function deleteUser(id: string) {
     name: `${user.firstName} ${user.lastName}`,
   });
 
-  await prisma.user.delete({ where: { id } });
+  // Use a transaction to clean up related data and soft-delete the user
+  await prisma.$transaction(async (tx) => {
+    // Nullify optional foreign keys on business records
+    await tx.client.updateMany({
+      where: { assignedAgentId: id },
+      data: { assignedAgentId: null },
+    });
+    await tx.enquiry.updateMany({
+      where: { assignedAgentId: id },
+      data: { assignedAgentId: null },
+    });
+
+    // Delete non-critical user-specific data
+    await tx.notification.deleteMany({ where: { userId: id } });
+    await tx.loginLog.deleteMany({ where: { userId: id } });
+    await tx.teamMember.deleteMany({ where: { userId: id } });
+
+    // Soft-delete: deactivate the user and scrub personal data
+    await tx.user.update({
+      where: { id },
+      data: {
+        isActive: false,
+        email: `deleted_${id}@removed.local`,
+        password: "DELETED",
+        phone: null,
+        avatar: null,
+        emailVerifyToken: null,
+        emailVerifyNewEmail: null,
+        emailVerifyExpires: null,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        twoFactorSecret: null,
+      },
+    });
+  });
 
   revalidatePath("/settings/users");
   return { success: true };

@@ -200,27 +200,33 @@ export function UserActions({ user }: UserActionsProps) {
             <Key className="h-4 w-4 mr-2" />
             Reset Password
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleToggleActive}>
-            {user.isActive ? (
-              <>
-                <UserX className="h-4 w-4 mr-2" />
-                Deactivate
-              </>
-            ) : (
-              <>
-                <UserCheck className="h-4 w-4 mr-2" />
-                Reactivate
-              </>
-            )}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-red-600 focus:text-red-600"
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete User
-          </DropdownMenuItem>
+          {user.role !== "SUPER_ADMIN" && (
+            <DropdownMenuItem onClick={handleToggleActive}>
+              {user.isActive ? (
+                <>
+                  <UserX className="h-4 w-4 mr-2" />
+                  Deactivate
+                </>
+              ) : (
+                <>
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  Reactivate
+                </>
+              )}
+            </DropdownMenuItem>
+          )}
+          {user.role !== "SUPER_ADMIN" && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-red-600 focus:text-red-600"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete User
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

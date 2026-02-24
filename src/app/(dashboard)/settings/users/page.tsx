@@ -38,12 +38,18 @@ import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/utils";
 
 const roleColors: Record<UserRole, string> = {
-  SUPER_ADMIN: "bg-blue-100 text-blue-700 border-blue-200",
+  SUPER_ADMIN: "bg-red-100 text-red-700 border-red-200",
   ADMIN: "bg-blue-100 text-blue-700 border-blue-200",
   SALES_MANAGER: "bg-orange-100 text-orange-700 border-orange-200",
   SALES_AGENT: "bg-blue-100 text-blue-700 border-blue-200",
   VIEWER: "bg-gray-100 text-gray-700 border-gray-200",
 };
+
+function isOnline(lastSeen: Date | string | null | undefined): boolean {
+  if (!lastSeen) return false;
+  const diff = Date.now() - new Date(lastSeen).getTime();
+  return diff < 5 * 60 * 1000; // 5 minutes
+}
 
 const roleLabels: Record<UserRole, string> = {
   SUPER_ADMIN: "Super Admin",
@@ -251,71 +257,105 @@ function UserManagementTab({ users }: { users: any[] }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
-                <TableRow
-                  key={user.id}
-                  className="border-b border-gray-50 hover:bg-gray-50/50"
-                >
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-medium text-gray-600">
-                        {user.firstName[0]}
-                        {user.lastName[0]}
+              {users.map((user) => {
+                const isSuperAdmin = user.role === "SUPER_ADMIN";
+                const online = isOnline(user.lastSeen);
+
+                return (
+                  <TableRow
+                    key={user.id}
+                    className={
+                      isSuperAdmin
+                        ? "border-b border-red-100 bg-red-50/40 hover:bg-red-50/70"
+                        : "border-b border-gray-50 hover:bg-gray-50/50"
+                    }
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div
+                            className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-medium ${
+                              isSuperAdmin
+                                ? "bg-red-100 text-red-700 ring-2 ring-red-300"
+                                : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {user.firstName[0]}
+                            {user.lastName[0]}
+                          </div>
+                          {online && (
+                            <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white">
+                              <span className="absolute h-2.5 w-2.5 animate-ping rounded-full bg-red-400 opacity-75" />
+                              <span className="relative h-2.5 w-2.5 rounded-full bg-red-500" />
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <p className={`text-sm font-medium ${isSuperAdmin ? "text-red-900" : "text-gray-900"}`}>
+                            {user.firstName} {user.lastName}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {officeLabels[user.office] || user.office}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {user.firstName} {user.lastName}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {officeLabels[user.office] || user.office}
-                        </p>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                          <Mail className="h-3 w-3" />
+                          {user.email}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                          <Phone className="h-3 w-3" />
+                          {user.phone || "—"}
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                        <Mail className="h-3 w-3" />
-                        {user.email}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${roleColors[user.role as UserRole]}`}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                        {roleLabels[user.role as UserRole]}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {user.isActive ? (
+                          <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-100">
+                            Away
+                          </Badge>
+                        )}
+                        {online && (
+                          <span className="flex items-center gap-1 text-[10px] font-medium text-red-600">
+                            <span className="relative flex h-2 w-2">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                            </span>
+                            Online
+                          </span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1.5 text-sm text-gray-500">
-                        <Phone className="h-3 w-3" />
-                        {user.phone || "—"}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${roleColors[user.role as UserRole]}`}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                      {roleLabels[user.role as UserRole]}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {user.isActive ? (
-                      <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">
-                        Active
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-100">
-                        Away
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm font-medium text-gray-900">
-                    {user._count.clients || 0}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm font-medium text-[#dc2626]">
-                      {user._count.sales || 0}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <UserActions user={user} />
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-gray-900">
+                      {user._count.clients || 0}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm font-medium text-[#dc2626]">
+                        {user._count.sales || 0}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <UserActions user={user} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}

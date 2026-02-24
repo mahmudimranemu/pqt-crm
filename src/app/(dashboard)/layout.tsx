@@ -16,10 +16,17 @@ export default async function DashboardRootLayout({
   }
 
   // Fetch fresh email from DB so topbar stays in sync after email changes
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { email: true },
-  });
+  // Also update lastSeen timestamp for online status tracking
+  const [dbUser] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { email: true },
+    }),
+    prisma.user.update({
+      where: { id: session.user.id },
+      data: { lastSeen: new Date() },
+    }).catch(() => {}),
+  ]);
 
   const unreadCount = await getUnreadNotificationCount();
 
