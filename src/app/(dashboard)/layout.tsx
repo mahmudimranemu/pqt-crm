@@ -15,12 +15,12 @@ export default async function DashboardRootLayout({
     redirect("/login");
   }
 
-  // Fetch fresh email from DB so topbar stays in sync after email changes
+  // Fetch fresh user data from DB so sidebar/topbar stays in sync after profile changes
   // Also update lastSeen timestamp for online status tracking
   const [dbUser] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { email: true },
+      select: { firstName: true, lastName: true, email: true },
     }),
     prisma.user.update({
       where: { id: session.user.id },
@@ -33,8 +33,8 @@ export default async function DashboardRootLayout({
   return (
     <DashboardLayout
       user={{
-        firstName: session.user.firstName,
-        lastName: session.user.lastName,
+        firstName: dbUser?.firstName ?? session.user.firstName,
+        lastName: dbUser?.lastName ?? session.user.lastName,
         email: dbUser?.email ?? session.user.email,
         role: session.user.role,
         office: session.user.office,
