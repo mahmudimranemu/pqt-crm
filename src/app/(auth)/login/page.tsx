@@ -17,53 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Loader2,
-  Building2,
-  Shield,
-  UserCog,
-  Briefcase,
-  Users,
-  Eye,
-} from "lucide-react";
-
-const demoAccounts = [
-  {
-    label: "Super Admin",
-    email: "admin@pqt.com",
-    password: "password123",
-    icon: Shield,
-    color: "bg-[#dc2626] hover:bg-[#b91c1c] text-white",
-  },
-  {
-    label: "Admin",
-    email: "sarah.dubai@pqt.com",
-    password: "password123",
-    icon: UserCog,
-    color: "bg-orange-500 hover:bg-orange-600 text-white",
-  },
-  {
-    label: "Manager",
-    email: "mehmet.istanbul@pqt.com",
-    password: "password123",
-    icon: Briefcase,
-    color: "bg-blue-600 hover:bg-blue-700 text-white",
-  },
-  {
-    label: "Agent",
-    email: "james.london@pqt.com",
-    password: "password123",
-    icon: Users,
-    color: "bg-emerald-600 hover:bg-emerald-700 text-white",
-  },
-  {
-    label: "Viewer",
-    email: "viewer@pqt.com",
-    password: "password123",
-    icon: Eye,
-    color: "bg-gray-500 hover:bg-gray-600 text-white",
-  },
-];
+import { Loader2, Building2 } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
@@ -119,12 +73,6 @@ function LoginForm() {
       setLoginError("An unexpected error occurred");
       setIsLoading(false);
     }
-  };
-
-  const fillCredentials = (demoEmail: string, demoPassword: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    setLoginError(null);
   };
 
   return (
@@ -200,51 +148,6 @@ function LoginForm() {
             )}
           </Button>
         </form>
-
-        {/* Demo Accounts */}
-        <div className="mt-6">
-          <div className="relative mb-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-2 text-gray-500">
-                Quick access - Demo accounts
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {demoAccounts.slice(0, 3).map((account) => (
-              <button
-                key={account.label}
-                type="button"
-                onClick={() => fillCredentials(account.email, account.password)}
-                className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${account.color}`}
-              >
-                <account.icon className="h-3.5 w-3.5" />
-                {account.label}
-              </button>
-            ))}
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {demoAccounts.slice(3).map((account) => (
-              <button
-                key={account.label}
-                type="button"
-                onClick={() => fillCredentials(account.email, account.password)}
-                className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${account.color}`}
-              >
-                <account.icon className="h-3.5 w-3.5" />
-                {account.label}
-              </button>
-            ))}
-          </div>
-
-          <p className="mt-3 text-center text-[10px] text-gray-400">
-            All demo accounts use password: password123
-          </p>
-        </div>
       </CardContent>
     </Card>
   );
