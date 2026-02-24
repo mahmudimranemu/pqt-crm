@@ -14,6 +14,7 @@ import { EnquiryDetailFields } from "./enquiry-detail-fields";
 import { EnquiryNotes } from "./enquiry-notes";
 import { EnquiryPropertySelector } from "./enquiry-property-selector";
 import { ConvertEnquiryDialog } from "./convert-enquiry-dialog";
+import { EditableInfoCard } from "./editable-info-card";
 import { TagManager } from "@/components/tag-manager";
 import { updateEnquiryTags } from "@/lib/actions/enquiries";
 import type { EnquiryStatus, EnquirySource } from "@prisma/client";
@@ -165,28 +166,20 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
             <p className="font-medium text-sm">{enquiry.phone}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
-              <Globe className="h-4 w-4" />
-              <span className="text-sm">Country</span>
-            </div>
-            <p className="font-medium text-sm">
-              {enquiry.country || "Not specified"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-gray-500 mb-1">
-              <DollarSign className="h-4 w-4" />
-              <span className="text-sm">Budget</span>
-            </div>
-            <p className="font-medium text-sm">
-              {enquiry.budget || "Not specified"}
-            </p>
-          </CardContent>
-        </Card>
+        <EditableInfoCard
+          enquiryId={enquiry.id}
+          field="country"
+          label="Country"
+          value={enquiry.country}
+          icon="globe"
+        />
+        <EditableInfoCard
+          enquiryId={enquiry.id}
+          field="budget"
+          label="Budget"
+          value={enquiry.budget}
+          icon="dollar"
+        />
       </div>
 
       {/* Lead Management - Full Width */}

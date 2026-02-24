@@ -43,8 +43,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
 import {
-  CheckSquare,
-  Square,
   Phone,
   Mail,
   Calendar,
@@ -135,13 +133,6 @@ const sourceBgColors: Record<string, string> = {
   WHATSAPP: "bg-green-100 text-green-700",
   LIVE_CHAT: "bg-yellow-100 text-yellow-700",
   PARTNER_REFERRAL: "bg-orange-100 text-orange-700",
-};
-
-const statusColors: Record<string, string> = {
-  Hot: "text-red-600",
-  Warm: "text-orange-500",
-  Cold: "text-blue-500",
-  New: "text-gray-500",
 };
 
 const priorityColors: Record<string, string> = {
@@ -584,28 +575,7 @@ export function EnquiriesTable({
                 Budget
               </TableHead>
               <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap">
-                Country
-              </TableHead>
-              <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap">
                 Notes & Contact Log
-              </TableHead>
-              <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap text-center">
-                Called
-              </TableHead>
-              <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap text-center">
-                Spoken
-              </TableHead>
-              <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap">
-                Segment
-              </TableHead>
-              <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap">
-                Status
-              </TableHead>
-              <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap">
-                Next Call
-              </TableHead>
-              <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap">
-                Snooze
               </TableHead>
               <TableHead className="text-[10px] font-medium text-gray-500 uppercase whitespace-nowrap">
                 Priority
@@ -690,11 +660,6 @@ export function EnquiriesTable({
                     {enquiry.budget || "—"}
                   </TableCell>
 
-                  {/* Country */}
-                  <TableCell className="text-xs text-gray-600 whitespace-nowrap">
-                    {enquiry.country || "—"}
-                  </TableCell>
-
                   {/* Notes */}
                   <TableCell className="text-xs text-gray-500 max-w-[200px]">
                     {enquiry.notes && enquiry.notes.length > 0 ? (
@@ -720,111 +685,6 @@ export function EnquiriesTable({
                     )}
                   </TableCell>
 
-                  {/* Called */}
-                  <TableCell className="text-center">
-                    <button
-                      onClick={() =>
-                        handleFieldUpdate(enquiry.id, "called", !enquiry.called)
-                      }
-                      className="mx-auto block"
-                    >
-                      {enquiry.called ? (
-                        <CheckSquare className="h-4 w-4 text-[#dc2626]" />
-                      ) : (
-                        <Square className="h-4 w-4 text-gray-300" />
-                      )}
-                    </button>
-                  </TableCell>
-
-                  {/* Spoken */}
-                  <TableCell className="text-center">
-                    <button
-                      onClick={() =>
-                        handleFieldUpdate(enquiry.id, "spoken", !enquiry.spoken)
-                      }
-                      className="mx-auto block"
-                    >
-                      {enquiry.spoken ? (
-                        <CheckSquare className="h-4 w-4 text-[#dc2626]" />
-                      ) : (
-                        <Square className="h-4 w-4 text-gray-300" />
-                      )}
-                    </button>
-                  </TableCell>
-
-                  {/* Segment */}
-                  <TableCell>
-                    <select
-                      className="rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] text-gray-600 cursor-pointer"
-                      value={enquiry.segment || "Buyer"}
-                      onChange={(e) =>
-                        handleFieldUpdate(enquiry.id, "segment", e.target.value)
-                      }
-                    >
-                      <option value="Buyer">Buyer</option>
-                      <option value="Investor">Investor</option>
-                      <option value="Tenant">Tenant</option>
-                    </select>
-                  </TableCell>
-
-                  {/* Status (leadStatus) */}
-                  <TableCell>
-                    <select
-                      className={`rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] font-medium cursor-pointer ${statusColors[enquiry.leadStatus || "New"] || "text-gray-600"}`}
-                      value={enquiry.leadStatus || "New"}
-                      onChange={(e) =>
-                        handleFieldUpdate(
-                          enquiry.id,
-                          "leadStatus",
-                          e.target.value,
-                        )
-                      }
-                    >
-                      <option value="Hot">Hot</option>
-                      <option value="Warm">Warm</option>
-                      <option value="Cold">Cold</option>
-                      <option value="New">New</option>
-                    </select>
-                  </TableCell>
-
-                  {/* Next Call */}
-                  <TableCell>
-                    <input
-                      type="date"
-                      className="rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] text-gray-600 cursor-pointer"
-                      value={
-                        enquiry.nextCallDate
-                          ? new Date(enquiry.nextCallDate)
-                              .toISOString()
-                              .split("T")[0]
-                          : ""
-                      }
-                      onChange={(e) => {
-                        const val = e.target.value
-                          ? new Date(e.target.value)
-                          : null;
-                        handleFieldUpdate(enquiry.id, "nextCallDate", val);
-                      }}
-                    />
-                  </TableCell>
-
-                  {/* Snooze */}
-                  <TableCell>
-                    <select
-                      className="rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] text-gray-600 cursor-pointer"
-                      value={enquiry.snooze || "Active"}
-                      onChange={(e) =>
-                        handleFieldUpdate(enquiry.id, "snooze", e.target.value)
-                      }
-                    >
-                      <option value="Active">Active</option>
-                      <option value="1 Day">1 Day</option>
-                      <option value="3 Days">3 Days</option>
-                      <option value="1 Week">1 Week</option>
-                      <option value="2 Weeks">2 Weeks</option>
-                      <option value="1 Month">1 Month</option>
-                    </select>
-                  </TableCell>
 
                   {/* Priority */}
                   <TableCell>
