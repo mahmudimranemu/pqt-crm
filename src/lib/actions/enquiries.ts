@@ -725,9 +725,18 @@ export async function updateEnquiryField(
     throw new Error(`Field '${field}' is not editable`);
   }
 
+  // Normalize empty strings to null for relation fields
+  let normalizedValue = value;
+  if (field === "assignedAgentId" && (value === "" || value === "unassigned")) {
+    normalizedValue = null;
+  }
+
+  // Build update data
+  const updateData: Record<string, unknown> = { [field]: normalizedValue };
+
   const enquiry = await prisma.enquiry.update({
     where: { id: enquiryId },
-    data: { [field]: value },
+    data: updateData,
   });
 
   // Log activity for nextCallDate changes
@@ -755,8 +764,6 @@ export async function updateEnquiryField(
     unknown
   >);
 
-  revalidatePath("/clients/enquiries");
-  revalidatePath(`/clients/enquiries/${enquiryId}`);
   return enquiry;
 }
 
@@ -984,9 +991,6 @@ export async function assignEnquiryToPool(
     where: { id: enquiryId },
     data: { tags: filteredTags, assignedAgentId: null },
   });
-
-  revalidatePath("/clients/enquiries");
-  revalidatePath("/settings/users");
 }
 
 export async function removeEnquiryFromPool(enquiryId: string) {
@@ -1008,9 +1012,6 @@ export async function removeEnquiryFromPool(enquiryId: string) {
     where: { id: enquiryId },
     data: { tags: filteredTags },
   });
-
-  revalidatePath("/clients/enquiries");
-  revalidatePath("/settings/users");
 }
 
 export async function bulkDeleteEnquiries(ids: string[]) {

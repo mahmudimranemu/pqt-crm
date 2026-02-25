@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -159,6 +159,12 @@ export function EnquiriesTable({
   const [localAgentOverrides, setLocalAgentOverrides] = useState<Record<string, string>>({});
   const [localPriorityOverrides, setLocalPriorityOverrides] = useState<Record<string, string>>({});
 
+  // Clear optimistic overrides when server data refreshes (new props)
+  useEffect(() => {
+    setLocalAgentOverrides({});
+    setLocalPriorityOverrides({});
+  }, [enquiries]);
+
   // Bulk delete state
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -293,26 +299,6 @@ export function EnquiriesTable({
     budgetMax: 500000,
   });
 
-  const handleFieldUpdate = async (
-    enquiryId: string,
-    field: string,
-    value: string | boolean | Date | null,
-  ) => {
-    try {
-      await updateEnquiryField(enquiryId, field, value);
-      startTransition(() => {
-        router.refresh();
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to update field",
-      });
-    }
-  };
-
   // Reallocate handlers
   const openReallocate = (enquiry: EnquiryRow) => {
     setReallocateEnquiry(enquiry);
@@ -330,7 +316,7 @@ export function EnquiriesTable({
         await updateEnquiryField(
           reallocateEnquiry.id,
           "assignedAgentId",
-          "",
+          null,
         );
         await updateEnquiryField(
           reallocateEnquiry.id,
@@ -639,7 +625,7 @@ export function EnquiriesTable({
           </TableHeader>
           <TableBody>
             {enquiries.map((enquiry, index) => {
-              const refId = `REF-${(10001 + index).toString()}`;
+              const refId = `REF-${(10000 + (currentPage - 1) * 25 + index + 1).toString()}`;
 
               return (
                 <TableRow
@@ -749,7 +735,6 @@ export function EnquiriesTable({
                             delete next[enquiry.id];
                             return next;
                           });
-                          router.refresh();
                         } catch {
                           setLocalPriorityOverrides((prev) => {
                             const next = { ...prev };
@@ -805,14 +790,8 @@ export function EnquiriesTable({
                             const agentVal = val === "unassigned" ? null : val;
                             await updateEnquiryField(enquiry.id, "assignedAgentId", agentVal);
                           }
-                          // Clear override and refresh server data
-                          setLocalAgentOverrides((prev) => {
-                            const next = { ...prev };
-                            delete next[enquiry.id];
-                            return next;
-                          });
-                          router.refresh();
-                        } catch {
+                          toast({ title: "Consultant updated" });
+                        } catch (err) {
                           // Revert on error
                           setLocalAgentOverrides((prev) => {
                             const next = { ...prev };
@@ -822,7 +801,8 @@ export function EnquiriesTable({
                           toast({
                             variant: "destructive",
                             title: "Error",
-                            description: "Failed to update consultant",
+                            description:
+                              err instanceof Error ? err.message : "Failed to update consultant",
                           });
                         }
                       }}
