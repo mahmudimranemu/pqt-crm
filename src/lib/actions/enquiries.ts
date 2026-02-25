@@ -47,7 +47,13 @@ export async function getEnquiries(params?: {
 
   if (status) where.status = status;
   if (source) where.source = source;
-  if (agentId) where.assignedAgentId = agentId;
+  if (agentId === "unassigned") {
+    where.assignedAgentId = null;
+  } else if (agentId === "POOL_1" || agentId === "POOL_2" || agentId === "POOL_3") {
+    where.tags = { has: agentId };
+  } else if (agentId) {
+    where.assignedAgentId = agentId;
+  }
 
   // Tab-based filtering
   const now = new Date();
@@ -765,6 +771,37 @@ export async function updateEnquiryField(
   >);
 
   return enquiry;
+}
+
+export async function getEnquiryCountsByConsultant() {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+
+  const baseWhere: any = {};
+  if (session.user.role !== "SUPER_ADMIN") {
+    baseWhere.assignedAgentId = session.user.id;
+  }
+
+  const [unassigned, pool1, pool2, pool3, agentCounts] = await Promise.all([
+    prisma.enquiry.count({ where: { ...baseWhere, assignedAgentId: null } }),
+    prisma.enquiry.count({ where: { ...baseWhere, tags: { has: "POOL_1" } } }),
+    prisma.enquiry.count({ where: { ...baseWhere, tags: { has: "POOL_2" } } }),
+    prisma.enquiry.count({ where: { ...baseWhere, tags: { has: "POOL_3" } } }),
+    prisma.enquiry.groupBy({
+      by: ["assignedAgentId"],
+      where: { ...baseWhere, assignedAgentId: { not: null } },
+      _count: true,
+    }),
+  ]);
+
+  const byAgent: Record<string, number> = {};
+  for (const row of agentCounts) {
+    if (row.assignedAgentId) {
+      byAgent[row.assignedAgentId] = row._count;
+    }
+  }
+
+  return { unassigned, pool1, pool2, pool3, byAgent };
 }
 
 export async function getAgents() {

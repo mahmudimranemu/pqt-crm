@@ -6,6 +6,7 @@ import {
   getEnquiriesByStatus,
   getAgents,
   getActiveProperties,
+  getEnquiryCountsByConsultant,
 } from "@/lib/actions/enquiries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, LayoutGrid, List } from "lucide-react";
@@ -39,6 +40,7 @@ interface PageProps {
     status?: EnquiryStatus;
     source?: EnquirySource;
     agent?: string;
+    consultant?: string;
     page?: string;
     tab?: string;
     tag?: string;
@@ -63,7 +65,7 @@ async function EnquiriesTableWrapper({
     getEnquiries({
       status: params.status,
       source: params.source,
-      agentId: params.agent,
+      agentId: params.consultant || params.agent,
       page: params.page ? parseInt(params.page) : 1,
       tab: params.tab || "all",
       tag: params.tag,
@@ -118,10 +120,12 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
   const activeTab = params.tab || "all";
   const activeTag = params.tag || "";
   const activeView = params.view || "table";
-  const [agents, properties, { futureCallCount }] = await Promise.all([
+  const activeConsultant = params.consultant || "";
+  const [agents, properties, { futureCallCount }, consultantCounts] = await Promise.all([
     getAgents(),
     getActiveProperties(),
     getEnquiries({ tab: "future", limit: 1 }),
+    getEnquiryCountsByConsultant(),
   ]);
 
   // Build URL helper
@@ -130,6 +134,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
     if (params.status) base.status = params.status;
     if (params.source) base.source = params.source;
     if (params.agent) base.agent = params.agent;
+    if (params.consultant) base.consultant = params.consultant;
     if (params.search) base.search = params.search;
     if (params.view && params.view !== "table") base.view = params.view;
     const merged = { ...base, ...overrides };
@@ -198,6 +203,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
           <input type="hidden" name="tab" value={activeTab} />
         )}
         {activeTag && <input type="hidden" name="tag" value={activeTag} />}
+        {activeConsultant && <input type="hidden" name="consultant" value={activeConsultant} />}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
@@ -245,6 +251,54 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
           </Link>
         )}
       </div>
+
+      {/* Consultant Filter - SUPER_ADMIN only */}
+      {userRole === "SUPER_ADMIN" && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-gray-500">Consultant:</span>
+          {[
+            { key: "", label: "All", count: 0 },
+            { key: "unassigned", label: "Unassigned", count: consultantCounts.unassigned },
+            { key: "POOL_1", label: "Pool 1", count: consultantCounts.pool1 },
+            { key: "POOL_2", label: "Pool 2", count: consultantCounts.pool2 },
+            { key: "POOL_3", label: "Pool 3", count: consultantCounts.pool3 },
+            ...agents.map((a) => ({
+              key: a.id,
+              label: `${a.firstName} ${a.lastName}`,
+              count: consultantCounts.byAgent[a.id] || 0,
+            })),
+          ].map((item) => (
+            <Link
+              key={item.key || "all"}
+              href={buildUrl({
+                consultant: item.key || undefined,
+                tab: activeTab !== "all" ? activeTab : undefined,
+                tag: activeTag || undefined,
+                page: undefined,
+              })}
+            >
+              <button
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  activeConsultant === item.key
+                    ? "border-[#dc2626] bg-[#dc2626] text-white"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {item.label}
+                {item.count > 0 && (
+                  <span className={`ml-1 ${
+                    activeConsultant === item.key
+                      ? "text-white/80"
+                      : "text-gray-400"
+                  }`}>
+                    ({item.count})
+                  </span>
+                )}
+              </button>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="flex items-center gap-1 overflow-x-auto">
