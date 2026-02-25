@@ -59,6 +59,7 @@ import {
   removeEnquiryFromPool,
   deleteEnquiry,
   bulkDeleteEnquiries,
+  bulkAssignEnquiries,
 } from "@/lib/actions/enquiries";
 import { createBooking } from "@/lib/actions/bookings";
 import { createSale } from "@/lib/actions/sales";
@@ -154,6 +155,10 @@ export function EnquiriesTable({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
+  // Optimistic local overrides for inline dropdowns
+  const [localAgentOverrides, setLocalAgentOverrides] = useState<Record<string, string>>({});
+  const [localPriorityOverrides, setLocalPriorityOverrides] = useState<Record<string, string>>({});
+
   // Bulk delete state
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -216,6 +221,35 @@ export function EnquiriesTable({
         });
       }
     });
+  };
+
+  // Bulk assign state
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [bulkAssignAgentId, setBulkAssignAgentId] = useState("");
+  const [bulkAssignLoading, setBulkAssignLoading] = useState(false);
+
+  const handleBulkAssign = async () => {
+    if (!bulkAssignAgentId) return;
+    setBulkAssignLoading(true);
+    try {
+      await bulkAssignEnquiries(Array.from(selectedRows), bulkAssignAgentId);
+      toast({
+        title: "Consultant assigned",
+        description: `${selectedRows.size} enquiry(ies) assigned.`,
+      });
+      setSelectedRows(new Set());
+      setShowBulkAssign(false);
+      setBulkAssignAgentId("");
+      startTransition(() => router.refresh());
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to assign enquiries.",
+      });
+    } finally {
+      setBulkAssignLoading(false);
+    }
   };
 
   // Reallocate dialog state
@@ -523,12 +557,20 @@ export function EnquiriesTable({
 
   return (
     <>
-      {/* Bulk Delete Bar */}
+      {/* Bulk Action Bar */}
       {canDelete && selectedRows.size > 0 && (
         <div className="flex items-center gap-3 border-b border-red-200 bg-red-50 px-4 py-2">
           <span className="text-sm font-medium text-red-700">
             {selectedRows.size} selected
           </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowBulkAssign(true)}
+          >
+            <UserPlus className="h-4 w-4 mr-1" />
+            Assign Consultant
+          </Button>
           <Button
             size="sm"
             variant="destructive"
@@ -539,12 +581,14 @@ export function EnquiriesTable({
           </Button>
         </div>
       )}
-      <div className="flex items-center justify-end px-4 py-2">
-        <Button variant="outline" size="sm" onClick={handleExportCSV}>
-          <Download className="h-4 w-4 mr-1" />
-          Export CSV
-        </Button>
-      </div>
+      {canDelete && (
+        <div className="flex items-center justify-end px-4 py-2">
+          <Button variant="outline" size="sm" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-1" />
+            Export CSV
+          </Button>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -693,15 +737,32 @@ export function EnquiriesTable({
                   {/* Priority */}
                   <TableCell>
                     <select
-                      className={`rounded border border-gray-200 px-1.5 py-1 text-[11px] font-medium cursor-pointer ${priorityColors[enquiry.priority || "Medium"] || "text-gray-600 bg-white"}`}
-                      value={enquiry.priority || "Medium"}
-                      onChange={(e) =>
-                        handleFieldUpdate(
-                          enquiry.id,
-                          "priority",
-                          e.target.value,
-                        )
-                      }
+                      className={`rounded border border-gray-200 px-1.5 py-1 text-[11px] font-medium cursor-pointer ${priorityColors[localPriorityOverrides[enquiry.id] || enquiry.priority || "Medium"] || "text-gray-600 bg-white"}`}
+                      value={localPriorityOverrides[enquiry.id] || enquiry.priority || "Medium"}
+                      onChange={async (e) => {
+                        const val = e.target.value;
+                        setLocalPriorityOverrides((prev) => ({ ...prev, [enquiry.id]: val }));
+                        try {
+                          await updateEnquiryField(enquiry.id, "priority", val);
+                          setLocalPriorityOverrides((prev) => {
+                            const next = { ...prev };
+                            delete next[enquiry.id];
+                            return next;
+                          });
+                          router.refresh();
+                        } catch {
+                          setLocalPriorityOverrides((prev) => {
+                            const next = { ...prev };
+                            delete next[enquiry.id];
+                            return next;
+                          });
+                          toast({
+                            variant: "destructive",
+                            title: "Error",
+                            description: "Failed to update priority",
+                          });
+                        }
+                      }}
                     >
                       <option value="High">High</option>
                       <option value="Medium">Medium</option>
@@ -714,35 +775,55 @@ export function EnquiriesTable({
                     <select
                       className="rounded border border-gray-200 bg-white px-1.5 py-1 text-[11px] text-gray-600 cursor-pointer min-w-[110px]"
                       value={
-                        enquiry.tags?.includes("POOL_1")
-                          ? "POOL_1"
-                          : enquiry.tags?.includes("POOL_2")
-                            ? "POOL_2"
-                            : enquiry.tags?.includes("POOL_3")
-                              ? "POOL_3"
-                              : enquiry.assignedAgentId || "unassigned"
+                        localAgentOverrides[enquiry.id] !== undefined
+                          ? localAgentOverrides[enquiry.id]
+                          : enquiry.tags?.includes("POOL_1")
+                            ? "POOL_1"
+                            : enquiry.tags?.includes("POOL_2")
+                              ? "POOL_2"
+                              : enquiry.tags?.includes("POOL_3")
+                                ? "POOL_3"
+                                : enquiry.assignedAgentId || "unassigned"
                       }
                       onChange={async (e) => {
                         const val = e.target.value;
-                        if (
-                          val === "POOL_1" ||
-                          val === "POOL_2" ||
-                          val === "POOL_3"
-                        ) {
-                          await assignEnquiryToPool(enquiry.id, val);
-                          startTransition(() => router.refresh());
-                        } else {
+                        // Optimistically update the dropdown immediately
+                        setLocalAgentOverrides((prev) => ({ ...prev, [enquiry.id]: val }));
+                        try {
                           if (
-                            enquiry.tags?.some((t) => t.startsWith("POOL_"))
+                            val === "POOL_1" ||
+                            val === "POOL_2" ||
+                            val === "POOL_3"
                           ) {
-                            await removeEnquiryFromPool(enquiry.id);
+                            await assignEnquiryToPool(enquiry.id, val);
+                          } else {
+                            if (
+                              enquiry.tags?.some((t) => t.startsWith("POOL_"))
+                            ) {
+                              await removeEnquiryFromPool(enquiry.id);
+                            }
+                            const agentVal = val === "unassigned" ? null : val;
+                            await updateEnquiryField(enquiry.id, "assignedAgentId", agentVal);
                           }
-                          const agentVal = val === "unassigned" ? null : val;
-                          handleFieldUpdate(
-                            enquiry.id,
-                            "assignedAgentId",
-                            agentVal,
-                          );
+                          // Clear override and refresh server data
+                          setLocalAgentOverrides((prev) => {
+                            const next = { ...prev };
+                            delete next[enquiry.id];
+                            return next;
+                          });
+                          router.refresh();
+                        } catch {
+                          // Revert on error
+                          setLocalAgentOverrides((prev) => {
+                            const next = { ...prev };
+                            delete next[enquiry.id];
+                            return next;
+                          });
+                          toast({
+                            variant: "destructive",
+                            title: "Error",
+                            description: "Failed to update consultant",
+                          });
                         }
                       }}
                     >
@@ -1423,6 +1504,53 @@ export function EnquiriesTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Assign Dialog */}
+      <Dialog open={showBulkAssign} onOpenChange={setShowBulkAssign}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Assign Consultant</DialogTitle>
+            <DialogDescription>
+              Assign {selectedRows.size} selected enquiry(ies) to a consultant
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Consultant</Label>
+              <Select
+                value={bulkAssignAgentId}
+                onValueChange={setBulkAssignAgentId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select consultant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {agents.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      {agent.firstName} {agent.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkAssign(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkAssign}
+              disabled={!bulkAssignAgentId || bulkAssignLoading}
+              className="bg-[#dc2626] hover:bg-[#b91c1c] text-white"
+            >
+              {bulkAssignLoading && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Assign {selectedRows.size} Enquiry(ies)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

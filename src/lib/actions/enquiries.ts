@@ -40,21 +40,9 @@ export async function getEnquiries(params?: {
 
   const where: any = {};
 
-  // Role-based filtering
-  if (session.user.role === "SALES_AGENT") {
-    where.OR = [
-      { assignedAgentId: session.user.id },
-      { assignedAgentId: null },
-    ];
-  } else if (session.user.role !== "SUPER_ADMIN") {
-    const officeAgents = await prisma.user.findMany({
-      where: { office: session.user.office },
-      select: { id: true },
-    });
-    where.OR = [
-      { assignedAgentId: { in: officeAgents.map((a) => a.id) } },
-      { assignedAgentId: null },
-    ];
+  // Role-based filtering: only SUPER_ADMIN sees all, others see only their own
+  if (session.user.role !== "SUPER_ADMIN") {
+    where.assignedAgentId = session.user.id;
   }
 
   if (status) where.status = status;
@@ -205,7 +193,7 @@ export async function getEnquiriesByStatus() {
   ];
 
   const where: Record<string, unknown> =
-    session.user.role === "SALES_AGENT"
+    session.user.role !== "SUPER_ADMIN"
       ? { assignedAgentId: session.user.id }
       : {};
 
@@ -436,13 +424,41 @@ export async function bulkCreateEnquiries(
     priority: row.priority?.trim() && validPriorities.includes(row.priority.trim()) ? row.priority.trim() : "Medium",
     nextCallDate: row.nextCallDate?.trim() ? new Date(row.nextCallDate.trim()) : null,
     snooze: row.snooze?.trim() && validSnooze.includes(row.snooze.trim()) ? row.snooze.trim() : "Active",
-    status: "NEW" as const,
+    assignedAgentId: session.user.id,
+    status: "ASSIGNED" as const,
   }));
 
   const result = await prisma.enquiry.createMany({ data });
 
   revalidatePath("/clients/enquiries");
   return { count: result.count };
+}
+
+export async function bulkAssignEnquiries(ids: string[], agentId: string) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role !== "SUPER_ADMIN") throw new Error("Only Super Admin can bulk assign");
+
+  await prisma.enquiry.updateMany({
+    where: { id: { in: ids } },
+    data: {
+      assignedAgentId: agentId || null,
+      status: agentId ? "ASSIGNED" : "NEW",
+    },
+  });
+
+  if (agentId && agentId !== session.user.id) {
+    await notify(
+      agentId,
+      "LEAD_ASSIGNED",
+      "Enquiries Assigned to You",
+      `${ids.length} enquiry(ies) have been assigned to you`,
+      `/clients/enquiries`,
+    );
+  }
+
+  revalidatePath("/clients/enquiries");
+  return { count: ids.length };
 }
 
 export async function assignEnquiry(enquiryId: string, agentId: string) {

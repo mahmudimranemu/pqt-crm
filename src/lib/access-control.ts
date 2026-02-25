@@ -121,9 +121,9 @@ export function getDataAccessFilter(
 export const roleDisplayNames: Record<UserRole, string> = {
   SUPER_ADMIN: "Super Admin",
   ADMIN: "Admin",
-  SALES_MANAGER: "Sales Manager",
-  SALES_AGENT: "Sales Agent",
-  VIEWER: "Viewer",
+  SALES_MANAGER: "Senior Consultant",
+  SALES_AGENT: "Consultant",
+  VIEWER: "Junior Consultant",
 };
 
 /**

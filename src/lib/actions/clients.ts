@@ -56,16 +56,9 @@ export async function getClients(params?: {
   // Build where clause based on user role
   const where: Record<string, unknown> = {};
 
-  // Role-based filtering
-  if (session.user.role === "SALES_AGENT") {
+  // Role-based filtering: only SUPER_ADMIN sees all, others see only their own
+  if (session.user.role !== "SUPER_ADMIN") {
     where.assignedAgentId = session.user.id;
-  } else if (session.user.role !== "SUPER_ADMIN") {
-    // Admins and managers see clients assigned to agents in their office
-    const officeAgents = await prisma.user.findMany({
-      where: { office: session.user.office },
-      select: { id: true },
-    });
-    where.assignedAgentId = { in: officeAgents.map((a) => a.id) };
   }
 
   // Apply filters
@@ -344,14 +337,8 @@ export async function getClientsForSelect() {
 
   const where: Record<string, unknown> = {};
 
-  if (session.user.role === "SALES_AGENT") {
+  if (session.user.role !== "SUPER_ADMIN") {
     where.assignedAgentId = session.user.id;
-  } else if (session.user.role !== "SUPER_ADMIN") {
-    const officeAgents = await prisma.user.findMany({
-      where: { office: session.user.office },
-      select: { id: true },
-    });
-    where.assignedAgentId = { in: officeAgents.map((a) => a.id) };
   }
 
   return prisma.client.findMany({

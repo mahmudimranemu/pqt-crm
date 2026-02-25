@@ -522,9 +522,9 @@ export async function requestEmailChangeByUser(newEmail: string) {
 
   const roleLabels: Record<string, string> = {
     ADMIN: "Admin",
-    SALES_MANAGER: "Sales Manager",
-    SALES_AGENT: "Sales Agent",
-    VIEWER: "Viewer",
+    SALES_MANAGER: "Senior Consultant",
+    SALES_AGENT: "Consultant",
+    VIEWER: "Junior Consultant",
   };
   const roleLabel = roleLabels[session.user.role] ?? session.user.role;
   const fullName = `${session.user.firstName} ${session.user.lastName}`;

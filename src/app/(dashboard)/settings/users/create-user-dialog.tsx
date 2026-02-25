@@ -25,10 +25,11 @@ import { createUser } from "@/lib/actions/users";
 import type { UserRole, Office } from "@prisma/client";
 
 const roles: { value: UserRole; label: string }[] = [
-  { value: "SALES_AGENT", label: "Sales Agent" },
-  { value: "SALES_MANAGER", label: "Sales Manager" },
+  { value: "SUPER_ADMIN", label: "Super Admin" },
   { value: "ADMIN", label: "Admin" },
-  { value: "VIEWER", label: "Viewer" },
+  { value: "SALES_MANAGER", label: "Senior Consultant" },
+  { value: "SALES_AGENT", label: "Consultant" },
+  { value: "VIEWER", label: "Junior Consultant" },
 ];
 
 const offices: { value: Office; label: string }[] = [
