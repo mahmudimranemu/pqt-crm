@@ -11,6 +11,7 @@ import {
   Users,
   MessageSquare,
   StickyNote,
+  ArrowLeft,
 } from "lucide-react";
 import { ProfileHeader } from "./profile-header";
 import { DashboardTab } from "./dashboard-tab";
@@ -80,6 +81,15 @@ export default async function UserProfilePage({
 
   return (
     <div className="space-y-6">
+      {/* Back Button */}
+      <Link
+        href="/settings/users"
+        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Users
+      </Link>
+
       {/* Profile Header */}
       <ProfileHeader
         user={{
