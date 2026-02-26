@@ -11,6 +11,8 @@ import {
   CheckCircle,
   Loader2,
   CheckCheck,
+  MessageSquare,
+  StickyNote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +41,8 @@ const typeIcons: Record<string, React.ElementType> = {
   COMMISSION_APPROVED: CheckCircle,
   SYSTEM_ALERT: Bell,
   MENTION: Bell,
+  CHAT_MESSAGE: MessageSquare,
+  ADMIN_NOTE: StickyNote,
 };
 
 const typeColors: Record<string, string> = {
@@ -50,6 +54,8 @@ const typeColors: Record<string, string> = {
   COMMISSION_APPROVED: "text-amber-600",
   SYSTEM_ALERT: "text-gray-600",
   MENTION: "text-indigo-600",
+  CHAT_MESSAGE: "text-blue-600",
+  ADMIN_NOTE: "text-amber-600",
 };
 
 function timeAgo(date: Date): string {

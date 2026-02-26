@@ -15,6 +15,8 @@ import {
   CheckCircle,
   CheckCheck,
   Mail,
+  MessageSquare,
+  StickyNote,
 } from "lucide-react";
 import { markAsRead, markAllAsRead } from "@/lib/actions/notifications";
 import Link from "next/link";
@@ -30,6 +32,8 @@ const typeIcons: Record<string, React.ElementType> = {
   MENTION: Bell,
   EMAIL_CHANGE_REQUEST: Mail,
   EMAIL_CHANGED: Mail,
+  CHAT_MESSAGE: MessageSquare,
+  ADMIN_NOTE: StickyNote,
 };
 
 const typeColors: Record<string, string> = {
@@ -43,6 +47,8 @@ const typeColors: Record<string, string> = {
   MENTION: "text-indigo-600 bg-indigo-50",
   EMAIL_CHANGE_REQUEST: "text-orange-600 bg-orange-50",
   EMAIL_CHANGED: "text-emerald-600 bg-emerald-50",
+  CHAT_MESSAGE: "text-blue-600 bg-blue-50",
+  ADMIN_NOTE: "text-amber-600 bg-amber-50",
 };
 
 interface Notification {

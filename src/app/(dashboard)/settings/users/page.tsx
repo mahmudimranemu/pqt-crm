@@ -35,7 +35,7 @@ import { CreateUserDialog } from "./create-user-dialog";
 import { UserActions } from "./user-actions";
 import { ReallocationPool } from "./reallocation-pool";
 import Link from "next/link";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate, formatDateTime, toUserSlug } from "@/lib/utils";
 
 const roleColors: Record<UserRole, string> = {
   SUPER_ADMIN: "bg-red-100 text-red-700 border-red-200",
@@ -291,9 +291,12 @@ function UserManagementTab({ users }: { users: any[] }) {
                           )}
                         </div>
                         <div>
-                          <p className={`text-sm font-medium ${isSuperAdmin ? "text-red-900" : "text-gray-900"}`}>
+                          <Link
+                            href={`/users/${toUserSlug(user.firstName, user.lastName)}`}
+                            className={`text-sm font-medium hover:underline ${isSuperAdmin ? "text-red-900 hover:text-red-700" : "text-gray-900 hover:text-[#dc2626]"}`}
+                          >
                             {user.firstName} {user.lastName}
-                          </p>
+                          </Link>
                           <p className="text-xs text-gray-500">
                             {officeLabels[user.office] || user.office}
                           </p>

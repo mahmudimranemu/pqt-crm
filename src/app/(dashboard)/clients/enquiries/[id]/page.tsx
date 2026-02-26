@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Mail, Phone, Globe, DollarSign, Tag, MessageSquare } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MessageSquare } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 import { EnquiryDetailFields } from "./enquiry-detail-fields";
 import { EnquiryNotes } from "./enquiry-notes";
@@ -236,7 +236,11 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
                           </a>
                         );
                       }
-                      return <span className="text-gray-700">{enquiry.sourceUrl}</span>;
+                      return (
+                        <span className="text-gray-700">
+                          {enquiry.sourceUrl}
+                        </span>
+                      );
                     })()}
                   </p>
                 </div>
@@ -319,8 +323,8 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
                           </p>
                         )}
                         <p className="mt-1 text-xs text-gray-400">
-                          {activity.user.firstName} {activity.user.lastName}
-                          {" "}&middot;{" "}
+                          {activity.user.firstName} {activity.user.lastName}{" "}
+                          &middot;{" "}
                           {new Date(activity.createdAt).toLocaleString()}
                         </p>
                       </div>

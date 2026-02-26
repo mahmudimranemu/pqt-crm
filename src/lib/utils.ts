@@ -54,3 +54,11 @@ export function slugify(text: string): string {
     .replace(/[^\w ]+/g, "")
     .replace(/ +/g, "-");
 }
+
+export function toUserSlug(firstName: string, lastName: string): string {
+  return `${firstName} ${lastName}`
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+}

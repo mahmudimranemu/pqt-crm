@@ -291,6 +291,10 @@ model User {
   notifications    Notification[]
   activities       Activity[]
   handovers        Handover[]     @relation("HandoverAssignee")
+  sentMessages     UserMessage[]  @relation("MessagesSent")
+  receivedMessages UserMessage[]  @relation("MessagesReceived")
+  notesAbout       UserNote[]     @relation("NotesAbout")
+  notesAuthored    UserNote[]     @relation("NotesAuthored")
 
   @@map("users")
 }
@@ -788,6 +792,8 @@ enum NotificationType {
   MENTION
   EMAIL_CHANGE_REQUEST
   EMAIL_CHANGED
+  CHAT_MESSAGE
+  ADMIN_NOTE
 }
 
 enum ActivityType {
@@ -1193,4 +1199,41 @@ model Handover {
   @@index([clientId])
   @@index([assignedToId])
   @@map("handovers")
+}
+
+// =====================
+// USER PROFILE MODELS
+// =====================
+
+model UserMessage {
+  id         String   @id @default(cuid())
+  content    String   @db.Text
+  senderId   String
+  receiverId String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("MessagesSent", fields: [senderId], references: [id])
+  receiver User @relation("MessagesReceived", fields: [receiverId], references: [id])
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+  @@map("user_messages")
+}
+
+model UserNote {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  userId    String
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User @relation("NotesAbout", fields: [userId], references: [id])
+  author User @relation("NotesAuthored", fields: [authorId], references: [id])
+
+  @@index([userId])
+  @@index([authorId])
+  @@map("user_notes")
 }
