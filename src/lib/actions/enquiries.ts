@@ -183,7 +183,7 @@ export async function getEnquiries(params?: {
     ];
   }
 
-  const [enquiries, total, newCount, futureCallCount] = await Promise.all([
+  const [enquiries, total, newCount, futureCallCount, previousCallCount] = await Promise.all([
     prisma.enquiry.findMany({
       where,
       include: {
@@ -246,6 +246,21 @@ export async function getEnquiries(params?: {
         },
       },
     }),
+    prisma.enquiry.count({
+      where: {
+        ...(session.user.role === "SALES_AGENT"
+          ? {
+              OR: [
+                { assignedAgentId: session.user.id },
+                { assignedAgentId: null },
+              ],
+            }
+          : {}),
+        nextCallDate: {
+          lt: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+        },
+      },
+    }),
   ]);
 
   return {
@@ -253,6 +268,7 @@ export async function getEnquiries(params?: {
     total,
     newCount,
     futureCallCount,
+    previousCallCount,
     pages: Math.ceil(total / limit),
     currentPage: page,
   };

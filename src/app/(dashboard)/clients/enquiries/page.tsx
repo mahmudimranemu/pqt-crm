@@ -219,7 +219,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
   const activeTag = params.tag || "";
   const activeView = params.view || "table";
   const activeConsultant = params.consultant || "";
-  const [agents, properties, { futureCallCount }, consultantCounts] = await Promise.all([
+  const [agents, properties, { futureCallCount, previousCallCount }, consultantCounts] = await Promise.all([
     getAgents(),
     getActiveProperties(),
     getEnquiries({ tab: "future", limit: 1 }),
@@ -400,6 +400,11 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
             {tab.key === "future" && futureCallCount > 0 && (
               <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">
                 {futureCallCount}
+              </span>
+            )}
+            {tab.key === "previous" && previousCallCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">
+                {previousCallCount}
               </span>
             )}
           </Link>
