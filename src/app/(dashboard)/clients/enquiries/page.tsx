@@ -14,6 +14,7 @@ import { EnquiriesTable } from "./enquiries-table";
 import { EnquiryKanban } from "./enquiry-kanban";
 import { AddEnquiryDialog } from "./add-enquiry-dialog";
 import { ImportLeads } from "./import-leads";
+import { FilterBar } from "@/components/shared/filter-bar";
 import type { EnquiryStatus, EnquirySource } from "@prisma/client";
 
 const TAGS = [
@@ -35,6 +36,83 @@ const TABS = [
   { key: "all", label: "All" },
 ];
 
+const ENQUIRY_STATUS_OPTIONS = [
+  { value: "NEW", label: "New" },
+  { value: "ASSIGNED", label: "Assigned" },
+  { value: "CONTACTED", label: "Contacted" },
+  { value: "CONVERTED_TO_CLIENT", label: "Converted" },
+  { value: "SPAM", label: "Spam" },
+  { value: "CLOSED", label: "Closed" },
+];
+
+const ENQUIRY_BUDGET_OPTIONS = [
+  { value: "Under 100K", label: "Under $100K" },
+  { value: "100K-250K", label: "$100K–$250K" },
+  { value: "250K-500K", label: "$250K–$500K" },
+  { value: "500K-1M", label: "$500K–$1M" },
+  { value: "1M+", label: "Over $1M" },
+];
+
+const ENQUIRY_SOURCE_OPTIONS = [
+  { value: "WEBSITE_FORM", label: "Website Form" },
+  { value: "PHONE_CALL", label: "Phone Call" },
+  { value: "EMAIL", label: "Email" },
+  { value: "WHATSAPP", label: "WhatsApp" },
+  { value: "LIVE_CHAT", label: "Live Chat" },
+  { value: "PARTNER_REFERRAL", label: "Partner Referral" },
+];
+
+const SEGMENT_OPTIONS = [
+  { value: "Buyer", label: "Buyer" },
+  { value: "Seller", label: "Seller" },
+  { value: "Investor", label: "Investor" },
+  { value: "Developer", label: "Developer" },
+  { value: "Tenant", label: "Tenant" },
+];
+
+const COUNTRY_OPTIONS = [
+  { value: "UAE", label: "UAE" },
+  { value: "UK", label: "UK" },
+  { value: "USA", label: "USA" },
+  { value: "India", label: "India" },
+  { value: "Pakistan", label: "Pakistan" },
+  { value: "Russia", label: "Russia" },
+  { value: "China", label: "China" },
+  { value: "Germany", label: "Germany" },
+  { value: "France", label: "France" },
+  { value: "Canada", label: "Canada" },
+  { value: "Australia", label: "Australia" },
+  { value: "Saudi Arabia", label: "Saudi Arabia" },
+  { value: "Kuwait", label: "Kuwait" },
+  { value: "Qatar", label: "Qatar" },
+  { value: "Bahrain", label: "Bahrain" },
+  { value: "Oman", label: "Oman" },
+  { value: "Egypt", label: "Egypt" },
+  { value: "Jordan", label: "Jordan" },
+  { value: "Lebanon", label: "Lebanon" },
+  { value: "Nigeria", label: "Nigeria" },
+  { value: "South Africa", label: "South Africa" },
+];
+
+const ENQUIRY_FILTER_SELECTS = [
+  { key: "status", label: "By Status", options: ENQUIRY_STATUS_OPTIONS },
+  { key: "budget", label: "By Budgets", options: ENQUIRY_BUDGET_OPTIONS },
+  { key: "clientTag", label: "Client Tags", options: TAGS.map((t) => ({ value: t, label: t })) },
+  { key: "country", label: "Country Origin", options: COUNTRY_OPTIONS },
+  { key: "tag", label: "By Tag", options: TAGS.map((t) => ({ value: t, label: t })) },
+  { key: "source", label: "By Source", options: ENQUIRY_SOURCE_OPTIONS },
+  { key: "segment", label: "By Segment", options: SEGMENT_OPTIONS },
+];
+
+const ENQUIRY_FILTER_INPUTS = [
+  { key: "projectName", placeholder: "Project Name" },
+  { key: "clientName", placeholder: "Client Name" },
+  { key: "clientPhone", placeholder: "Client Phone" },
+  { key: "nextCallDate", placeholder: "Next Call", type: "date" },
+  { key: "clientEmail", placeholder: "Client Email" },
+  { key: "clientId", placeholder: "Client ID" },
+];
+
 interface PageProps {
   searchParams: Promise<{
     status?: EnquiryStatus;
@@ -46,6 +124,16 @@ interface PageProps {
     tag?: string;
     search?: string;
     view?: string;
+    budget?: string;
+    segment?: string;
+    country?: string;
+    clientTag?: string;
+    projectName?: string;
+    clientName?: string;
+    clientPhone?: string;
+    nextCallDate?: string;
+    clientEmail?: string;
+    clientId?: string;
   }>;
 }
 
@@ -70,6 +158,16 @@ async function EnquiriesTableWrapper({
       tab: params.tab || "all",
       tag: params.tag,
       search: params.search,
+      budget: params.budget,
+      segment: params.segment,
+      country: params.country,
+      clientTag: params.clientTag,
+      projectName: params.projectName,
+      clientName: params.clientName,
+      clientPhone: params.clientPhone,
+      nextCallDate: params.nextCallDate,
+      clientEmail: params.clientEmail,
+      clientId: params.clientId,
     }),
     getAgents(),
     getActiveProperties(),
@@ -137,6 +235,18 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
     if (params.consultant) base.consultant = params.consultant;
     if (params.search) base.search = params.search;
     if (params.view && params.view !== "table") base.view = params.view;
+    // Preserve filter bar params
+    if (params.tag) base.tag = params.tag;
+    if (params.budget) base.budget = params.budget;
+    if (params.segment) base.segment = params.segment;
+    if (params.country) base.country = params.country;
+    if (params.clientTag) base.clientTag = params.clientTag;
+    if (params.projectName) base.projectName = params.projectName;
+    if (params.clientName) base.clientName = params.clientName;
+    if (params.clientPhone) base.clientPhone = params.clientPhone;
+    if (params.nextCallDate) base.nextCallDate = params.nextCallDate;
+    if (params.clientEmail) base.clientEmail = params.clientEmail;
+    if (params.clientId) base.clientId = params.clientId;
     const merged = { ...base, ...overrides };
     // Remove undefined/empty values
     const filtered = Object.fromEntries(
@@ -202,7 +312,6 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
         {activeTab !== "all" && (
           <input type="hidden" name="tab" value={activeTab} />
         )}
-        {activeTag && <input type="hidden" name="tag" value={activeTag} />}
         {activeConsultant && <input type="hidden" name="consultant" value={activeConsultant} />}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -216,41 +325,12 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
         </div>
       </form>
 
-      {/* Tags Row */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-medium text-gray-500">Tags:</span>
-        {TAGS.map((tag) => (
-          <Link
-            key={tag}
-            href={buildUrl({
-              tag: activeTag === tag ? undefined : tag,
-              tab: activeTab !== "all" ? activeTab : undefined,
-            })}
-          >
-            <button
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                activeTag === tag
-                  ? "border-[#dc2626] bg-[#dc2626] text-white"
-                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {tag}
-            </button>
-          </Link>
-        ))}
-        {activeTag && !TAGS.includes(activeTag) && (
-          <Link
-            href={buildUrl({
-              tag: undefined,
-              tab: activeTab !== "all" ? activeTab : undefined,
-            })}
-          >
-            <button className="rounded-full border border-[#dc2626] bg-[#dc2626] px-3 py-1 text-xs font-medium text-white">
-              {activeTag} &times;
-            </button>
-          </Link>
-        )}
-      </div>
+      {/* Filter Bar */}
+      <FilterBar
+        selects={ENQUIRY_FILTER_SELECTS}
+        textInputs={ENQUIRY_FILTER_INPUTS}
+        preserveParams={["tab", "view", "search", "consultant"]}
+      />
 
       {/* Consultant Filter - SUPER_ADMIN only */}
       {userRole === "SUPER_ADMIN" && (

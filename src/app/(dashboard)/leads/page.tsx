@@ -8,7 +8,6 @@ import {
   getAgentsForLeads,
 } from "@/lib/actions/leads";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -23,7 +22,8 @@ import {
 } from "lucide-react";
 import { LeadKanban } from "./lead-kanban";
 import { LeadsTable } from "./leads-table";
-import type { LeadStage } from "@prisma/client";
+import { FilterBar } from "@/components/shared/filter-bar";
+import type { LeadStage, BudgetRange, LeadSource } from "@prisma/client";
 
 const TAGS = [
   "Cash Buyer",
@@ -44,6 +44,88 @@ const TABS = [
   { key: "all", label: "All" },
 ];
 
+const LEAD_STAGE_OPTIONS = [
+  { value: "NEW_ENQUIRY", label: "New Enquiry" },
+  { value: "CONTACTED", label: "Contacted" },
+  { value: "QUALIFIED", label: "Qualified" },
+  { value: "VIEWING_ARRANGED", label: "Viewing Arranged" },
+  { value: "VIEWED", label: "Viewed" },
+  { value: "OFFER_MADE", label: "Offer Made" },
+  { value: "NEGOTIATING", label: "Negotiating" },
+  { value: "WON", label: "Won" },
+  { value: "LOST", label: "Lost" },
+];
+
+const BUDGET_OPTIONS = [
+  { value: "UNDER_100K", label: "Under $100K" },
+  { value: "FROM_100K_TO_250K", label: "$100K–$250K" },
+  { value: "FROM_250K_TO_500K", label: "$250K–$500K" },
+  { value: "FROM_500K_TO_1M", label: "$500K–$1M" },
+  { value: "OVER_1M", label: "Over $1M" },
+];
+
+const LEAD_SOURCE_OPTIONS = [
+  { value: "WEBSITE", label: "Website" },
+  { value: "REFERRAL", label: "Referral" },
+  { value: "SOCIAL_MEDIA", label: "Social Media" },
+  { value: "GOOGLE_ADS", label: "Google Ads" },
+  { value: "FACEBOOK_ADS", label: "Facebook Ads" },
+  { value: "WALK_IN", label: "Walk In" },
+  { value: "PARTNER", label: "Partner" },
+  { value: "OTHER", label: "Other" },
+];
+
+const SEGMENT_OPTIONS = [
+  { value: "Buyer", label: "Buyer" },
+  { value: "Seller", label: "Seller" },
+  { value: "Investor", label: "Investor" },
+  { value: "Developer", label: "Developer" },
+  { value: "Tenant", label: "Tenant" },
+];
+
+const COUNTRY_OPTIONS = [
+  { value: "UAE", label: "UAE" },
+  { value: "UK", label: "UK" },
+  { value: "USA", label: "USA" },
+  { value: "India", label: "India" },
+  { value: "Pakistan", label: "Pakistan" },
+  { value: "Russia", label: "Russia" },
+  { value: "China", label: "China" },
+  { value: "Germany", label: "Germany" },
+  { value: "France", label: "France" },
+  { value: "Canada", label: "Canada" },
+  { value: "Australia", label: "Australia" },
+  { value: "Saudi Arabia", label: "Saudi Arabia" },
+  { value: "Kuwait", label: "Kuwait" },
+  { value: "Qatar", label: "Qatar" },
+  { value: "Bahrain", label: "Bahrain" },
+  { value: "Oman", label: "Oman" },
+  { value: "Egypt", label: "Egypt" },
+  { value: "Jordan", label: "Jordan" },
+  { value: "Lebanon", label: "Lebanon" },
+  { value: "Nigeria", label: "Nigeria" },
+  { value: "South Africa", label: "South Africa" },
+];
+
+const LEAD_FILTER_SELECTS = [
+  { key: "stage", label: "By Status", options: LEAD_STAGE_OPTIONS },
+  { key: "budgetRange", label: "By Budgets", options: BUDGET_OPTIONS },
+  { key: "clientTag", label: "Client Tags", options: TAGS.map((t) => ({ value: t, label: t })) },
+  { key: "country", label: "Country Origin", options: COUNTRY_OPTIONS },
+  { key: "tag", label: "By Tag", options: TAGS.map((t) => ({ value: t, label: t })) },
+  { key: "source", label: "By Source", options: LEAD_SOURCE_OPTIONS },
+  { key: "segment", label: "By Segment", options: SEGMENT_OPTIONS },
+];
+
+const LEAD_FILTER_INPUTS = [
+  { key: "projectName", placeholder: "Project Name" },
+  { key: "clientName", placeholder: "Client Name" },
+  { key: "clientPhone", placeholder: "Client Phone" },
+  { key: "nextCallDate", placeholder: "Next Call", type: "date" },
+  { key: "clientEmail", placeholder: "Client Email" },
+  { key: "clientId", placeholder: "Client ID" },
+];
+
 interface PageProps {
   searchParams: Promise<{
     tab?: string;
@@ -52,6 +134,17 @@ interface PageProps {
     page?: string;
     view?: string;
     stage?: LeadStage;
+    budgetRange?: BudgetRange;
+    source?: LeadSource;
+    segment?: string;
+    country?: string;
+    clientTag?: string;
+    projectName?: string;
+    clientName?: string;
+    clientPhone?: string;
+    nextCallDate?: string;
+    clientEmail?: string;
+    clientId?: string;
   }>;
 }
 
@@ -105,6 +198,19 @@ export default async function LeadsPage({ searchParams }: PageProps) {
     if (params.search) base.search = params.search;
     if (params.view && params.view !== "table") base.view = params.view;
     if (params.stage) base.stage = params.stage;
+    // Preserve filter bar params
+    if (params.tag) base.tag = params.tag;
+    if (params.budgetRange) base.budgetRange = params.budgetRange;
+    if (params.source) base.source = params.source;
+    if (params.segment) base.segment = params.segment;
+    if (params.country) base.country = params.country;
+    if (params.clientTag) base.clientTag = params.clientTag;
+    if (params.projectName) base.projectName = params.projectName;
+    if (params.clientName) base.clientName = params.clientName;
+    if (params.clientPhone) base.clientPhone = params.clientPhone;
+    if (params.nextCallDate) base.nextCallDate = params.nextCallDate;
+    if (params.clientEmail) base.clientEmail = params.clientEmail;
+    if (params.clientId) base.clientId = params.clientId;
     const merged = { ...base, ...overrides };
     const filtered = Object.fromEntries(
       Object.entries(merged).filter(([, v]) => v),
@@ -201,7 +307,6 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         {activeTab !== "all" && (
           <input type="hidden" name="tab" value={activeTab} />
         )}
-        {activeTag && <input type="hidden" name="tag" value={activeTag} />}
         {activeView !== "table" && (
           <input type="hidden" name="view" value={activeView} />
         )}
@@ -217,29 +322,12 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         </div>
       </form>
 
-      {/* Tags Row */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-medium text-gray-500">Tags:</span>
-        {TAGS.map((tag) => (
-          <Link
-            key={tag}
-            href={buildUrl({
-              tag: activeTag === tag ? undefined : tag,
-              tab: activeTab !== "all" ? activeTab : undefined,
-            })}
-          >
-            <button
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                activeTag === tag
-                  ? "border-[#dc2626] bg-[#dc2626] text-white"
-                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {tag}
-            </button>
-          </Link>
-        ))}
-      </div>
+      {/* Filter Bar */}
+      <FilterBar
+        selects={LEAD_FILTER_SELECTS}
+        textInputs={LEAD_FILTER_INPUTS}
+        preserveParams={["tab", "view", "search"]}
+      />
 
       {/* Tab Navigation */}
       <div className="flex items-center gap-1 overflow-x-auto">
@@ -301,6 +389,17 @@ async function LeadsTableWrapper({
     page: params.page ? parseInt(params.page) : 1,
     tab: params.tab || "all",
     tag: params.tag,
+    budgetRange: params.budgetRange,
+    source: params.source,
+    segment: params.segment,
+    country: params.country,
+    clientTag: params.clientTag,
+    projectName: params.projectName,
+    clientName: params.clientName,
+    clientPhone: params.clientPhone,
+    nextCallDate: params.nextCallDate,
+    clientEmail: params.clientEmail,
+    clientId: params.clientId,
   });
 
   const serialized = leads.map((l) => ({

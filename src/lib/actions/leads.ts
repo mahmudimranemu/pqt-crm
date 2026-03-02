@@ -57,6 +57,18 @@ export async function getLeads(params?: {
   limit?: number;
   tab?: string;
   tag?: string;
+  // Extended filters
+  budgetRange?: BudgetRange;
+  source?: LeadSource;
+  segment?: string;
+  country?: string;
+  clientTag?: string;
+  projectName?: string;
+  clientName?: string;
+  clientPhone?: string;
+  nextCallDate?: string;
+  clientEmail?: string;
+  clientId?: string;
 }) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
@@ -69,6 +81,17 @@ export async function getLeads(params?: {
     limit = 50,
     tab,
     tag,
+    budgetRange,
+    source,
+    segment,
+    country,
+    clientTag,
+    projectName,
+    clientName,
+    clientPhone,
+    nextCallDate,
+    clientEmail,
+    clientId,
   } = params || {};
   const where: any = {};
 
@@ -80,6 +103,9 @@ export async function getLeads(params?: {
   }
 
   if (stage) where.stage = stage;
+  if (budgetRange) where.budgetRange = budgetRange;
+  if (source) where.source = source;
+  if (segment) where.segment = segment;
 
   if (search) {
     where.AND = [
@@ -95,6 +121,66 @@ export async function getLeads(params?: {
         ],
       },
     ];
+  }
+
+  // Extended filter conditions
+  if (country) {
+    where.AND = [
+      ...(where.AND || []),
+      { client: { country: { contains: country, mode: "insensitive" } } },
+    ];
+  }
+  if (clientTag) {
+    where.AND = [
+      ...(where.AND || []),
+      { client: { tags: { has: clientTag } } },
+    ];
+  }
+  if (projectName) {
+    where.AND = [
+      ...(where.AND || []),
+      { interestedProperty: { name: { contains: projectName, mode: "insensitive" } } },
+    ];
+  }
+  if (clientName) {
+    where.AND = [
+      ...(where.AND || []),
+      {
+        OR: [
+          { client: { firstName: { contains: clientName, mode: "insensitive" } } },
+          { client: { lastName: { contains: clientName, mode: "insensitive" } } },
+        ],
+      },
+    ];
+  }
+  if (clientPhone) {
+    where.AND = [
+      ...(where.AND || []),
+      { client: { phone: { contains: clientPhone, mode: "insensitive" } } },
+    ];
+  }
+  if (clientEmail) {
+    where.AND = [
+      ...(where.AND || []),
+      { client: { email: { contains: clientEmail, mode: "insensitive" } } },
+    ];
+  }
+  if (clientId) {
+    where.clientId = clientId;
+  }
+  if (nextCallDate) {
+    const date = new Date(nextCallDate);
+    if (!isNaN(date.getTime())) {
+      where.AND = [
+        ...(where.AND || []),
+        {
+          nextCallDate: {
+            gte: new Date(date.getFullYear(), date.getMonth(), date.getDate()),
+            lt: new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1),
+          },
+        },
+      ];
+    }
   }
 
   // Tab-based filtering
