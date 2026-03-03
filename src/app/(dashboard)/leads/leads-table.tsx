@@ -134,9 +134,15 @@ interface SerializedLead {
   } | null;
 }
 
+interface Pool {
+  tag: string;
+  name: string;
+}
+
 interface LeadsTableProps {
   leads: SerializedLead[];
   agents: { id: string; firstName: string; lastName: string }[];
+  pools?: Pool[];
   total: number;
   pages: number;
   currentPage: number;
@@ -146,6 +152,7 @@ interface LeadsTableProps {
 export function LeadsTable({
   leads,
   agents,
+  pools = [],
   total,
   pages,
   currentPage,
@@ -283,10 +290,7 @@ export function LeadsTable({
           const currentPriority = localPriorityOverrides[lead.id] ?? lead.priority ?? "Medium";
           const currentOwner = localOwnerOverrides[lead.id] !== undefined
             ? localOwnerOverrides[lead.id]
-            : lead.tags?.includes("POOL_1") ? "POOL_1"
-            : lead.tags?.includes("POOL_2") ? "POOL_2"
-            : lead.tags?.includes("POOL_3") ? "POOL_3"
-            : lead.owner.id;
+            : lead.tags?.find((t) => t.startsWith("POOL_")) || lead.owner.id;
 
           return (
             <div
@@ -503,7 +507,7 @@ export function LeadsTable({
                       const val = e.target.value;
                       setLocalOwnerOverrides((prev) => ({ ...prev, [lead.id]: val }));
                       try {
-                        if (val === "POOL_1" || val === "POOL_2" || val === "POOL_3") {
+                        if (val.startsWith("POOL_")) {
                           await assignLeadToPool(lead.id, val);
                         } else {
                           if (lead.tags?.some((t) => t.startsWith("POOL_"))) {
@@ -518,9 +522,11 @@ export function LeadsTable({
                       }
                     }}
                   >
-                    <option value="POOL_1">Pool 1</option>
-                    <option value="POOL_2">Pool 2</option>
-                    <option value="POOL_3">Pool 3</option>
+                    {pools.map((pool) => (
+                      <option key={pool.tag} value={pool.tag}>
+                        {pool.name}
+                      </option>
+                    ))}
                     {agents.map((agent) => (
                       <option key={agent.id} value={agent.id}>
                         {agent.firstName} {agent.lastName}

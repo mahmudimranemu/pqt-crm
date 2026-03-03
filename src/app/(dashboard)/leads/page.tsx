@@ -7,6 +7,7 @@ import {
   getLeadStats,
   getAgentsForLeads,
 } from "@/lib/actions/leads";
+import { getPoolsForUser } from "@/lib/actions/crm-settings";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -157,9 +158,10 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   const activeTag = params.tag || "";
   const activeView = params.view || "table";
 
-  const [stats, agents] = await Promise.all([
+  const [stats, agents, pools] = await Promise.all([
     getLeadStats(),
     getAgentsForLeads(),
+    session?.user ? getPoolsForUser(session.user.id) : Promise.resolve([]),
   ]);
 
   const statCards = [
@@ -360,6 +362,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
           <LeadsTableWrapper
             searchParams={searchParams}
             agents={agents}
+            pools={pools}
             userRole={session.user.role}
           />
         </Suspense>
@@ -376,10 +379,12 @@ async function KanbanWrapper() {
 async function LeadsTableWrapper({
   searchParams,
   agents,
+  pools,
   userRole,
 }: {
   searchParams: PageProps["searchParams"];
   agents: { id: string; firstName: string; lastName: string }[];
+  pools: { tag: string; name: string }[];
   userRole: string;
 }) {
   const params = await searchParams;
@@ -422,6 +427,7 @@ async function LeadsTableWrapper({
     <LeadsTable
       leads={serialized}
       agents={agents}
+      pools={pools}
       total={total}
       pages={pages}
       currentPage={currentPage}

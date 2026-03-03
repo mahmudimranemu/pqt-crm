@@ -5,6 +5,8 @@ import {
   getAgents,
   getActiveProperties,
 } from "@/lib/actions/enquiries";
+import { getPoolsForUser } from "@/lib/actions/crm-settings";
+import { auth, type ExtendedSession } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,11 +56,13 @@ const sourceLabels: Record<EnquirySource, string> = {
 };
 
 export default async function EnquiryDetailPage({ params }: PageProps) {
+  const session = (await auth()) as ExtendedSession | null;
   const { id } = await params;
-  const [enquiry, agents, properties] = await Promise.all([
+  const [enquiry, agents, properties, pools] = await Promise.all([
     getEnquiry(id),
     getAgents(),
     getActiveProperties(),
+    session?.user ? getPoolsForUser(session.user.id) : Promise.resolve([]),
   ]);
 
   if (!enquiry) {
@@ -197,6 +201,7 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
           tags: enquiry.tags,
         }}
         agents={agents}
+        pools={pools}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -286,7 +291,7 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
           {/* Property Assignment */}
           <EnquiryPropertySelector
             enquiryId={enquiry.id}
-            currentProperty={enquiry.interestedProperty}
+            selectedRefs={enquiry.interestedPropertyRefs}
             properties={properties}
           />
         </div>

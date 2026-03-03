@@ -8,6 +8,7 @@ import {
   getActiveProperties,
   getEnquiryCountsByConsultant,
 } from "@/lib/actions/enquiries";
+import { getPoolsForUser } from "@/lib/actions/crm-settings";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, LayoutGrid, List } from "lucide-react";
 import { EnquiriesTable } from "./enquiries-table";
@@ -140,9 +141,11 @@ interface PageProps {
 async function EnquiriesTableWrapper({
   searchParams,
   userRole,
+  pools,
 }: {
   searchParams: PageProps["searchParams"];
   userRole: string;
+  pools: { tag: string; name: string }[];
 }) {
   const params = await searchParams;
   const [
@@ -191,6 +194,7 @@ async function EnquiriesTableWrapper({
       enquiries={serialized as never}
       agents={agents}
       properties={properties}
+      pools={pools}
       total={total}
       pages={pages}
       currentPage={currentPage}
@@ -219,11 +223,12 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
   const activeTag = params.tag || "";
   const activeView = params.view || "table";
   const activeConsultant = params.consultant || "";
-  const [agents, properties, { futureCallCount, previousCallCount }, consultantCounts] = await Promise.all([
+  const [agents, properties, { futureCallCount, previousCallCount }, consultantCounts, pools] = await Promise.all([
     getAgents(),
     getActiveProperties(),
     getEnquiries({ tab: "future", limit: 1 }),
     getEnquiryCountsByConsultant(),
+    session?.user ? getPoolsForUser(session.user.id) : Promise.resolve([]),
   ]);
 
   // Build URL helper
@@ -303,7 +308,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
             </Link>
           </div>
           <ImportLeads />
-          <AddEnquiryDialog agents={agents} properties={properties} />
+          <AddEnquiryDialog agents={agents} properties={properties} pools={pools} />
         </div>
       </div>
 
@@ -422,6 +427,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
             <EnquiriesTableWrapper
               searchParams={searchParams}
               userRole={userRole}
+              pools={pools}
             />
           </Suspense>
         </div>

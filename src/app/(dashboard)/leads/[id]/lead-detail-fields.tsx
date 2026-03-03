@@ -12,6 +12,11 @@ import {
 } from "@/lib/actions/leads";
 import { Settings, ChevronLeft, ChevronRight } from "lucide-react";
 
+interface Pool {
+  tag: string;
+  name: string;
+}
+
 interface LeadDetailFieldsProps {
   lead: {
     id: string;
@@ -25,6 +30,7 @@ interface LeadDetailFieldsProps {
     tags: string[];
   };
   agents: { id: string; firstName: string; lastName: string }[];
+  pools?: Pool[];
 }
 
 function getNextMonday(): Date {
@@ -172,7 +178,7 @@ function MiniCalendar({
   );
 }
 
-export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
+export function LeadDetailFields({ lead, agents, pools = [] }: LeadDetailFieldsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -318,21 +324,14 @@ export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
                 </label>
                 <select
                   value={
-                    lead.tags.includes("POOL_1")
-                      ? "POOL_1"
-                      : lead.tags.includes("POOL_2")
-                        ? "POOL_2"
-                        : lead.tags.includes("POOL_3")
-                          ? "POOL_3"
-                          : lead.ownerId
+                    (() => {
+                      const poolTag = lead.tags.find((t) => t.startsWith("POOL_"));
+                      return poolTag ?? lead.ownerId;
+                    })()
                   }
                   onChange={(e) => {
                     const val = e.target.value;
-                    if (
-                      val === "POOL_1" ||
-                      val === "POOL_2" ||
-                      val === "POOL_3"
-                    ) {
+                    if (val.startsWith("POOL_")) {
                       startTransition(async () => {
                         await assignLeadToPool(lead.id, val);
                         router.refresh();
@@ -351,9 +350,11 @@ export function LeadDetailFields({ lead, agents }: LeadDetailFieldsProps) {
                   }}
                   className={selectClass}
                 >
-                  <option value="POOL_1">Pool 1</option>
-                  <option value="POOL_2">Pool 2</option>
-                  <option value="POOL_3">Pool 3</option>
+                  {pools.map((pool) => (
+                    <option key={pool.tag} value={pool.tag}>
+                      {pool.name}
+                    </option>
+                  ))}
                   {agents.map((agent) => (
                     <option key={agent.id} value={agent.id}>
                       {agent.firstName} {agent.lastName}

@@ -411,6 +411,7 @@ model Enquiry {
   nextCallDate      DateTime?
   snooze              String?       @default("Active")
   interestedPropertyId String?
+  interestedPropertyRefs String[]   @default([])
 
   // Relations
   assignedAgent      User?          @relation(fields: [assignedAgentId], references: [id])
@@ -846,6 +847,7 @@ model Lead {
   nextCallDate     DateTime?
   snooze           String?      @default("Active")
   interestedPropertyId String?
+  interestedPropertyRefs String[] @default([])
 
   // Relations
   client             Client     @relation(fields: [clientId], references: [id])
@@ -1236,4 +1238,16 @@ model UserNote {
   @@index([userId])
   @@index([authorId])
   @@map("user_notes")
+}
+
+model Pool {
+  id             String   @id @default(cuid())
+  name           String
+  tag            String   @unique
+  isActive       Boolean  @default(true)
+  allowedUserIds String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("pools")
 }

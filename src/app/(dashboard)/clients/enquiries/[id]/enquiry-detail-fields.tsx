@@ -37,9 +37,15 @@ interface EnquiryFieldsData {
   tags: string[];
 }
 
+interface Pool {
+  tag: string;
+  name: string;
+}
+
 interface EnquiryDetailFieldsProps {
   enquiry: EnquiryFieldsData;
   agents: Agent[];
+  pools?: Pool[];
 }
 
 const statusColors: Record<string, string> = {
@@ -210,6 +216,7 @@ function MiniCalendar({
 export function EnquiryDetailFields({
   enquiry,
   agents,
+  pools = [],
 }: EnquiryDetailFieldsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -380,27 +387,18 @@ export function EnquiryDetailFields({
                 <select
                   className={selectClass}
                   value={
-                    enquiry.tags.includes("POOL_1")
-                      ? "POOL_1"
-                      : enquiry.tags.includes("POOL_2")
-                        ? "POOL_2"
-                        : enquiry.tags.includes("POOL_3")
-                          ? "POOL_3"
-                          : enquiry.assignedAgentId || "unassigned"
+                    (() => {
+                      const poolTag = enquiry.tags.find((t) => t.startsWith("POOL_"));
+                      return poolTag ?? enquiry.assignedAgentId ?? "unassigned";
+                    })()
                   }
                   onChange={async (e) => {
                     const val = e.target.value;
-                    if (
-                      val === "POOL_1" ||
-                      val === "POOL_2" ||
-                      val === "POOL_3"
-                    ) {
+                    if (val.startsWith("POOL_")) {
                       await assignEnquiryToPool(enquiry.id, val);
                       startTransition(() => router.refresh());
                     } else {
-                      if (
-                        enquiry.tags.some((t) => t.startsWith("POOL_"))
-                      ) {
+                      if (enquiry.tags.some((t) => t.startsWith("POOL_"))) {
                         await removeEnquiryFromPool(enquiry.id);
                       }
                       const agentVal = val === "unassigned" ? null : val;
@@ -409,24 +407,15 @@ export function EnquiryDetailFields({
                   }}
                 >
                   <option value="unassigned">Unassigned</option>
-                  <option
-                    value="POOL_1"
-                    className="text-blue-600 font-medium"
-                  >
-                    Pool 1
-                  </option>
-                  <option
-                    value="POOL_2"
-                    className="text-blue-600 font-medium"
-                  >
-                    Pool 2
-                  </option>
-                  <option
-                    value="POOL_3"
-                    className="text-blue-600 font-medium"
-                  >
-                    Pool 3
-                  </option>
+                  {pools.map((pool) => (
+                    <option
+                      key={pool.tag}
+                      value={pool.tag}
+                      className="text-blue-600 font-medium"
+                    >
+                      {pool.name}
+                    </option>
+                  ))}
                   {agents.map((agent) => (
                     <option key={agent.id} value={agent.id}>
                       {agent.firstName} {agent.lastName}

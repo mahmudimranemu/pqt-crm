@@ -37,9 +37,15 @@ interface Property {
   pqtNumber: string;
 }
 
+interface Pool {
+  tag: string;
+  name: string;
+}
+
 interface AddEnquiryDialogProps {
   agents: Agent[];
   properties: Property[];
+  pools?: Pool[];
 }
 
 const sources = [
@@ -86,6 +92,7 @@ const initialFormState = {
 export function AddEnquiryDialog({
   agents,
   properties,
+  pools = [],
 }: AddEnquiryDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -344,9 +351,11 @@ export function AddEnquiryDialog({
                     <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="POOL_1">Pool 1</SelectItem>
-                    <SelectItem value="POOL_2">Pool 2</SelectItem>
-                    <SelectItem value="POOL_3">Pool 3</SelectItem>
+                    {pools.map((pool) => (
+                      <SelectItem key={pool.tag} value={pool.tag}>
+                        {pool.name}
+                      </SelectItem>
+                    ))}
                     {agents.map((agent) => (
                       <SelectItem key={agent.id} value={agent.id}>
                         {agent.firstName} {agent.lastName}

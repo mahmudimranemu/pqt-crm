@@ -954,11 +954,25 @@ export async function getActiveProperties() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  return prisma.property.findMany({
-    where: { status: "ACTIVE" },
-    select: { id: true, name: true, pqtNumber: true },
-    orderBy: { name: "asc" },
+  const { fetchProperties } = await import("@/lib/api/external-properties");
+  const props = await fetchProperties();
+  return props.map((p) => ({ id: p.id, name: p.name, pqtNumber: p.reference }));
+}
+
+export async function updateEnquiryProperties(
+  enquiryId: string,
+  propertyRefs: string[],
+) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  await prisma.enquiry.update({
+    where: { id: enquiryId },
+    data: { interestedPropertyRefs: propertyRefs },
   });
+
+  revalidatePath(`/clients/enquiries/${enquiryId}`);
 }
 
 export async function addEnquiryNote(enquiryId: string, content: string) {
@@ -1096,7 +1110,7 @@ export async function updateEnquiryTags(enquiryId: string, tags: string[]) {
 
 export async function assignEnquiryToPool(
   enquiryId: string,
-  pool: "POOL_1" | "POOL_2" | "POOL_3",
+  pool: string,
 ) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
@@ -1108,9 +1122,7 @@ export async function assignEnquiryToPool(
   });
   if (!enquiry) throw new Error("Enquiry not found");
 
-  const filteredTags = enquiry.tags.filter(
-    (t) => t !== "POOL_1" && t !== "POOL_2" && t !== "POOL_3",
-  );
+  const filteredTags = enquiry.tags.filter((t) => !t.startsWith("POOL_"));
   filteredTags.push(pool);
 
   await prisma.enquiry.update({
@@ -1130,9 +1142,7 @@ export async function removeEnquiryFromPool(enquiryId: string) {
   });
   if (!enquiry) throw new Error("Enquiry not found");
 
-  const filteredTags = enquiry.tags.filter(
-    (t) => t !== "POOL_1" && t !== "POOL_2" && t !== "POOL_3",
-  );
+  const filteredTags = enquiry.tags.filter((t) => !t.startsWith("POOL_"));
 
   await prisma.enquiry.update({
     where: { id: enquiryId },

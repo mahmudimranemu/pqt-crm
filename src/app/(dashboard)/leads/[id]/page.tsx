@@ -1,6 +1,7 @@
 import { auth, type ExtendedSession } from "@/lib/auth";
 import { getLeadById, getAgentsForLeads } from "@/lib/actions/leads";
 import { getActiveProperties } from "@/lib/actions/enquiries";
+import { getPoolsForUser } from "@/lib/actions/crm-settings";
 import { updateLeadTags } from "@/lib/actions/leads";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -49,12 +50,14 @@ export default async function LeadDetailPage({
   let lead: Awaited<ReturnType<typeof getLeadById>>;
   let agents: Awaited<ReturnType<typeof getAgentsForLeads>>;
   let properties: Awaited<ReturnType<typeof getActiveProperties>>;
+  let pools: { tag: string; name: string }[] = [];
 
   try {
-    [lead, agents, properties] = await Promise.all([
+    [lead, agents, properties, pools] = await Promise.all([
       getLeadById(id),
       getAgentsForLeads(),
       getActiveProperties(),
+      getPoolsForUser(session.user.id),
     ]);
   } catch (error) {
     console.error("Lead detail page error:", error);
@@ -179,6 +182,7 @@ export default async function LeadDetailPage({
           tags: lead.tags,
         }}
         agents={agents}
+        pools={pools}
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -204,7 +208,7 @@ export default async function LeadDetailPage({
           {/* Property Selector */}
           <LeadPropertySelector
             leadId={lead.id}
-            currentProperty={lead.interestedProperty}
+            selectedRefs={lead.interestedPropertyRefs}
             properties={properties}
           />
 

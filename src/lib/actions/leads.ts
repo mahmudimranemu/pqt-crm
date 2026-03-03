@@ -978,7 +978,7 @@ export async function convertLeadToDeal(
 
 export async function assignLeadToPool(
   leadId: string,
-  pool: "POOL_1" | "POOL_2" | "POOL_3",
+  pool: string,
 ) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
@@ -990,9 +990,7 @@ export async function assignLeadToPool(
   });
   if (!lead) throw new Error("Lead not found");
 
-  const filteredTags = lead.tags.filter(
-    (t) => t !== "POOL_1" && t !== "POOL_2" && t !== "POOL_3",
-  );
+  const filteredTags = lead.tags.filter((t) => !t.startsWith("POOL_"));
   filteredTags.push(pool);
 
   await prisma.lead.update({
@@ -1028,9 +1026,7 @@ export async function removeLeadFromPool(leadId: string) {
   });
   if (!lead) throw new Error("Lead not found");
 
-  const filteredTags = lead.tags.filter(
-    (t) => t !== "POOL_1" && t !== "POOL_2" && t !== "POOL_3",
-  );
+  const filteredTags = lead.tags.filter((t) => !t.startsWith("POOL_"));
 
   await prisma.lead.update({
     where: { id: leadId },
@@ -1039,4 +1035,20 @@ export async function removeLeadFromPool(leadId: string) {
 
   revalidatePath("/leads");
   revalidatePath("/settings/users");
+}
+
+export async function updateLeadProperties(
+  leadId: string,
+  propertyRefs: string[],
+) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+
+  await prisma.lead.update({
+    where: { id: leadId },
+    data: { interestedPropertyRefs: propertyRefs },
+  });
+
+  revalidatePath(`/leads/${leadId}`);
 }

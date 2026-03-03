@@ -4,32 +4,28 @@ import { useState, useEffect, useCallback } from "react";
 import { RefreshCw, Inbox, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getPoolData } from "@/lib/actions/pool";
+import { getPoolData, type PoolGroup } from "@/lib/actions/pool";
 
-type PoolItem = {
-  id: string;
-  type: "enquiry" | "lead";
-  name: string;
-  email: string;
-  phone: string | null;
-  status: string;
-  createdAt: string;
-  pool: string;
-};
+const POOL_COLORS = [
+  "bg-blue-500",
+  "bg-purple-500",
+  "bg-orange-500",
+  "bg-green-500",
+  "bg-pink-500",
+  "bg-teal-500",
+  "bg-yellow-500",
+  "bg-indigo-500",
+];
 
 export function ReallocationPool() {
-  const [poolData, setPoolData] = useState<{
-    pool1: PoolItem[];
-    pool2: PoolItem[];
-    pool3: PoolItem[];
-  }>({ pool1: [], pool2: [], pool3: [] });
+  const [poolGroups, setPoolGroups] = useState<PoolGroup[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getPoolData();
-      setPoolData(data);
+      setPoolGroups(data);
     } catch {
       console.error("Failed to fetch pool data");
     } finally {
@@ -41,26 +37,7 @@ export function ReallocationPool() {
     fetchData();
   }, [fetchData]);
 
-  const pools = [
-    {
-      key: "pool1" as const,
-      label: "Pool 1",
-      tag: "POOL_1",
-      color: "bg-blue-500",
-    },
-    {
-      key: "pool2" as const,
-      label: "Pool 2",
-      tag: "POOL_2",
-      color: "bg-purple-500",
-    },
-    {
-      key: "pool3" as const,
-      label: "Pool 3",
-      tag: "POOL_3",
-      color: "bg-orange-500",
-    },
-  ];
+  const hasItems = poolGroups.some((g) => g.items.length > 0);
 
   return (
     <div className="space-y-6">
@@ -88,20 +65,19 @@ export function ReallocationPool() {
 
       {/* Pool Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {pools.map((pool) => {
-          const items = poolData[pool.key];
-          const enquiries = items.filter((i) => i.type === "enquiry").length;
-          const leads = items.filter((i) => i.type === "lead").length;
+        {poolGroups.map((group, index) => {
+          const enquiries = group.items.filter((i) => i.type === "enquiry").length;
+          const leads = group.items.filter((i) => i.type === "lead").length;
           return (
             <div
-              key={pool.key}
+              key={group.tag}
               className="bg-white rounded-xl border border-gray-200 p-5"
             >
               <div className="flex items-center gap-3 mb-3">
-                <div className={`h-3 w-3 rounded-full ${pool.color}`} />
-                <h3 className="font-semibold text-gray-900">{pool.label}</h3>
+                <div className={`h-3 w-3 rounded-full ${POOL_COLORS[index % POOL_COLORS.length]}`} />
+                <h3 className="font-semibold text-gray-900">{group.name}</h3>
                 <Badge variant="secondary" className="ml-auto">
-                  {items.length} total
+                  {group.items.length} total
                 </Badge>
               </div>
               <div className="flex gap-4 text-sm text-gray-500">
@@ -114,23 +90,22 @@ export function ReallocationPool() {
       </div>
 
       {/* Pool Detail Tables */}
-      {pools.map((pool) => {
-        const items = poolData[pool.key];
-        if (items.length === 0) return null;
+      {poolGroups.map((group, index) => {
+        if (group.items.length === 0) return null;
         return (
           <div
-            key={pool.key}
+            key={group.tag}
             className="bg-white rounded-xl border border-gray-200 overflow-hidden"
           >
             <div className="px-5 py-3 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
-              <div className={`h-2.5 w-2.5 rounded-full ${pool.color}`} />
-              <h3 className="font-medium text-gray-900">{pool.label}</h3>
+              <div className={`h-2.5 w-2.5 rounded-full ${POOL_COLORS[index % POOL_COLORS.length]}`} />
+              <h3 className="font-medium text-gray-900">{group.name}</h3>
               <Badge variant="outline" className="ml-2">
-                {items.length}
+                {group.items.length}
               </Badge>
             </div>
             <div className="divide-y divide-gray-100">
-              {items.map((item) => (
+              {group.items.map((item) => (
                 <div
                   key={`${item.type}-${item.id}`}
                   className="px-5 py-3 flex items-center gap-4 hover:bg-gray-50"
@@ -174,20 +149,17 @@ export function ReallocationPool() {
       })}
 
       {/* Empty State */}
-      {!loading &&
-        poolData.pool1.length === 0 &&
-        poolData.pool2.length === 0 &&
-        poolData.pool3.length === 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <Inbox className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">
-              No items in any reallocation pool
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Assign enquiries or leads to a pool from their assignment dropdown
-            </p>
-          </div>
-        )}
+      {!loading && !hasItems && (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <Inbox className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">
+            No items in any reallocation pool
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Assign enquiries or leads to a pool from their assignment dropdown
+          </p>
+        </div>
+      )}
     </div>
   );
 }

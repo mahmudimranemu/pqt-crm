@@ -102,10 +102,16 @@ interface EnquiryRow {
   createdAt: string;
 }
 
+interface Pool {
+  tag: string;
+  name: string;
+}
+
 interface EnquiriesTableProps {
   enquiries: EnquiryRow[];
   agents: Agent[];
   properties: Property[];
+  pools?: Pool[];
   total: number;
   pages: number;
   currentPage: number;
@@ -158,6 +164,7 @@ export function EnquiriesTable({
   enquiries,
   agents,
   properties,
+  pools = [],
   total,
   pages,
   currentPage,
@@ -712,19 +719,14 @@ export function EnquiriesTable({
                     value={
                       localAgentOverrides[enquiry.id] !== undefined
                         ? localAgentOverrides[enquiry.id]
-                        : enquiry.tags?.includes("POOL_1")
-                          ? "POOL_1"
-                          : enquiry.tags?.includes("POOL_2")
-                            ? "POOL_2"
-                            : enquiry.tags?.includes("POOL_3")
-                              ? "POOL_3"
-                              : enquiry.assignedAgentId || "unassigned"
+                        : enquiry.tags?.find((t) => t.startsWith("POOL_")) ||
+                          enquiry.assignedAgentId || "unassigned"
                     }
                     onChange={async (e) => {
                       const val = e.target.value;
                       setLocalAgentOverrides((prev) => ({ ...prev, [enquiry.id]: val }));
                       try {
-                        if (val === "POOL_1" || val === "POOL_2" || val === "POOL_3") {
+                        if (val.startsWith("POOL_")) {
                           await assignEnquiryToPool(enquiry.id, val);
                         } else {
                           if (enquiry.tags?.some((t) => t.startsWith("POOL_"))) {
@@ -740,9 +742,11 @@ export function EnquiriesTable({
                     }}
                   >
                     <option value="unassigned">Unassigned</option>
-                    <option value="POOL_1">Pool 1</option>
-                    <option value="POOL_2">Pool 2</option>
-                    <option value="POOL_3">Pool 3</option>
+                    {pools.map((pool) => (
+                      <option key={pool.tag} value={pool.tag}>
+                        {pool.name}
+                      </option>
+                    ))}
                     {agents.map((agent) => (
                       <option key={agent.id} value={agent.id}>
                         {agent.firstName} {agent.lastName}
@@ -854,9 +858,11 @@ export function EnquiriesTable({
                   <SelectValue placeholder="Select consultant or pool" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="POOL_1">Pool 1 (Unassigned)</SelectItem>
-                  <SelectItem value="POOL_2">Pool 2 (Unassigned)</SelectItem>
-                  <SelectItem value="POOL_3">Pool 3 (Unassigned)</SelectItem>
+                  {pools.map((pool) => (
+                    <SelectItem key={pool.tag} value={pool.tag}>
+                      {pool.name} (Unassigned)
+                    </SelectItem>
+                  ))}
                   {agents
                     .filter((a) => a.id !== reallocateEnquiry?.assignedAgentId)
                     .map((agent) => (

@@ -4,6 +4,7 @@ import { auth, type ExtendedSession } from "@/lib/auth";
 import { fetchPropertyBySlug } from "@/lib/api/external-properties";
 import type { DisplayProperty } from "@/lib/api/external-properties";
 import { getProperty } from "@/lib/actions/properties";
+import { getPropertyCrmData, type PropertyCrmData } from "@/lib/actions/property-crm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,10 @@ import {
   Star,
   Sparkles,
   Zap,
+  ExternalLink,
+  Mail,
+  Users,
+  Target,
 } from "lucide-react";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import type { PropertyStatus, BookingStatus } from "@prisma/client";
@@ -43,7 +48,15 @@ interface PageProps {
 
 // --- External API property detail ---
 
-function ExternalPropertyDetail({ property }: { property: DisplayProperty }) {
+function ExternalPropertyDetail({
+  property,
+  crmData,
+}: {
+  property: DisplayProperty;
+  crmData: PropertyCrmData;
+}) {
+  const websiteUrl = `https://propertyquestturkey.com/properties/${property.slug}`;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -95,7 +108,94 @@ function ExternalPropertyDetail({ property }: { property: DisplayProperty }) {
             </p>
           </div>
         </div>
+        <a href={websiteUrl} target="_blank" rel="noopener noreferrer">
+          <Button variant="outline" className="gap-2 shrink-0">
+            <ExternalLink className="h-4 w-4" />
+            View on Website
+          </Button>
+        </a>
       </div>
+
+      {/* CRM Activity Panel */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <Mail className="h-4 w-4" />
+              <span className="text-sm">Enquiries</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{crmData.enquiryCount}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <Target className="h-4 w-4" />
+              <span className="text-sm">Leads</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{crmData.leadCount}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <Users className="h-4 w-4" />
+              <span className="text-sm">Clients</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{crmData.clientCount}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Consultant Activity */}
+      {crmData.activity.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4 text-[#dc2626]" />
+              Consultant Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y divide-gray-100">
+              {crmData.activity.map((item, i) => (
+                <div key={i} className="flex items-center gap-3 py-2.5">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#dc2626]/10 text-xs font-semibold text-[#dc2626]">
+                    {item.consultantName
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900">
+                      <span className="font-medium">{item.consultantName}</span>
+                      <span className="text-gray-500"> is dealing with this property via </span>
+                      <Link
+                        href={item.entityLink}
+                        className="text-[#dc2626] hover:underline font-medium"
+                      >
+                        {item.entityType === "enquiry" ? "Enquiry" : "Lead"} — {item.entityLabel}
+                      </Link>
+                    </p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={
+                      item.entityType === "enquiry"
+                        ? "bg-amber-50 text-amber-700 border-amber-200 shrink-0"
+                        : "bg-blue-50 text-blue-700 border-blue-200 shrink-0"
+                    }
+                  >
+                    {item.entityType === "enquiry" ? "Enquiry" : "Lead"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Featured Image + Gallery */}
       {property.imageUrl && (
@@ -448,7 +548,8 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   // Try external API first (by slug or numeric id)
   const externalProperty = await fetchPropertyBySlug(id);
   if (externalProperty) {
-    return <ExternalPropertyDetail property={externalProperty} />;
+    const crmData = await getPropertyCrmData(externalProperty.id);
+    return <ExternalPropertyDetail property={externalProperty} crmData={crmData} />;
   }
 
   // Fallback to local database (for legacy properties with bookings/sales)

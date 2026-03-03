@@ -37,6 +37,7 @@ import {
   FileSpreadsheet,
   Route,
   Activity,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { UserRole } from "@prisma/client";
 
@@ -195,6 +196,12 @@ const navSections: NavSection[] = [
         href: "/settings/import-export",
         icon: FileSpreadsheet,
         roles: ["SUPER_ADMIN", "ADMIN"],
+      },
+      {
+        title: "CRM Settings",
+        href: "/settings/crm",
+        icon: SlidersHorizontal,
+        roles: ["SUPER_ADMIN"],
       },
       { title: "Settings", href: "/settings", icon: Settings },
     ],
