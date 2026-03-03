@@ -18,6 +18,10 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { PropertyFilters } from "./property-filters";
 import { PropertyPagination } from "./property-pagination";
+import {
+  getBulkPropertyCrmCounts,
+  type PropertyCrmCounts,
+} from "@/lib/actions/property-crm";
 
 interface PageProps {
   searchParams: Promise<{
@@ -77,7 +81,10 @@ async function PropertiesGrid({
   searchParams: PageProps["searchParams"];
 }) {
   const params = await searchParams;
-  const allProperties = await fetchProperties();
+  const [allProperties, crmCounts] = await Promise.all([
+    fetchProperties(),
+    getBulkPropertyCrmCounts(),
+  ]);
   const filtered = filterProperties(allProperties, params);
 
   if (filtered.length === 0) {
@@ -228,6 +235,32 @@ async function PropertiesGrid({
                       <span className="text-muted-foreground">
                         {" "}
                         · {property.rentalGuaranteePercentage}% rental guarantee
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* CRM Activity Counts */}
+                {((crmCounts[property.id]?.leadCount ?? 0) > 0 ||
+                  (crmCounts[property.id]?.enquiryCount ?? 0) > 0) && (
+                  <div className="flex items-center gap-1.5 pt-2 border-t border-gray-100 flex-wrap">
+                    <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">
+                      Active in:
+                    </span>
+                    {(crmCounts[property.id]?.leadCount ?? 0) > 0 && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold">
+                        {crmCounts[property.id].leadCount}{" "}
+                        {crmCounts[property.id].leadCount === 1
+                          ? "lead"
+                          : "leads"}
+                      </span>
+                    )}
+                    {(crmCounts[property.id]?.enquiryCount ?? 0) > 0 && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold">
+                        {crmCounts[property.id].enquiryCount}{" "}
+                        {crmCounts[property.id].enquiryCount === 1
+                          ? "enquiry"
+                          : "enquiries"}
                       </span>
                     )}
                   </div>

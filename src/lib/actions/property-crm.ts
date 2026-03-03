@@ -3,6 +3,45 @@
 import prisma from "@/lib/prisma";
 import { auth, type ExtendedSession } from "@/lib/auth";
 
+export type PropertyCrmCounts = Record<
+  string,
+  { enquiryCount: number; leadCount: number }
+>;
+
+export async function getBulkPropertyCrmCounts(): Promise<PropertyCrmCounts> {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) return {};
+
+  const [enquiries, leads] = await Promise.all([
+    prisma.enquiry.findMany({
+      where: { interestedPropertyRefs: { isEmpty: false } },
+      select: { interestedPropertyRefs: true },
+    }),
+    prisma.lead.findMany({
+      where: { interestedPropertyRefs: { isEmpty: false } },
+      select: { interestedPropertyRefs: true },
+    }),
+  ]);
+
+  const counts: PropertyCrmCounts = {};
+
+  for (const e of enquiries) {
+    for (const ref of e.interestedPropertyRefs) {
+      if (!counts[ref]) counts[ref] = { enquiryCount: 0, leadCount: 0 };
+      counts[ref].enquiryCount++;
+    }
+  }
+
+  for (const l of leads) {
+    for (const ref of l.interestedPropertyRefs) {
+      if (!counts[ref]) counts[ref] = { enquiryCount: 0, leadCount: 0 };
+      counts[ref].leadCount++;
+    }
+  }
+
+  return counts;
+}
+
 export type PropertyCrmData = {
   enquiryCount: number;
   leadCount: number;
