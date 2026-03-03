@@ -3,7 +3,7 @@
 import prisma from "@/lib/prisma";
 import { auth, type ExtendedSession } from "@/lib/auth";
 
-type PoolItem = {
+export type PoolItem = {
   id: string;
   type: "enquiry" | "lead";
   name: string;
@@ -12,6 +12,12 @@ type PoolItem = {
   status: string;
   createdAt: string;
   pool: string;
+};
+
+export type PoolGroup = {
+  tag: string;
+  name: string;
+  items: PoolItem[];
 };
 
 async function getItemsForPool(poolTag: string): Promise<PoolItem[]> {
@@ -55,15 +61,34 @@ async function getItemsForPool(poolTag: string): Promise<PoolItem[]> {
   return [...enquiryItems, ...leadItems];
 }
 
-export async function getPoolData() {
+export async function getPoolData(): Promise<PoolGroup[]> {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const [pool1, pool2, pool3] = await Promise.all([
-    getItemsForPool("POOL_1"),
-    getItemsForPool("POOL_2"),
-    getItemsForPool("POOL_3"),
-  ]);
+  // Fetch active pools from DB (dynamic)
+  const pools = await prisma.pool.findMany({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { tag: true, name: true },
+  });
 
-  return { pool1, pool2, pool3 };
+  // If no pools exist, fall back to defaults
+  const activePools =
+    pools.length > 0
+      ? pools
+      : [
+          { tag: "POOL_1", name: "Pool 1" },
+          { tag: "POOL_2", name: "Pool 2" },
+          { tag: "POOL_3", name: "Pool 3" },
+        ];
+
+  const results = await Promise.all(
+    activePools.map((p) => getItemsForPool(p.tag)),
+  );
+
+  return activePools.map((p, i) => ({
+    tag: p.tag,
+    name: p.name,
+    items: results[i],
+  }));
 }
