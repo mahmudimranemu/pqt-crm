@@ -914,7 +914,7 @@ export async function getAgents() {
   return prisma.user.findMany({
     where: {
       isActive: true,
-      role: { in: ["SALES_AGENT", "SALES_MANAGER", "ADMIN"] },
+      role: { in: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "SALES_AGENT"] },
     },
     select: { id: true, firstName: true, lastName: true },
     orderBy: { firstName: "asc" },

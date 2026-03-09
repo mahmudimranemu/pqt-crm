@@ -75,6 +75,35 @@ export async function getEntityAuditLogs(entityType: string, entityId: string) {
   });
 }
 
+export async function getMyAuditLogs(params?: {
+  page?: number;
+  limit?: number;
+}) {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+
+  const { page = 1, limit = 30 } = params || {};
+
+  const where = { userId: session.user.id };
+
+  const [logs, total] = await Promise.all([
+    prisma.auditLog.findMany({
+      where,
+      include: {
+        user: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.auditLog.count({ where }),
+  ]);
+
+  return { logs, total, page, limit };
+}
+
 export async function createAuditLog(data: {
   action: AuditAction;
   entityType: string;
