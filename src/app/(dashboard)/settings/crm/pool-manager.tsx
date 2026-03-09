@@ -5,6 +5,21 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
 import {
   Plus,
@@ -17,6 +32,8 @@ import {
   Pencil,
   Check,
   X,
+  AlertTriangle,
+  ArrowRightLeft,
 } from "lucide-react";
 import {
   createPool,
@@ -24,6 +41,8 @@ import {
   togglePoolActive,
   updatePoolName,
   setPoolAccess,
+  getPoolItemCount,
+  transferPoolItems,
 } from "@/lib/actions/crm-settings";
 
 type Pool = {
@@ -78,6 +97,16 @@ export function PoolManager({ initialPools, users }: PoolManagerProps) {
   // Access control expanded state
   const [expandedAccess, setExpandedAccess] = useState<string | null>(null);
 
+  // Transfer dialog state
+  const [transferDialog, setTransferDialog] = useState<{
+    pool: Pool;
+    action: "delete" | "deactivate";
+    enquiryCount: number;
+    leadCount: number;
+  } | null>(null);
+  const [transferType, setTransferType] = useState<"pool" | "user">("pool");
+  const [transferTarget, setTransferTarget] = useState("");
+
   async function handleCreate() {
     if (!newPoolName.trim()) return;
     startTransition(async () => {
@@ -95,17 +124,44 @@ export function PoolManager({ initialPools, users }: PoolManagerProps) {
   }
 
   async function handleToggle(pool: Pool) {
+    // If activating (currently inactive), just activate directly
+    if (!pool.isActive) {
+      startTransition(async () => {
+        try {
+          await togglePoolActive(pool.id);
+          setPools((prev) =>
+            prev.map((p) => (p.id === pool.id ? { ...p, isActive: true } : p)),
+          );
+          toast({ title: "Pool activated", description: `"${pool.name}" has been activated.` });
+          router.refresh();
+        } catch (e) {
+          toast({ variant: "destructive", title: "Error", description: (e as Error).message });
+        }
+      });
+      return;
+    }
+
+    // Deactivating: check for assigned items first
     startTransition(async () => {
       try {
-        await togglePoolActive(pool.id);
-        setPools((prev) =>
-          prev.map((p) => (p.id === pool.id ? { ...p, isActive: !p.isActive } : p)),
-        );
-        toast({
-          title: pool.isActive ? "Pool deactivated" : "Pool activated",
-          description: `"${pool.name}" has been ${pool.isActive ? "deactivated" : "activated"}.`,
-        });
-        router.refresh();
+        const counts = await getPoolItemCount(pool.id);
+        if (counts.total > 0) {
+          setTransferDialog({
+            pool,
+            action: "deactivate",
+            enquiryCount: counts.enquiryCount,
+            leadCount: counts.leadCount,
+          });
+          setTransferType("pool");
+          setTransferTarget("");
+        } else {
+          await togglePoolActive(pool.id);
+          setPools((prev) =>
+            prev.map((p) => (p.id === pool.id ? { ...p, isActive: false } : p)),
+          );
+          toast({ title: "Pool deactivated", description: `"${pool.name}" has been deactivated.` });
+          router.refresh();
+        }
       } catch (e) {
         toast({ variant: "destructive", title: "Error", description: (e as Error).message });
       }
@@ -113,17 +169,59 @@ export function PoolManager({ initialPools, users }: PoolManagerProps) {
   }
 
   async function handleDelete(pool: Pool) {
-    if (
-      !window.confirm(
-        `Delete "${pool.name}"? This will remove it from all enquiries and leads.`,
-      )
-    )
-      return;
     startTransition(async () => {
       try {
-        await deletePool(pool.id);
-        setPools((prev) => prev.filter((p) => p.id !== pool.id));
-        toast({ title: "Pool deleted", description: `"${pool.name}" has been removed.` });
+        const counts = await getPoolItemCount(pool.id);
+        if (counts.total > 0) {
+          setTransferDialog({
+            pool,
+            action: "delete",
+            enquiryCount: counts.enquiryCount,
+            leadCount: counts.leadCount,
+          });
+          setTransferType("pool");
+          setTransferTarget("");
+        } else {
+          if (!window.confirm(`Delete "${pool.name}"?`)) return;
+          await deletePool(pool.id);
+          setPools((prev) => prev.filter((p) => p.id !== pool.id));
+          toast({ title: "Pool deleted", description: `"${pool.name}" has been removed.` });
+          router.refresh();
+        }
+      } catch (e) {
+        toast({ variant: "destructive", title: "Error", description: (e as Error).message });
+      }
+    });
+  }
+
+  async function handleTransferAndAction() {
+    if (!transferDialog || !transferTarget) return;
+    const { pool, action } = transferDialog;
+
+    startTransition(async () => {
+      try {
+        // Transfer items first
+        await transferPoolItems(
+          pool.id,
+          transferType === "pool"
+            ? { type: "pool", poolId: transferTarget }
+            : { type: "user", userId: transferTarget },
+        );
+
+        // Then perform the action
+        if (action === "delete") {
+          await deletePool(pool.id);
+          setPools((prev) => prev.filter((p) => p.id !== pool.id));
+          toast({ title: "Pool deleted", description: `Items transferred and "${pool.name}" deleted.` });
+        } else {
+          await togglePoolActive(pool.id);
+          setPools((prev) =>
+            prev.map((p) => (p.id === pool.id ? { ...p, isActive: false } : p)),
+          );
+          toast({ title: "Pool deactivated", description: `Items transferred and "${pool.name}" deactivated.` });
+        }
+
+        setTransferDialog(null);
         router.refresh();
       } catch (e) {
         toast({ variant: "destructive", title: "Error", description: (e as Error).message });
@@ -457,6 +555,105 @@ export function PoolManager({ initialPools, users }: PoolManagerProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Transfer Dialog */}
+      <Dialog
+        open={!!transferDialog}
+        onOpenChange={(open) => !open && setTransferDialog(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              {transferDialog?.action === "delete" ? "Delete" : "Deactivate"} &ldquo;{transferDialog?.pool.name}&rdquo;
+            </DialogTitle>
+            <DialogDescription>
+              This pool has{" "}
+              {transferDialog && (
+                <span className="font-medium text-gray-900">
+                  {transferDialog.enquiryCount > 0 && `${transferDialog.enquiryCount} enquir${transferDialog.enquiryCount === 1 ? "y" : "ies"}`}
+                  {transferDialog.enquiryCount > 0 && transferDialog.leadCount > 0 && " and "}
+                  {transferDialog.leadCount > 0 && `${transferDialog.leadCount} lead${transferDialog.leadCount === 1 ? "" : "s"}`}
+                </span>
+              )}{" "}
+              assigned. Transfer them before proceeding.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Transfer type toggle */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setTransferType("pool"); setTransferTarget(""); }}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  transferType === "pool"
+                    ? "border-[#dc2626] bg-red-50 text-[#dc2626]"
+                    : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <ArrowRightLeft className="inline h-4 w-4 mr-1.5" />
+                To another pool
+              </button>
+              <button
+                onClick={() => { setTransferType("user"); setTransferTarget(""); }}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  transferType === "user"
+                    ? "border-[#dc2626] bg-red-50 text-[#dc2626]"
+                    : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <Users className="inline h-4 w-4 mr-1.5" />
+                To a user
+              </button>
+            </div>
+
+            {/* Target selector */}
+            <Select value={transferTarget} onValueChange={setTransferTarget}>
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    transferType === "pool"
+                      ? "Select target pool..."
+                      : "Select target user..."
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {transferType === "pool"
+                  ? pools
+                      .filter((p) => p.id !== transferDialog?.pool.id && p.isActive)
+                      .map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                        </SelectItem>
+                      ))
+                  : users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.firstName} {u.lastName}
+                      </SelectItem>
+                    ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setTransferDialog(null)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleTransferAndAction}
+              disabled={isPending || !transferTarget}
+              className="bg-[#dc2626] hover:bg-[#b91c1c] text-white"
+            >
+              {isPending ? "Transferring..." : `Transfer & ${transferDialog?.action === "delete" ? "Delete" : "Deactivate"}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

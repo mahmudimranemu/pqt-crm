@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Mail,
@@ -8,6 +10,7 @@ import {
   MapPin,
   Calendar,
   Clock,
+  Pencil,
 } from "lucide-react";
 import type { UserRole, Office } from "@prisma/client";
 
@@ -51,6 +54,7 @@ interface ProfileHeaderProps {
     createdAt: string;
   };
   isSuperAdmin: boolean;
+  isSelf: boolean;
   stats: {
     totalEnquiries: number;
     totalLeads: number;
@@ -65,7 +69,7 @@ function isOnline(lastSeen: string | null): boolean {
   return diff < 5 * 60 * 1000;
 }
 
-export function ProfileHeader({ user, isSuperAdmin, stats }: ProfileHeaderProps) {
+export function ProfileHeader({ user, isSuperAdmin, isSelf, stats }: ProfileHeaderProps) {
   const online = isOnline(user.lastSeen);
 
   return (
@@ -121,6 +125,14 @@ export function ProfileHeader({ user, isSuperAdmin, stats }: ProfileHeaderProps)
                   </span>
                   Online
                 </span>
+              )}
+              {isSelf && (
+                <Link href="/settings/profile">
+                  <Button variant="outline" size="sm" className="gap-1.5 ml-2">
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit Profile
+                  </Button>
+                </Link>
               )}
             </div>
 

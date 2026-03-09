@@ -58,7 +58,7 @@ export default async function ImportExportPage() {
 
   if (
     !session?.user?.role ||
-    !["SUPER_ADMIN", "ADMIN"].includes(session.user.role)
+    session.user.role !== "SUPER_ADMIN"
   ) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">

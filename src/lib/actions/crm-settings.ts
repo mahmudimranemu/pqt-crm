@@ -91,6 +91,7 @@ export async function createPool(name: string) {
 
   revalidatePath("/settings/crm");
   revalidatePath("/settings/users");
+  revalidatePath("/clients/enquiries");
   return pool;
 }
 
@@ -120,6 +121,7 @@ export async function togglePoolActive(poolId: string) {
 
   revalidatePath("/settings/crm");
   revalidatePath("/settings/users");
+  revalidatePath("/clients/enquiries");
 }
 
 export async function deletePool(poolId: string) {
@@ -155,6 +157,7 @@ export async function deletePool(poolId: string) {
 
   revalidatePath("/settings/crm");
   revalidatePath("/settings/users");
+  revalidatePath("/clients/enquiries");
 }
 
 export async function setPoolAccess(poolId: string, allowedUserIds: string[]) {
@@ -166,6 +169,90 @@ export async function setPoolAccess(poolId: string, allowedUserIds: string[]) {
   });
 
   revalidatePath("/settings/crm");
+}
+
+// Returns count of enquiries + leads assigned to a pool
+export async function getPoolItemCount(poolId: string) {
+  await requireSuperAdmin();
+
+  const pool = await prisma.pool.findUnique({ where: { id: poolId } });
+  if (!pool) throw new Error("Pool not found");
+
+  const [enquiryCount, leadCount] = await Promise.all([
+    prisma.enquiry.count({ where: { tags: { has: pool.tag } } }),
+    prisma.lead.count({ where: { tags: { has: pool.tag } } }),
+  ]);
+
+  return { enquiryCount, leadCount, total: enquiryCount + leadCount };
+}
+
+// Transfer all enquiries/leads from one pool to another pool or a user
+export async function transferPoolItems(
+  fromPoolId: string,
+  target: { type: "pool"; poolId: string } | { type: "user"; userId: string },
+) {
+  await requireSuperAdmin();
+
+  const fromPool = await prisma.pool.findUnique({ where: { id: fromPoolId } });
+  if (!fromPool) throw new Error("Source pool not found");
+
+  // Get all enquiries and leads in this pool
+  const enquiries = await prisma.enquiry.findMany({
+    where: { tags: { has: fromPool.tag } },
+    select: { id: true, tags: true },
+  });
+  const leads = await prisma.lead.findMany({
+    where: { tags: { has: fromPool.tag } },
+    select: { id: true, tags: true },
+  });
+
+  if (target.type === "pool") {
+    const toPool = await prisma.pool.findUnique({ where: { id: target.poolId } });
+    if (!toPool) throw new Error("Target pool not found");
+
+    // Swap pool tags: remove old, add new
+    for (const e of enquiries) {
+      const newTags = e.tags.filter((t) => t !== fromPool.tag);
+      newTags.push(toPool.tag);
+      await prisma.enquiry.update({
+        where: { id: e.id },
+        data: { tags: newTags },
+      });
+    }
+    for (const l of leads) {
+      const newTags = l.tags.filter((t) => t !== fromPool.tag);
+      newTags.push(toPool.tag);
+      await prisma.lead.update({
+        where: { id: l.id },
+        data: { tags: newTags },
+      });
+    }
+  } else {
+    // Transfer to user: remove pool tag and assign agent
+    for (const e of enquiries) {
+      await prisma.enquiry.update({
+        where: { id: e.id },
+        data: {
+          tags: e.tags.filter((t) => t !== fromPool.tag),
+          assignedAgentId: target.userId,
+        },
+      });
+    }
+    for (const l of leads) {
+      await prisma.lead.update({
+        where: { id: l.id },
+        data: {
+          tags: l.tags.filter((t) => t !== fromPool.tag),
+          ownerId: target.userId,
+        },
+      });
+    }
+  }
+
+  revalidatePath("/clients/enquiries");
+  revalidatePath("/leads");
+  revalidatePath("/settings/crm");
+  revalidatePath("/settings/users");
 }
 
 // Returns users for the access control selector

@@ -68,7 +68,11 @@ export function CreateUserDialog() {
       setIsSubmitting(true);
       setError(null);
 
-      await createUser(formData);
+      const result = await createUser(formData);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
       setIsOpen(false);
       setFormData({
         email: "",
@@ -79,8 +83,8 @@ export function CreateUserDialog() {
         office: "HEAD_OFFICE",
       });
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create user");
+    } catch {
+      setError("Failed to create user. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

@@ -75,7 +75,7 @@ export async function getEnquiries(params?: {
 
   if (agentId === "unassigned") {
     where.assignedAgentId = null;
-  } else if (agentId === "POOL_1" || agentId === "POOL_2" || agentId === "POOL_3") {
+  } else if (agentId?.startsWith("POOL_")) {
     where.tags = { has: agentId };
   } else if (agentId) {
     where.assignedAgentId = agentId;
@@ -871,17 +871,25 @@ export async function getEnquiryCountsByConsultant() {
     baseWhere.assignedAgentId = session.user.id;
   }
 
-  const [unassigned, pool1, pool2, pool3, agentCounts] = await Promise.all([
+  // Fetch active pools dynamically
+  const activePools = await prisma.pool.findMany({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { tag: true, name: true },
+  });
+
+  const [unassigned, ...poolCountResults] = await Promise.all([
     prisma.enquiry.count({ where: { ...baseWhere, assignedAgentId: null } }),
-    prisma.enquiry.count({ where: { ...baseWhere, tags: { has: "POOL_1" } } }),
-    prisma.enquiry.count({ where: { ...baseWhere, tags: { has: "POOL_2" } } }),
-    prisma.enquiry.count({ where: { ...baseWhere, tags: { has: "POOL_3" } } }),
-    prisma.enquiry.groupBy({
-      by: ["assignedAgentId"],
-      where: { ...baseWhere, assignedAgentId: { not: null } },
-      _count: true,
-    }),
+    ...activePools.map((pool) =>
+      prisma.enquiry.count({ where: { ...baseWhere, tags: { has: pool.tag } } }),
+    ),
   ]);
+
+  const agentCounts = await prisma.enquiry.groupBy({
+    by: ["assignedAgentId"],
+    where: { ...baseWhere, assignedAgentId: { not: null } },
+    _count: true,
+  });
 
   const byAgent: Record<string, number> = {};
   for (const row of agentCounts) {
@@ -890,7 +898,13 @@ export async function getEnquiryCountsByConsultant() {
     }
   }
 
-  return { unassigned, pool1, pool2, pool3, byAgent };
+  const poolCounts = activePools.map((pool, i) => ({
+    tag: pool.tag,
+    name: pool.name,
+    count: poolCountResults[i],
+  }));
+
+  return { unassigned, poolCounts, byAgent };
 }
 
 export async function getAgents() {

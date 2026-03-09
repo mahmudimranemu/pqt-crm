@@ -344,9 +344,11 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
           {[
             { key: "", label: "All", count: 0 },
             { key: "unassigned", label: "Unassigned", count: consultantCounts.unassigned },
-            { key: "POOL_1", label: "Pool 1", count: consultantCounts.pool1 },
-            { key: "POOL_2", label: "Pool 2", count: consultantCounts.pool2 },
-            { key: "POOL_3", label: "Pool 3", count: consultantCounts.pool3 },
+            ...consultantCounts.poolCounts.map((p) => ({
+              key: p.tag,
+              label: p.name,
+              count: p.count,
+            })),
             ...agents.map((a) => ({
               key: a.id,
               label: `${a.firstName} ${a.lastName}`,

@@ -138,17 +138,17 @@ export async function createUser(data: {
   lastName: string;
   role: UserRole;
   office: Office;
-}) {
+}): Promise<{ success: true; user: any } | { success: false; error: string }> {
   const session = (await auth()) as ExtendedSession | null;
-  if (!session?.user) throw new Error("Unauthorized");
+  if (!session?.user) return { success: false, error: "Unauthorized" };
   if (!["SUPER_ADMIN", "ADMIN"].includes(session.user.role)) {
-    throw new Error("Unauthorized - Admin access required");
+    return { success: false, error: "Unauthorized - Admin access required" };
   }
 
   // Validate password strength
   const passwordError = validatePassword(data.password);
   if (passwordError) {
-    throw new Error(passwordError);
+    return { success: false, error: passwordError };
   }
 
   // Check if email already exists
@@ -157,7 +157,7 @@ export async function createUser(data: {
   });
 
   if (existing) {
-    throw new Error("A user with this email already exists");
+    return { success: false, error: "A user with this email already exists" };
   }
 
   // Hash password
@@ -177,7 +177,7 @@ export async function createUser(data: {
   });
 
   revalidatePath("/settings/users");
-  return user;
+  return { success: true, user };
 }
 
 // Update user

@@ -98,6 +98,7 @@ export default async function UserProfilePage({
           lastSeen: profileUser.lastSeen?.toISOString() || null,
         }}
         isSuperAdmin={isSuperAdmin}
+        isSelf={isSelf}
         stats={stats}
       />
 

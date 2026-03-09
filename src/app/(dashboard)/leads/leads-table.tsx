@@ -252,12 +252,14 @@ export function LeadsTable({
         </div>
       )}
 
-      <div className="flex items-center justify-end px-4 py-2 border-b border-gray-100">
-        <Button variant="outline" size="sm" onClick={handleExportCSV}>
-          <Download className="h-4 w-4 mr-1" />
-          Export CSV
-        </Button>
-      </div>
+      {userRole === "SUPER_ADMIN" && (
+        <div className="flex items-center justify-end px-4 py-2 border-b border-gray-100">
+          <Button variant="outline" size="sm" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-1" />
+            Export CSV
+          </Button>
+        </div>
+      )}
 
       {/* Column Headers */}
       <div
