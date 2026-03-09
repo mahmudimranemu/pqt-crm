@@ -11,6 +11,7 @@ import {
   Calendar,
   Clock,
   Pencil,
+  MessageSquare,
 } from "lucide-react";
 import type { UserRole, Office } from "@prisma/client";
 
@@ -61,6 +62,7 @@ interface ProfileHeaderProps {
     totalClients: number;
     totalSales: number;
   } | null;
+  superAdminChatLink?: string | null;
 }
 
 function isOnline(lastSeen: string | null): boolean {
@@ -69,7 +71,7 @@ function isOnline(lastSeen: string | null): boolean {
   return diff < 5 * 60 * 1000;
 }
 
-export function ProfileHeader({ user, isSuperAdmin, isSelf, stats }: ProfileHeaderProps) {
+export function ProfileHeader({ user, isSuperAdmin, isSelf, stats, superAdminChatLink }: ProfileHeaderProps) {
   const online = isOnline(user.lastSeen);
 
   return (
@@ -131,6 +133,14 @@ export function ProfileHeader({ user, isSuperAdmin, isSelf, stats }: ProfileHead
                   <Button variant="outline" size="sm" className="gap-1.5 ml-2">
                     <Pencil className="h-3.5 w-3.5" />
                     Edit Profile
+                  </Button>
+                </Link>
+              )}
+              {superAdminChatLink && (
+                <Link href={superAdminChatLink}>
+                  <Button size="sm" className="gap-1.5 ml-1 bg-[#dc2626] hover:bg-[#b91c1c] text-white">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Chat with Admin
                   </Button>
                 </Link>
               )}

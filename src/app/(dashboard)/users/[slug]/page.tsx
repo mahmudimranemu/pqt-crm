@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { auth, type ExtendedSession } from "@/lib/auth";
+import prisma from "@/lib/prisma";
+import { toUserSlug } from "@/lib/utils";
 import { getUserBySlug, getUserProfileStats } from "@/lib/actions/user-profile";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -48,24 +50,27 @@ export default async function UserProfilePage({
   }
 
   const isSuperAdmin = session.user.role === "SUPER_ADMIN";
+  const isAdmin = ["SUPER_ADMIN", "ADMIN"].includes(session.user.role);
   const isSelf = session.user.id === profileUser.id;
 
-  // Determine active tab
-  const activeTab = tab || (isSuperAdmin ? "dashboard" : "enquiries");
+  // Define available tabs based on viewer's relationship to this profile
+  const tabs = [];
+  if (isSuperAdmin) {
+    tabs.push({ key: "dashboard", label: "Dashboard", icon: LayoutDashboard });
+  }
+  if (isSuperAdmin || isSelf) {
+    tabs.push({ key: "enquiries", label: "Enquiries", icon: Mail });
+    tabs.push({ key: "leads", label: "Leads", icon: Target });
+    tabs.push({ key: "clients", label: "Clients", icon: Users });
+  }
+  tabs.push({ key: "chat", label: "Chat", icon: MessageSquare });
+  if (isSuperAdmin) {
+    tabs.push({ key: "notes", label: "Notes", icon: StickyNote });
+  }
 
-  // Define available tabs based on role
-  const tabs = [
-    ...(isSuperAdmin
-      ? [{ key: "dashboard", label: "Dashboard", icon: LayoutDashboard }]
-      : []),
-    { key: "enquiries", label: "Enquiries", icon: Mail },
-    { key: "leads", label: "Leads", icon: Target },
-    { key: "clients", label: "Clients", icon: Users },
-    { key: "chat", label: "Chat", icon: MessageSquare },
-    ...(isSuperAdmin
-      ? [{ key: "notes", label: "Notes", icon: StickyNote }]
-      : []),
-  ];
+  // Default tab
+  const defaultTab = isSuperAdmin ? "dashboard" : (isSelf ? "enquiries" : "chat");
+  const activeTab = tab || defaultTab;
 
   // Fetch stats for dashboard tab
   let stats = null;
@@ -77,17 +82,29 @@ export default async function UserProfilePage({
     }
   }
 
+  // Get super admin info for "Chat with Super Admin" button (for non-super-admin users viewing their own profile)
+  let superAdminChatLink: string | null = null;
+  if (!isSuperAdmin && isSelf) {
+    const superAdmin = await prisma.user.findFirst({
+      where: { role: "SUPER_ADMIN", isActive: true },
+      select: { firstName: true, lastName: true },
+    });
+    if (superAdmin) {
+      superAdminChatLink = `/users/${toUserSlug(superAdmin.firstName, superAdmin.lastName)}?tab=chat`;
+    }
+  }
+
   const currentPage = page ? parseInt(page) : 1;
 
   return (
     <div className="space-y-6">
       {/* Back Button */}
       <Link
-        href="/settings/users"
+        href={isAdmin ? "/settings/users" : "/dashboard"}
         className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Users
+        {isAdmin ? "Back to Users" : "Back to Dashboard"}
       </Link>
 
       {/* Profile Header */}
@@ -100,6 +117,7 @@ export default async function UserProfilePage({
         isSuperAdmin={isSuperAdmin}
         isSelf={isSelf}
         stats={stats}
+        superAdminChatLink={superAdminChatLink}
       />
 
       {/* Tab Navigation */}
@@ -107,7 +125,7 @@ export default async function UserProfilePage({
         {tabs.map((t) => (
           <Link
             key={t.key}
-            href={`/users/${slug}${t.key === (isSuperAdmin ? "dashboard" : "enquiries") ? "" : `?tab=${t.key}`}`}
+            href={`/users/${slug}${t.key === defaultTab ? "" : `?tab=${t.key}`}`}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === t.key
                 ? "border-b-2 border-[#dc2626] text-gray-900"
@@ -125,19 +143,19 @@ export default async function UserProfilePage({
         <DashboardTab stats={stats} />
       )}
 
-      {activeTab === "enquiries" && (
+      {activeTab === "enquiries" && (isSuperAdmin || isSelf) && (
         <Suspense fallback={<TabSkeleton />}>
           <EnquiriesTab userId={profileUser.id} page={currentPage} slug={slug} />
         </Suspense>
       )}
 
-      {activeTab === "leads" && (
+      {activeTab === "leads" && (isSuperAdmin || isSelf) && (
         <Suspense fallback={<TabSkeleton />}>
           <LeadsTab userId={profileUser.id} page={currentPage} slug={slug} />
         </Suspense>
       )}
 
-      {activeTab === "clients" && (
+      {activeTab === "clients" && (isSuperAdmin || isSelf) && (
         <Suspense fallback={<TabSkeleton />}>
           <ClientsTab userId={profileUser.id} page={currentPage} slug={slug} />
         </Suspense>

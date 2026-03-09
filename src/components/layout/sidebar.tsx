@@ -72,52 +72,126 @@ const navSections: NavSection[] = [
   {
     label: "Pipeline",
     items: [
-      { title: "Leads", href: "/leads", icon: Target },
-      { title: "Deals", href: "/deals", icon: Handshake },
+      {
+        title: "Leads",
+        href: "/leads",
+        icon: Target,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "SALES_AGENT"],
+      },
+      {
+        title: "Deals",
+        href: "/deals",
+        icon: Handshake,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "SALES_AGENT"],
+      },
     ],
   },
   {
     label: "Contacts",
     items: [
-      { title: "Clients", href: "/clients", icon: Users },
-      { title: "Enquiries", href: "/clients/enquiries", icon: Mail },
+      {
+        title: "Clients",
+        href: "/clients",
+        icon: Users,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "SALES_AGENT"],
+      },
+      {
+        title: "Enquiries",
+        href: "/clients/enquiries",
+        icon: Mail,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "SALES_AGENT"],
+      },
     ],
   },
   {
     label: "Properties",
     items: [
       { title: "Properties", href: "/properties", icon: Building2 },
-      { title: "Bookings", href: "/bookings", icon: CalendarDays },
+      {
+        title: "Bookings",
+        href: "/bookings",
+        icon: CalendarDays,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+      },
     ],
   },
   {
     label: "Finance",
     items: [
-      { title: "Sales", href: "/sales", icon: DollarSign },
-      { title: "Payments", href: "/payments", icon: CreditCard },
-      { title: "Commissions", href: "/commissions", icon: Percent },
+      {
+        title: "Sales",
+        href: "/sales",
+        icon: DollarSign,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "SALES_AGENT"],
+      },
+      {
+        title: "Payments",
+        href: "/payments",
+        icon: CreditCard,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+      },
+      {
+        title: "Commissions",
+        href: "/commissions",
+        icon: Percent,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+      },
     ],
   },
   {
     label: "Citizenship",
-    items: [{ title: "Applications", href: "/citizenship", icon: Flag }],
+    items: [
+      {
+        title: "Applications",
+        href: "/citizenship",
+        icon: Flag,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+      },
+    ],
   },
   {
     label: "Activities",
     items: [
       { title: "Tasks", href: "/tasks", icon: CheckSquare },
-      { title: "Communications", href: "/communications", icon: MessageSquare },
-      { title: "Documents", href: "/documents", icon: FileText },
+      {
+        title: "Communications",
+        href: "/communications",
+        icon: MessageSquare,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+      },
+      {
+        title: "Chat",
+        href: "/chat",
+        icon: MessageSquare,
+        roles: ["SALES_AGENT"],
+      },
+      {
+        title: "Activity",
+        href: "/activity",
+        icon: Activity,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "SALES_AGENT"],
+      },
+      {
+        title: "Documents",
+        href: "/documents",
+        icon: FileText,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+      },
     ],
   },
   {
     label: "Analytics",
     items: [
-      { title: "KPIs", href: "/kpis", icon: BarChart3 },
+      {
+        title: "KPIs",
+        href: "/kpis",
+        icon: BarChart3,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+      },
       {
         title: "Agent Performance",
         href: "/kpis/performance",
-        icon: Activity,
+        icon: TrendingUp,
         roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
       },
       {

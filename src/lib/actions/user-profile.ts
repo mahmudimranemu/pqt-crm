@@ -60,13 +60,6 @@ export async function getUserBySlug(slug: string) {
 
   if (!user) throw new Error("User not found");
 
-  // Access control: SUPER_ADMIN can view any profile, users can view their own
-  const isSuperAdmin = session.user.role === "SUPER_ADMIN";
-  const isSelf = session.user.id === user.id;
-  if (!isSuperAdmin && !isSelf) {
-    throw new Error("Access denied");
-  }
-
   return user;
 }
 
@@ -352,9 +345,9 @@ export async function sendMessage(receiverId: string, content: string) {
     },
   });
 
-  // Notify the receiver
-  const senderName = `${session.user.firstName} ${session.user.lastName}`;
-  const senderSlug = toUserSlug(session.user.firstName, session.user.lastName);
+  // Use fresh name from DB (not session which can be stale)
+  const senderName = `${message.sender.firstName} ${message.sender.lastName}`;
+  const senderSlug = toUserSlug(message.sender.firstName, message.sender.lastName);
   const preview = content.trim().length > 80
     ? content.trim().substring(0, 80) + "..."
     : content.trim();
