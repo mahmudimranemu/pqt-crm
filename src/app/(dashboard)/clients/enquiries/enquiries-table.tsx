@@ -115,6 +115,7 @@ interface EnquiriesTableProps {
   total: number;
   pages: number;
   currentPage: number;
+  pageSize?: number;
   userRole?: string;
 }
 
@@ -168,6 +169,7 @@ export function EnquiriesTable({
   total,
   pages,
   currentPage,
+  pageSize = 10,
   userRole,
 }: EnquiriesTableProps) {
   const router = useRouter();
@@ -798,11 +800,28 @@ export function EnquiriesTable({
       </div>
 
       {/* Pagination */}
-      {pages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+        <div className="flex items-center gap-3">
           <p className="text-xs text-gray-500">
-            Showing {(currentPage - 1) * 25 + 1} to {Math.min(currentPage * 25, total)} of {total} enquiries
+            Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, total)} of {total} enquiries
           </p>
+          <select
+            className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 cursor-pointer"
+            value={pageSize}
+            onChange={(e) => {
+              const params = new URLSearchParams(window.location.search);
+              params.set("pageSize", e.target.value);
+              params.delete("page");
+              router.push(`/clients/enquiries?${params.toString()}`);
+            }}
+          >
+            <option value="10">10 / page</option>
+            <option value="25">25 / page</option>
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+          </select>
+        </div>
+        {pages > 1 && (
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -830,8 +849,8 @@ export function EnquiriesTable({
               Next
             </Button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* ==================== REALLOCATE DIALOG ==================== */}
       <Dialog open={reallocateOpen} onOpenChange={setReallocateOpen}>

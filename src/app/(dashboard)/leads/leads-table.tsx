@@ -21,8 +21,6 @@ import {
   Mail,
   Users,
   StickyNote,
-  ChevronLeft,
-  ChevronRight,
   Tag,
   Download,
   Trash2,
@@ -146,6 +144,7 @@ interface LeadsTableProps {
   total: number;
   pages: number;
   currentPage: number;
+  pageSize?: number;
   userRole?: string;
 }
 
@@ -156,6 +155,7 @@ export function LeadsTable({
   total,
   pages,
   currentPage,
+  pageSize = 10,
   userRole,
 }: LeadsTableProps) {
   const router = useRouter();
@@ -561,26 +561,57 @@ export function LeadsTable({
       </div>
 
       {/* Pagination */}
-      {pages > 1 && (
-        <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3">
+      <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3">
+        <div className="flex items-center gap-3">
           <p className="text-xs text-gray-500">
-            Showing {(currentPage - 1) * 50 + 1} to {Math.min(currentPage * 50, total)} of {total} leads
+            Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, total)} of {total} leads
           </p>
-          <div className="flex items-center gap-2">
-            <Link href={`/leads?page=${Math.max(1, currentPage - 1)}&view=table`}>
-              <Button variant="outline" size="sm" disabled={currentPage <= 1}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            </Link>
-            <span className="text-xs text-gray-600">Page {currentPage} of {pages}</span>
-            <Link href={`/leads?page=${Math.min(pages, currentPage + 1)}&view=table`}>
-              <Button variant="outline" size="sm" disabled={currentPage >= pages}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
+          <select
+            className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 cursor-pointer"
+            value={pageSize}
+            onChange={(e) => {
+              const params = new URLSearchParams(window.location.search);
+              params.set("pageSize", e.target.value);
+              params.delete("page");
+              router.push(`/leads?${params.toString()}`);
+            }}
+          >
+            <option value="10">10 / page</option>
+            <option value="25">25 / page</option>
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+          </select>
         </div>
-      )}
+        {pages > 1 && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage <= 1}
+              onClick={() => {
+                const params = new URLSearchParams(window.location.search);
+                params.set("page", String(currentPage - 1));
+                router.push(`/leads?${params.toString()}`);
+              }}
+            >
+              Previous
+            </Button>
+            <span className="text-xs text-gray-500">Page {currentPage} of {pages}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= pages}
+              onClick={() => {
+                const params = new URLSearchParams(window.location.search);
+                params.set("page", String(currentPage + 1));
+                router.push(`/leads?${params.toString()}`);
+              }}
+            >
+              Next
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Single Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>

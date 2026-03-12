@@ -42,7 +42,7 @@ export async function getEnquiries(params?: {
     source,
     agentId,
     page = 1,
-    limit = 25,
+    limit = 10,
     tab,
     tag,
     search,
@@ -340,7 +340,9 @@ export async function getEnquiry(id: string) {
       assignedAgent: {
         select: { id: true, firstName: true, lastName: true, email: true },
       },
-      convertedClient: true,
+      convertedClient: {
+        select: { id: true, firstName: true, lastName: true },
+      },
       interestedProperty: {
         select: { id: true, name: true, pqtNumber: true },
       },
@@ -420,7 +422,7 @@ export async function createEnquiry(data: CreateEnquiryData) {
       segment: data.segment || "Buyer",
       priority: data.priority || "Medium",
       assignedAgentId: assignedAgentId,
-      interestedPropertyId: data.interestedPropertyId || null,
+      interestedPropertyRefs: data.interestedPropertyId ? [data.interestedPropertyId] : [],
       status: assignedAgentId ? "ASSIGNED" : "NEW",
     },
   });
@@ -657,29 +659,28 @@ export async function convertToClientAndLead(
 
   const enquiry = await prisma.enquiry.findUnique({
     where: { id: enquiryId },
+    include: {
+      notes: true,
+      activities: true,
+    },
   });
 
   if (!enquiry) throw new Error("Enquiry not found");
   if (enquiry.convertedClientId) throw new Error("Already converted");
 
-  // Generate lead number
-  const today = new Date();
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
-  const todayStart = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
-  const count = await prisma.lead.count({
-    where: { createdAt: { gte: todayStart } },
-  });
-  const leadNumber = `PQT-L-${dateStr}-${String(count + 1).padStart(4, "0")}`;
-
   const ownerId = enquiry.assignedAgentId || session.user.id;
   const leadSource = mapEnquirySourceToLeadSource(enquiry.source);
 
+  // Store enquiry notes and activity IDs before deletion
+  const enquiryNotes = enquiry.notes;
+  const enquiryActivityIds = enquiry.activities.map((a) => a.id);
+
   // Run everything in a transaction
   const result = await prisma.$transaction(async (tx) => {
+    // Generate lead number inside transaction for accurate count
+    const count = await tx.lead.count();
+    const leadNumber = `PQT-L-${String(count + 1).padStart(4, "0")}`;
+
     // 1. Create Client
     const client = await tx.client.create({
       data: {
@@ -699,9 +700,15 @@ export async function convertToClientAndLead(
       },
     });
 
-    // 2. Create Lead linked to the new Client
+    // 2. Delete the enquiry (cascades: EnquiryNotes deleted, Activity.enquiryId set to null)
+    await tx.enquiry.delete({
+      where: { id: enquiryId },
+    });
+
+    // 3. Create Lead with the same ID as the enquiry
     const lead = await tx.lead.create({
       data: {
+        id: enquiryId,
         leadNumber,
         title: data.leadTitle,
         description: data.description || enquiry.message || undefined,
@@ -714,10 +721,39 @@ export async function convertToClientAndLead(
         preferredLocation: data.preferredLocation || undefined,
         clientId: client.id,
         ownerId,
+        tags: enquiry.tags,
+        called: enquiry.called,
+        spoken: enquiry.spoken,
+        segment: enquiry.segment,
+        priority: enquiry.priority,
+        nextCallDate: enquiry.nextCallDate,
+        snooze: enquiry.snooze,
+        interestedPropertyId: enquiry.interestedPropertyId,
+        interestedPropertyRefs: enquiry.interestedPropertyRefs,
       },
     });
 
-    // 3. Create Activity on the lead
+    // 4. Convert EnquiryNotes to LeadNotes
+    if (enquiryNotes.length > 0) {
+      await tx.leadNote.createMany({
+        data: enquiryNotes.map((note) => ({
+          leadId: lead.id,
+          agentId: note.agentId,
+          content: note.content,
+          createdAt: note.createdAt,
+        })),
+      });
+    }
+
+    // 5. Move existing activities from enquiry to the new lead
+    if (enquiryActivityIds.length > 0) {
+      await tx.activity.updateMany({
+        where: { id: { in: enquiryActivityIds } },
+        data: { leadId: lead.id, enquiryId: null },
+      });
+    }
+
+    // 6. Create conversion activity on the lead
     await tx.activity.create({
       data: {
         type: "NOTE",
@@ -726,15 +762,6 @@ export async function convertToClientAndLead(
         leadId: lead.id,
         clientId: client.id,
         userId: session.user.id,
-      },
-    });
-
-    // 4. Update Enquiry status
-    await tx.enquiry.update({
-      where: { id: enquiryId },
-      data: {
-        status: "CONVERTED_TO_CLIENT",
-        convertedClientId: client.id,
       },
     });
 

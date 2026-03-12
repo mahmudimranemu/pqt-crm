@@ -40,13 +40,8 @@ interface UpdateLeadData extends Partial<CreateLeadData> {
 }
 
 async function generateLeadNumber(): Promise<string> {
-  const today = new Date();
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
-  const prefix = `PQT-L-${dateStr}`;
-  const count = await prisma.lead.count({
-    where: { leadNumber: { startsWith: prefix } },
-  });
-  return `${prefix}-${String(count + 1).padStart(4, "0")}`;
+  const count = await prisma.lead.count();
+  return `PQT-L-${String(count + 1).padStart(4, "0")}`;
 }
 
 export async function getLeads(params?: {
@@ -78,7 +73,7 @@ export async function getLeads(params?: {
     stage,
     ownerId,
     page = 1,
-    limit = 50,
+    limit = 10,
     tab,
     tag,
     budgetRange,

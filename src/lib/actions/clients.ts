@@ -49,7 +49,7 @@ export async function getClients(params?: {
     agentId,
     source,
     page = 1,
-    limit = 25,
+    limit = 10,
   } = params || {};
   const skip = (page - 1) * limit;
 

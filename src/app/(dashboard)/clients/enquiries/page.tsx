@@ -135,6 +135,7 @@ interface PageProps {
     nextCallDate?: string;
     clientEmail?: string;
     clientId?: string;
+    pageSize?: string;
   }>;
 }
 
@@ -148,6 +149,7 @@ async function EnquiriesTableWrapper({
   pools: { tag: string; name: string }[];
 }) {
   const params = await searchParams;
+  const pageSize = params.pageSize ? parseInt(params.pageSize) : 10;
   const [
     { enquiries, total, pages, currentPage, futureCallCount },
     agents,
@@ -158,6 +160,7 @@ async function EnquiriesTableWrapper({
       source: params.source,
       agentId: params.consultant || params.agent,
       page: params.page ? parseInt(params.page) : 1,
+      limit: pageSize,
       tab: params.tab || "all",
       tag: params.tag,
       search: params.search,
@@ -198,6 +201,7 @@ async function EnquiriesTableWrapper({
       total={total}
       pages={pages}
       currentPage={currentPage}
+      pageSize={pageSize}
       userRole={userRole}
     />
   );

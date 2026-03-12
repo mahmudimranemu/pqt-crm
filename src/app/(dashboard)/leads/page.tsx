@@ -146,6 +146,7 @@ interface PageProps {
     nextCallDate?: string;
     clientEmail?: string;
     clientId?: string;
+    pageSize?: string;
   }>;
 }
 
@@ -388,10 +389,12 @@ async function LeadsTableWrapper({
   userRole: string;
 }) {
   const params = await searchParams;
+  const pageSize = params.pageSize ? parseInt(params.pageSize) : 10;
   const { leads, total, pages, currentPage } = await getLeads({
     search: params.search,
     stage: params.stage,
     page: params.page ? parseInt(params.page) : 1,
+    limit: pageSize,
     tab: params.tab || "all",
     tag: params.tag,
     budgetRange: params.budgetRange,
@@ -431,6 +434,7 @@ async function LeadsTableWrapper({
       total={total}
       pages={pages}
       currentPage={currentPage}
+      pageSize={pageSize}
       userRole={userRole}
     />
   );

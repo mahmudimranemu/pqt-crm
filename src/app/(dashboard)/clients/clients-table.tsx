@@ -105,6 +105,7 @@ interface ClientsTableContentProps {
   total: number;
   pages: number;
   currentPage: number;
+  pageSize?: number;
   searchParams: { search?: string; status?: string; agent?: string; source?: string };
   userRole: string;
 }
@@ -114,6 +115,7 @@ export function ClientsTableContent({
   total,
   pages,
   currentPage,
+  pageSize = 10,
   searchParams,
   userRole,
 }: ClientsTableContentProps) {
@@ -293,18 +295,35 @@ export function ClientsTableContent({
 
       {/* Pagination */}
       <div className="flex items-center justify-between px-2 py-4 border-t">
-        <p className="text-sm text-muted-foreground">
-          Showing{" "}
-          <span className="font-medium text-gray-900">
-            {(currentPage - 1) * 25 + 1}
-          </span>{" "}
-          to{" "}
-          <span className="font-medium text-gray-900">
-            {Math.min(currentPage * 25, total)}
-          </span>{" "}
-          of{" "}
-          <span className="font-medium text-gray-900">{total}</span> clients
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            Showing{" "}
+            <span className="font-medium text-gray-900">
+              {(currentPage - 1) * pageSize + 1}
+            </span>{" "}
+            to{" "}
+            <span className="font-medium text-gray-900">
+              {Math.min(currentPage * pageSize, total)}
+            </span>{" "}
+            of{" "}
+            <span className="font-medium text-gray-900">{total}</span> clients
+          </p>
+          <select
+            className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 cursor-pointer"
+            value={pageSize}
+            onChange={(e) => {
+              const params = new URLSearchParams(window.location.search);
+              params.set("pageSize", e.target.value);
+              params.delete("page");
+              router.push(`/clients?${params.toString()}`);
+            }}
+          >
+            <option value="10">10 / page</option>
+            <option value="25">25 / page</option>
+            <option value="50">50 / page</option>
+            <option value="100">100 / page</option>
+          </select>
+        </div>
         {pages > 1 && (
           <div className="flex items-center gap-1">
             <Link href={buildPageUrl(1, searchParams)}>

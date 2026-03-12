@@ -17,6 +17,7 @@ interface PageProps {
     agent?: string;
     source?: LeadSource;
     page?: string;
+    pageSize?: string;
   }>;
 }
 
@@ -28,12 +29,14 @@ async function ClientsTableWrapper({
   userRole: string;
 }) {
   const params = await searchParams;
+  const pageSize = params.pageSize ? parseInt(params.pageSize) : 10;
   const { clients, total, pages, currentPage } = await getClients({
     search: params.search,
     status: params.status,
     agentId: params.agent,
     source: params.source,
     page: params.page ? parseInt(params.page) : 1,
+    limit: pageSize,
   });
 
   return (
@@ -42,6 +45,7 @@ async function ClientsTableWrapper({
       total={total}
       pages={pages}
       currentPage={currentPage}
+      pageSize={pageSize}
       searchParams={{
         search: params.search,
         status: params.status,
