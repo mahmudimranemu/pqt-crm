@@ -269,13 +269,8 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Auto-assign
-        try {
-          const { autoAssignEnquiry } = await import("@/lib/lead-routing");
-          await autoAssignEnquiry(enquiry.id);
-        } catch {
-          // Non-critical
-        }
+        // Website enquiries stay Unassigned with status NEW
+        // They will be manually assigned by admins from the CRM
 
         results.push({
           id: submission.id,
