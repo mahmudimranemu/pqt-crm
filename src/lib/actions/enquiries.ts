@@ -33,6 +33,7 @@ export async function getEnquiries(params?: {
   nextCallDate?: string;
   clientEmail?: string;
   clientId?: string;
+  priority?: string;
 }) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
@@ -56,6 +57,7 @@ export async function getEnquiries(params?: {
     nextCallDate,
     clientEmail,
     clientId,
+    priority,
   } = params || {};
   const skip = (page - 1) * limit;
 
@@ -71,6 +73,7 @@ export async function getEnquiries(params?: {
   if (segment) where.segment = segment;
   if (budget) where.budget = { contains: budget, mode: "insensitive" };
   if (country) where.country = { contains: country, mode: "insensitive" };
+  if (priority) where.priority = priority;
   if (clientId) where.id = clientId;
 
   if (agentId === "unassigned") {

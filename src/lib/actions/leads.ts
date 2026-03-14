@@ -64,6 +64,7 @@ export async function getLeads(params?: {
   nextCallDate?: string;
   clientEmail?: string;
   clientId?: string;
+  priority?: string;
 }) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
@@ -87,6 +88,7 @@ export async function getLeads(params?: {
     nextCallDate,
     clientEmail,
     clientId,
+    priority,
   } = params || {};
   const where: any = {};
 
@@ -101,6 +103,7 @@ export async function getLeads(params?: {
   if (budgetRange) where.budgetRange = budgetRange;
   if (source) where.source = source;
   if (segment) where.segment = segment;
+  if (priority) where.priority = priority;
 
   if (search) {
     where.AND = [

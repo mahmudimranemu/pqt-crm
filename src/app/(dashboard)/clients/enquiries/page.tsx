@@ -16,6 +16,7 @@ import { EnquiryKanban } from "./enquiry-kanban";
 import { AddEnquiryDialog } from "./add-enquiry-dialog";
 import { ImportLeads } from "./import-leads";
 import { FilterBar } from "@/components/shared/filter-bar";
+import { PriorityFilter } from "@/components/shared/priority-filter";
 import type { EnquiryStatus, EnquirySource } from "@prisma/client";
 
 const TAGS = [
@@ -135,6 +136,7 @@ interface PageProps {
     nextCallDate?: string;
     clientEmail?: string;
     clientId?: string;
+    priority?: string;
     pageSize?: string;
   }>;
 }
@@ -174,6 +176,7 @@ async function EnquiriesTableWrapper({
       nextCallDate: params.nextCallDate,
       clientEmail: params.clientEmail,
       clientId: params.clientId,
+      priority: params.priority,
     }),
     getAgents(),
     getActiveProperties(),
@@ -256,6 +259,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
     if (params.nextCallDate) base.nextCallDate = params.nextCallDate;
     if (params.clientEmail) base.clientEmail = params.clientEmail;
     if (params.clientId) base.clientId = params.clientId;
+    if (params.priority) base.priority = params.priority;
     const merged = { ...base, ...overrides };
     // Remove undefined/empty values
     const filtered = Object.fromEntries(
@@ -338,7 +342,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
       <FilterBar
         selects={ENQUIRY_FILTER_SELECTS}
         textInputs={ENQUIRY_FILTER_INPUTS}
-        preserveParams={["tab", "view", "search", "consultant"]}
+        preserveParams={["tab", "view", "search", "consultant", "priority"]}
       />
 
       {/* Consultant Filter - SUPER_ADMIN only */}
@@ -391,35 +395,38 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* Tab Navigation */}
-      <div className="flex items-center gap-1 overflow-x-auto">
-        {TABS.map((tab) => (
-          <Link
-            key={tab.key}
-            href={buildUrl({
-              tab: tab.key === "all" ? undefined : tab.key,
-              page: undefined,
-              tag: activeTag || undefined,
-            })}
-            className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? "bg-[#dc2626] text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {tab.label}
-            {tab.key === "future" && futureCallCount > 0 && (
-              <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">
-                {futureCallCount}
-              </span>
-            )}
-            {tab.key === "previous" && previousCallCount > 0 && (
-              <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">
-                {previousCallCount}
-              </span>
-            )}
-          </Link>
-        ))}
+      {/* Tab Navigation + Priority Filter */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {TABS.map((tab) => (
+            <Link
+              key={tab.key}
+              href={buildUrl({
+                tab: tab.key === "all" ? undefined : tab.key,
+                page: undefined,
+                tag: activeTag || undefined,
+              })}
+              className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? "bg-[#dc2626] text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {tab.label}
+              {tab.key === "future" && futureCallCount > 0 && (
+                <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">
+                  {futureCallCount}
+                </span>
+              )}
+              {tab.key === "previous" && previousCallCount > 0 && (
+                <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">
+                  {previousCallCount}
+                </span>
+              )}
+            </Link>
+          ))}
+        </div>
+        <PriorityFilter />
       </div>
 
       {/* Content - Board or Table */}

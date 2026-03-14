@@ -24,6 +24,7 @@ import {
 import { LeadKanban } from "./lead-kanban";
 import { LeadsTable } from "./leads-table";
 import { FilterBar } from "@/components/shared/filter-bar";
+import { PriorityFilter } from "@/components/shared/priority-filter";
 import type { LeadStage, BudgetRange, LeadSource } from "@prisma/client";
 
 const TAGS = [
@@ -146,6 +147,7 @@ interface PageProps {
     nextCallDate?: string;
     clientEmail?: string;
     clientId?: string;
+    priority?: string;
     pageSize?: string;
   }>;
 }
@@ -214,6 +216,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
     if (params.nextCallDate) base.nextCallDate = params.nextCallDate;
     if (params.clientEmail) base.clientEmail = params.clientEmail;
     if (params.clientId) base.clientId = params.clientId;
+    if (params.priority) base.priority = params.priority;
     const merged = { ...base, ...overrides };
     const filtered = Object.fromEntries(
       Object.entries(merged).filter(([, v]) => v),
@@ -329,28 +332,31 @@ export default async function LeadsPage({ searchParams }: PageProps) {
       <FilterBar
         selects={LEAD_FILTER_SELECTS}
         textInputs={LEAD_FILTER_INPUTS}
-        preserveParams={["tab", "view", "search"]}
+        preserveParams={["tab", "view", "search", "priority"]}
       />
 
-      {/* Tab Navigation */}
-      <div className="flex items-center gap-1 overflow-x-auto">
-        {TABS.map((tab) => (
-          <Link
-            key={tab.key}
-            href={buildUrl({
-              tab: tab.key === "all" ? undefined : tab.key,
-              page: undefined,
-              tag: activeTag || undefined,
-            })}
-            className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? "bg-[#dc2626] text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {tab.label}
-          </Link>
-        ))}
+      {/* Tab Navigation + Priority Filter */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {TABS.map((tab) => (
+            <Link
+              key={tab.key}
+              href={buildUrl({
+                tab: tab.key === "all" ? undefined : tab.key,
+                page: undefined,
+                tag: activeTag || undefined,
+              })}
+              className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? "bg-[#dc2626] text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {tab.label}
+            </Link>
+          ))}
+        </div>
+        <PriorityFilter />
       </div>
 
       {/* Content - Board or Table */}
@@ -408,6 +414,7 @@ async function LeadsTableWrapper({
     nextCallDate: params.nextCallDate,
     clientEmail: params.clientEmail,
     clientId: params.clientId,
+    priority: params.priority,
   });
 
   const serialized = leads.map((l) => ({
