@@ -95,6 +95,8 @@ export async function getLeads(params?: {
   // SALES_AGENT can only see their own leads
   if (session.user.role === "SALES_AGENT") {
     where.ownerId = session.user.id;
+  } else if (ownerId?.startsWith("POOL_")) {
+    where.tags = { has: ownerId };
   } else if (ownerId) {
     where.ownerId = ownerId;
   }
@@ -881,6 +883,50 @@ export async function deleteLeadNote(noteId: string) {
 
   await prisma.leadNote.delete({ where: { id: noteId } });
   revalidatePath(`/leads/${note.leadId}`);
+}
+
+export async function getLeadCountsByConsultant() {
+  const session = (await auth()) as ExtendedSession | null;
+  if (!session?.user) throw new Error("Unauthorized");
+
+  const baseWhere: any = {};
+  if (session.user.role !== "SUPER_ADMIN") {
+    baseWhere.ownerId = session.user.id;
+  }
+
+  // Fetch active pools dynamically
+  const activePools = await prisma.pool.findMany({
+    where: { isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { tag: true, name: true },
+  });
+
+  const poolCountResults = await Promise.all(
+    activePools.map((pool) =>
+      prisma.lead.count({ where: { ...baseWhere, tags: { has: pool.tag } } }),
+    ),
+  );
+
+  const agentCounts = await prisma.lead.groupBy({
+    by: ["ownerId"],
+    where: baseWhere,
+    _count: true,
+  });
+
+  const byAgent: Record<string, number> = {};
+  for (const row of agentCounts) {
+    if (row.ownerId) {
+      byAgent[row.ownerId] = row._count;
+    }
+  }
+
+  const poolCounts = activePools.map((pool, i) => ({
+    tag: pool.tag,
+    name: pool.name,
+    count: poolCountResults[i],
+  }));
+
+  return { poolCounts, byAgent };
 }
 
 export async function getAgentsForLeads() {

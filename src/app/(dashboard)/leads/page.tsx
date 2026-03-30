@@ -6,6 +6,7 @@ import {
   getLeadsByStage,
   getLeadStats,
   getAgentsForLeads,
+  getLeadCountsByConsultant,
 } from "@/lib/actions/leads";
 import { getPoolsForUser } from "@/lib/actions/crm-settings";
 import { Card, CardContent } from "@/components/ui/card";
@@ -149,6 +150,7 @@ interface PageProps {
     clientId?: string;
     priority?: string;
     pageSize?: string;
+    consultant?: string;
   }>;
 }
 
@@ -160,11 +162,14 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   const activeTab = params.tab || "all";
   const activeTag = params.tag || "";
   const activeView = params.view || "table";
+  const activeConsultant = params.consultant || "";
+  const userRole = session.user.role;
 
-  const [stats, agents, pools] = await Promise.all([
+  const [stats, agents, pools, consultantCounts] = await Promise.all([
     getLeadStats(),
     getAgentsForLeads(),
     session?.user ? getPoolsForUser(session.user.id) : Promise.resolve([]),
+    getLeadCountsByConsultant(),
   ]);
 
   const statCards = [
@@ -203,6 +208,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
     if (params.search) base.search = params.search;
     if (params.view && params.view !== "table") base.view = params.view;
     if (params.stage) base.stage = params.stage;
+    if (params.consultant) base.consultant = params.consultant;
     // Preserve filter bar params
     if (params.tag) base.tag = params.tag;
     if (params.budgetRange) base.budgetRange = params.budgetRange;
@@ -316,13 +322,16 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         {activeView !== "table" && (
           <input type="hidden" name="view" value={activeView} />
         )}
+        {activeConsultant && (
+          <input type="hidden" name="consultant" value={activeConsultant} />
+        )}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             name="search"
             defaultValue={params.search || ""}
-            placeholder="Search by name, lead number, email, or phone..."
+            placeholder="Search by ref ID, name, lead number, email, or phone..."
             className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm focus:border-[#dc2626] focus:outline-none focus:ring-1 focus:ring-[#dc2626]"
           />
         </div>
@@ -332,8 +341,57 @@ export default async function LeadsPage({ searchParams }: PageProps) {
       <FilterBar
         selects={LEAD_FILTER_SELECTS}
         textInputs={LEAD_FILTER_INPUTS}
-        preserveParams={["tab", "view", "search", "priority"]}
+        preserveParams={["tab", "view", "search", "priority", "consultant"]}
       />
+
+      {/* Consultant Filter - SUPER_ADMIN only */}
+      {userRole === "SUPER_ADMIN" && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-gray-500">Consultant:</span>
+          {[
+            { key: "", label: "All", count: 0 },
+            ...consultantCounts.poolCounts.map((p) => ({
+              key: p.tag,
+              label: p.name,
+              count: p.count,
+            })),
+            ...agents.map((a) => ({
+              key: a.id,
+              label: `${a.firstName} ${a.lastName}`,
+              count: consultantCounts.byAgent[a.id] || 0,
+            })),
+          ].map((item) => (
+            <Link
+              key={item.key || "all"}
+              href={buildUrl({
+                consultant: item.key || undefined,
+                tab: activeTab !== "all" ? activeTab : undefined,
+                tag: activeTag || undefined,
+                page: undefined,
+              })}
+            >
+              <button
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  activeConsultant === item.key
+                    ? "border-[#dc2626] bg-[#dc2626] text-white"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {item.label}
+                {item.count > 0 && (
+                  <span className={`ml-1 ${
+                    activeConsultant === item.key
+                      ? "text-white/80"
+                      : "text-gray-400"
+                  }`}>
+                    ({item.count})
+                  </span>
+                )}
+              </button>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Tab Navigation + Priority Filter */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -399,6 +457,7 @@ async function LeadsTableWrapper({
   const { leads, total, pages, currentPage } = await getLeads({
     search: params.search,
     stage: params.stage,
+    ownerId: params.consultant || undefined,
     page: params.page ? parseInt(params.page) : 1,
     limit: pageSize,
     tab: params.tab || "all",
