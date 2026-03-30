@@ -46,6 +46,7 @@ type LeadStageKey = (typeof STAGES)[number]["key"];
 
 interface LeadCard {
   id: string;
+  refId: string | null;
   leadNumber: string;
   title: string;
   stage: string;
@@ -221,6 +222,9 @@ export function LeadKanban({ initialData }: LeadKanbanProps) {
                         {lead.title}
                       </Link>
                       <p className="mt-0.5 text-xs text-gray-500">
+                        {lead.refId && (
+                          <span className="font-mono font-semibold text-[#dc2626] mr-1.5">{lead.refId}</span>
+                        )}
                         {lead.leadNumber}
                       </p>
 

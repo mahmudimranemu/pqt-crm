@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { notifySuperAdmins } from "@/lib/notifications";
+import { generateRefId } from "@/lib/ref-id";
 
 /**
  * Sync form submissions from Payload CMS (propertyquestturkey.com).
@@ -252,8 +253,10 @@ export async function POST(request: NextRequest) {
         }
 
         // Create the enquiry
+        const refId = await generateRefId();
         const enquiry = await prisma.enquiry.create({
           data: {
+            refId,
             firstName: enquiryData.firstName,
             lastName: enquiryData.lastName || "-",
             email: enquiryData.email,

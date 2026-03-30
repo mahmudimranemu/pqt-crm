@@ -386,6 +386,7 @@ model Property {
 
 model Enquiry {
   id                String        @id @default(cuid())
+  refId             String?       @unique
   firstName         String
   lastName          String
   email             String
@@ -816,6 +817,7 @@ enum ActivityType {
 
 model Lead {
   id               String       @id @default(cuid())
+  refId            String?      @unique
   leadNumber       String       @unique @default(cuid())
   title            String
   description      String?      @db.Text

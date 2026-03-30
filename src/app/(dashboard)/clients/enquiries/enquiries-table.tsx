@@ -73,6 +73,7 @@ interface Property {
 
 interface EnquiryRow {
   id: string;
+  refId: string | null;
   firstName: string;
   lastName: string;
   email: string;
@@ -449,7 +450,7 @@ export function EnquiriesTable({
 
       {/* Column Headers */}
       <div className="grid border-b border-gray-200 bg-gray-50 text-[10px] font-semibold uppercase tracking-wider text-gray-500"
-        style={{ gridTemplateColumns: canDelete ? "40px 40px 185px 1fr 205px 180px" : "40px 185px 1fr 205px 180px" }}
+        style={{ gridTemplateColumns: canDelete ? "40px 80px 185px 1fr 205px 180px" : "80px 185px 1fr 205px 180px" }}
       >
         {canDelete && (
           <div className="flex items-center justify-center px-2 py-2.5">
@@ -459,7 +460,7 @@ export function EnquiriesTable({
             />
           </div>
         )}
-        <div className="px-2 py-2.5 border-l border-gray-200">ID</div>
+        <div className="px-2 py-2.5 border-l border-gray-200">Ref ID</div>
         <div className="px-3 py-2.5 border-l border-gray-200">Info</div>
         <div className="px-3 py-2.5 border-l border-gray-200">Client Details</div>
         <div className="px-3 py-2.5 border-l border-gray-200">Status & Dates</div>
@@ -468,8 +469,7 @@ export function EnquiriesTable({
 
       {/* Rows */}
       <div className="divide-y divide-gray-100">
-        {enquiries.map((enquiry, index) => {
-          const refId = `${10000 + (currentPage - 1) * 25 + index + 1}`;
+        {enquiries.map((enquiry) => {
           const nextCall = localNextCallOverrides[enquiry.id] !== undefined
             ? localNextCallOverrides[enquiry.id]
             : toDateInput(enquiry.nextCallDate);
@@ -479,7 +479,7 @@ export function EnquiriesTable({
             <div
               key={enquiry.id}
               className={`grid hover:bg-gray-50/60 transition-colors ${isPastCall ? "bg-amber-50/40" : "bg-white"}`}
-              style={{ gridTemplateColumns: canDelete ? "40px 40px 185px 1fr 205px 180px" : "40px 185px 1fr 205px 180px" }}
+              style={{ gridTemplateColumns: canDelete ? "40px 80px 185px 1fr 205px 180px" : "80px 185px 1fr 205px 180px" }}
             >
               {/* Checkbox */}
               {canDelete && (
@@ -491,9 +491,9 @@ export function EnquiriesTable({
                 </div>
               )}
 
-              {/* ID */}
+              {/* Ref ID */}
               <div className="flex flex-col items-center justify-start gap-1 px-2 pt-3 border-l border-gray-100">
-                <span className="text-[11px] font-bold text-gray-400">{refId}</span>
+                <span className="text-[10px] font-mono font-bold text-[#dc2626]">{enquiry.refId || "—"}</span>
                 {enquiry.convertedClientId && (
                   <span className="rounded-full bg-green-100 px-1 py-0.5 text-[8px] font-medium text-green-700">CV</span>
                 )}

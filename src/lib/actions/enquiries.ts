@@ -12,6 +12,7 @@ import type {
 } from "@prisma/client";
 import { auditLog } from "@/lib/audit";
 import { notify, notifySuperAdmins, notifyUserAndAdmins } from "@/lib/notifications";
+import { generateRefId } from "@/lib/ref-id";
 
 export async function getEnquiries(params?: {
   status?: EnquiryStatus;
@@ -177,6 +178,7 @@ export async function getEnquiries(params?: {
       ...(where.AND || []),
       {
         OR: [
+          { refId: { contains: search, mode: "insensitive" } },
           { firstName: { contains: search, mode: "insensitive" } },
           { lastName: { contains: search, mode: "insensitive" } },
           { email: { contains: search, mode: "insensitive" } },
@@ -412,8 +414,10 @@ export async function createEnquiry(data: CreateEnquiryData) {
     }
   }
 
+  const refId = await generateRefId();
   const enquiry = await prisma.enquiry.create({
     data: {
+      refId,
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email,
@@ -506,7 +510,12 @@ export async function bulkCreateEnquiries(
   const validSegments = ["Buyer", "Investor", "Renter", "Other"];
   const validSnooze = ["Active", "1 Day", "3 Days", "1 Week", "1 Month"];
 
-  const data = rows.map((row) => ({
+  // Generate starting refId number
+  const baseRefId = await generateRefId();
+  const baseNum = parseInt(baseRefId.replace("PQT-", ""), 10);
+
+  const data = rows.map((row, index) => ({
+    refId: `PQT-${String(baseNum + index).padStart(4, "0")}`,
     firstName: row.firstName.trim(),
     lastName: row.lastName.trim(),
     email: row.email.trim(),
@@ -712,6 +721,7 @@ export async function convertToClientAndLead(
     const lead = await tx.lead.create({
       data: {
         id: enquiryId,
+        refId: enquiry.refId,
         leadNumber,
         title: data.leadTitle,
         description: data.description || enquiry.message || undefined,
@@ -1393,8 +1403,10 @@ export async function syncWebsiteSubmissions(): Promise<{
       }
 
       // Create enquiry
+      const refId = await generateRefId();
       const enquiry = await prisma.enquiry.create({
         data: {
+          refId,
           firstName,
           lastName: lastName || "-",
           email,

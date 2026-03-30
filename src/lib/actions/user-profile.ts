@@ -174,6 +174,7 @@ export async function getUserEnquiries(userId: string, page = 1) {
       where: { assignedAgentId: userId },
       select: {
         id: true,
+        refId: true,
         firstName: true,
         lastName: true,
         email: true,

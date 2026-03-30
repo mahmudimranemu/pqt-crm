@@ -99,6 +99,9 @@ export default async function LeadDetailPage({
               </Badge>
             </div>
             <p className="text-sm text-gray-500">
+              {lead.refId && (
+                <span className="font-mono font-semibold text-[#dc2626] mr-2">{lead.refId}</span>
+              )}
               {lead.leadNumber}
               {lead.owner && (
                 <>

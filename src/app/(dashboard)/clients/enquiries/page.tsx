@@ -332,7 +332,7 @@ export default async function EnquiriesPage({ searchParams }: PageProps) {
             type="text"
             name="search"
             defaultValue={params.search || ""}
-            placeholder="Search by name, email, or phone..."
+            placeholder="Search by ref ID, name, email, or phone..."
             className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm focus:border-[#dc2626] focus:outline-none focus:ring-1 focus:ring-[#dc2626]"
           />
         </div>

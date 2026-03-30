@@ -83,6 +83,9 @@ export async function EnquiriesTab({ userId, page, slug }: EnquiriesTabProps) {
                         href={`/clients/enquiries`}
                         className="text-sm font-medium text-gray-900 hover:text-[#dc2626]"
                       >
+                        {enquiry.refId && (
+                          <span className="font-mono text-xs font-semibold text-[#dc2626] mr-1.5">{enquiry.refId}</span>
+                        )}
                         {enquiry.firstName} {enquiry.lastName}
                       </Link>
                     </TableCell>

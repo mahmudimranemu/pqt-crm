@@ -110,6 +110,7 @@ export async function getLeads(params?: {
       ...(where.AND || []),
       {
         OR: [
+          { refId: { contains: search, mode: "insensitive" } },
           { title: { contains: search, mode: "insensitive" } },
           { leadNumber: { contains: search, mode: "insensitive" } },
           { client: { firstName: { contains: search, mode: "insensitive" } } },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { notifySuperAdmins } from "@/lib/notifications";
+import { generateRefId } from "@/lib/ref-id";
 
 /**
  * Webhook endpoint for Payload CMS form submissions.
@@ -270,8 +271,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the enquiry
+    const refId = await generateRefId();
     const enquiry = await prisma.enquiry.create({
       data: {
+        refId,
         firstName,
         lastName: lastName || "-",
         email,

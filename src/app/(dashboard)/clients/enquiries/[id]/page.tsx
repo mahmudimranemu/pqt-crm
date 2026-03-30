@@ -93,6 +93,9 @@ export default async function EnquiryDetailPage({ params }: PageProps) {
               <h1 className="text-2xl font-bold text-gray-900">
                 {enquiry.firstName} {enquiry.lastName}
               </h1>
+              {enquiry.refId && (
+                <span className="font-mono text-sm font-semibold text-[#dc2626]">{enquiry.refId}</span>
+              )}
               <Badge variant={statusColors[enquiry.status]}>
                 {statusLabels[enquiry.status]}
               </Badge>

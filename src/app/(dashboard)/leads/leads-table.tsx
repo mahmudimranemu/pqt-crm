@@ -109,6 +109,7 @@ function formatRelativeTime(dateStr: string): string {
 
 interface SerializedLead {
   id: string;
+  refId: string | null;
   leadNumber: string;
   title: string;
   stage: string;
@@ -214,6 +215,7 @@ export function LeadsTable({
 
   function handleExportCSV() {
     const csv = generateCSV(leads as unknown as Record<string, unknown>[], [
+      { key: "refId", header: "Ref ID" },
       { key: "leadNumber", header: "Lead #" },
       { key: "client.firstName", header: "First Name" },
       { key: "client.lastName", header: "Last Name" },
@@ -274,7 +276,7 @@ export function LeadsTable({
             />
           </div>
         )}
-        <div className="px-2 py-2.5">Lead #</div>
+        <div className="px-2 py-2.5">Ref ID</div>
         <div className="px-3 py-2.5 border-l border-gray-200">Client Info</div>
         <div className="px-3 py-2.5 border-l border-gray-200">Lead Details</div>
         <div className="px-3 py-2.5 border-l border-gray-200">Stage & Dates</div>
@@ -310,9 +312,9 @@ export function LeadsTable({
                 </div>
               )}
 
-              {/* Lead Number */}
+              {/* Ref ID */}
               <div className="flex flex-col gap-1.5 px-2 py-3">
-                <span className="text-[10px] font-mono font-bold text-gray-500 leading-none">{lead.leadNumber}</span>
+                <span className="text-[10px] font-mono font-bold text-[#dc2626] leading-none">{lead.refId || "—"}</span>
                 {lead.estimatedValue && (
                   <span className="text-[10px] font-semibold text-emerald-600">
                     ${lead.estimatedValue.toLocaleString()}
