@@ -163,7 +163,7 @@ const navSections: NavSection[] = [
         title: "Chat",
         href: "/chat",
         icon: MessageSquare,
-        roles: ["SALES_AGENT"],
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "SALES_AGENT"],
       },
       {
         title: "Activity",
