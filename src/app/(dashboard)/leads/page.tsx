@@ -360,7 +360,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
               label: `${a.firstName} ${a.lastName}`,
               count: consultantCounts.byAgent[a.id] || 0,
             })),
-          ].map((item) => (
+          ].filter((item) => item.key === "" || item.count > 0).map((item) => (
             <Link
               key={item.key || "all"}
               href={buildUrl({

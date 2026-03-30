@@ -1075,6 +1075,15 @@ export function EnquiriesTable({
               <Select value={bulkAssignAgentId} onValueChange={setBulkAssignAgentId}>
                 <SelectTrigger><SelectValue placeholder="Select consultant" /></SelectTrigger>
                 <SelectContent>
+                  {pools.length > 0 && (
+                    <>
+                      {pools.map((pool) => (
+                        <SelectItem key={pool.tag} value={pool.tag}>
+                          {pool.name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
                   {agents.map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.firstName} {agent.lastName}

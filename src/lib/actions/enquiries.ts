@@ -548,22 +548,41 @@ export async function bulkAssignEnquiries(ids: string[], agentId: string) {
   if (!session?.user) throw new Error("Unauthorized");
   if (session.user.role !== "SUPER_ADMIN") throw new Error("Only Super Admin can bulk assign");
 
-  await prisma.enquiry.updateMany({
-    where: { id: { in: ids } },
-    data: {
-      assignedAgentId: agentId || null,
-      status: agentId ? "ASSIGNED" : "NEW",
-    },
-  });
+  const isPool = agentId?.startsWith("POOL_");
 
-  if (agentId && agentId !== session.user.id) {
-    await notify(
-      agentId,
-      "LEAD_ASSIGNED",
-      "Enquiries Assigned to You",
-      `${ids.length} enquiry(ies) have been assigned to you`,
-      `/clients/enquiries`,
-    );
+  if (isPool) {
+    // Assign to pool: add pool tag to each enquiry
+    const enquiries = await prisma.enquiry.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, tags: true },
+    });
+    for (const enquiry of enquiries) {
+      const tags = enquiry.tags.includes(agentId)
+        ? enquiry.tags
+        : [...enquiry.tags, agentId];
+      await prisma.enquiry.update({
+        where: { id: enquiry.id },
+        data: { tags },
+      });
+    }
+  } else {
+    await prisma.enquiry.updateMany({
+      where: { id: { in: ids } },
+      data: {
+        assignedAgentId: agentId || null,
+        status: agentId ? "ASSIGNED" : "NEW",
+      },
+    });
+
+    if (agentId && agentId !== session.user.id) {
+      await notify(
+        agentId,
+        "LEAD_ASSIGNED",
+        "Enquiries Assigned to You",
+        `${ids.length} enquiry(ies) have been assigned to you`,
+        `/clients/enquiries`,
+      );
+    }
   }
 
   revalidatePath("/clients/enquiries");
