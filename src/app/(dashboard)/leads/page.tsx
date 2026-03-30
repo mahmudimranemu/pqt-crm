@@ -165,11 +165,12 @@ export default async function LeadsPage({ searchParams }: PageProps) {
   const activeConsultant = params.consultant || "";
   const userRole = session.user.role;
 
-  const [stats, agents, pools, consultantCounts] = await Promise.all([
+  const [stats, agents, pools, consultantCounts, { futureCallCount, previousCallCount }] = await Promise.all([
     getLeadStats(),
     getAgentsForLeads(),
     session?.user ? getPoolsForUser(session.user.id) : Promise.resolve([]),
     getLeadCountsByConsultant(),
+    getLeads({ tab: "future", limit: 1 }),
   ]);
 
   const statCards = [
@@ -411,6 +412,16 @@ export default async function LeadsPage({ searchParams }: PageProps) {
               }`}
             >
               {tab.label}
+              {tab.key === "future" && futureCallCount > 0 && (
+                <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">
+                  {futureCallCount}
+                </span>
+              )}
+              {tab.key === "previous" && previousCallCount > 0 && (
+                <span className="ml-1.5 rounded-full bg-white/20 px-1.5 py-0.5 text-xs">
+                  {previousCallCount}
+                </span>
+              )}
             </Link>
           ))}
         </div>

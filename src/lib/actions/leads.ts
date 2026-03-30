@@ -225,7 +225,9 @@ export async function getLeads(params?: {
     where.tags = { has: tag };
   }
 
-  const [leads, total, futureCallCount] = await Promise.all([
+  const roleWhere = session.user.role === "SALES_AGENT" ? { ownerId: session.user.id } : {};
+
+  const [leads, total, futureCallCount, previousCallCount] = await Promise.all([
     prisma.lead.findMany({
       where,
       include: {
@@ -266,8 +268,17 @@ export async function getLeads(params?: {
     prisma.lead.count({ where }),
     prisma.lead.count({
       where: {
+        ...roleWhere,
         nextCallDate: {
           gt: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1),
+        },
+      },
+    }),
+    prisma.lead.count({
+      where: {
+        ...roleWhere,
+        nextCallDate: {
+          lt: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
         },
       },
     }),
@@ -277,6 +288,7 @@ export async function getLeads(params?: {
     leads,
     total,
     futureCallCount,
+    previousCallCount,
     pages: Math.ceil(total / limit),
     currentPage: page,
   };

@@ -428,6 +428,7 @@ export async function createEnquiry(data: CreateEnquiryData) {
       country: data.country || null,
       segment: data.segment || "Buyer",
       priority: data.priority || "Medium",
+      nextCallDate: new Date(),
       assignedAgentId: assignedAgentId,
       interestedPropertyRefs: data.interestedPropertyId ? [data.interestedPropertyId] : [],
       status: assignedAgentId ? "ASSIGNED" : "NEW",
@@ -531,7 +532,7 @@ export async function bulkCreateEnquiries(
     segment: row.segment?.trim() && validSegments.includes(row.segment.trim()) ? row.segment.trim() : "Buyer",
     leadStatus: row.leadStatus?.trim() || "New",
     priority: row.priority?.trim() && validPriorities.includes(row.priority.trim()) ? row.priority.trim() : "Medium",
-    nextCallDate: row.nextCallDate?.trim() ? new Date(row.nextCallDate.trim()) : null,
+    nextCallDate: row.nextCallDate?.trim() ? new Date(row.nextCallDate.trim()) : new Date(),
     snooze: row.snooze?.trim() && validSnooze.includes(row.snooze.trim()) ? row.snooze.trim() : "Active",
     assignedAgentId: session.user.id,
     status: "ASSIGNED" as const,
@@ -1438,6 +1439,7 @@ export async function syncWebsiteSubmissions(): Promise<{
           status: "NEW",
           segment: "Buyer",
           priority: "Medium",
+          nextCallDate: new Date(),
         },
       });
 

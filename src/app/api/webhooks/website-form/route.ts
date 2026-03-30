@@ -289,6 +289,7 @@ export async function POST(request: NextRequest) {
         status: "NEW",
         segment: "Buyer",
         priority: "Medium",
+        nextCallDate: new Date(),
       },
     });
 
