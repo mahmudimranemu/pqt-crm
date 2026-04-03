@@ -174,6 +174,8 @@ export async function createUser(data: {
   const user = await prisma.user.create({
     data: {
       ...data,
+      firstName: data.firstName.toUpperCase(),
+      lastName: data.lastName.toUpperCase(),
       password: hashedPassword,
     },
   });
@@ -258,6 +260,9 @@ export async function updateUser(
       oldEmail = currentUser.email;
     }
   }
+
+  if (data.firstName) data.firstName = data.firstName.toUpperCase();
+  if (data.lastName) data.lastName = data.lastName.toUpperCase();
 
   const user = await prisma.user.update({
     where: { id },

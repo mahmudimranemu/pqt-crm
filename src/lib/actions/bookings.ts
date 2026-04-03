@@ -482,7 +482,7 @@ export async function getBookingFormData() {
     prisma.user.findMany({
       where: {
         isActive: true,
-        role: { in: ["SALES_AGENT", "SALES_MANAGER"] },
+        role: { in: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER", "SALES_AGENT"] },
         ...(session.user.role !== "SUPER_ADMIN"
           ? { office: session.user.office }
           : {}),

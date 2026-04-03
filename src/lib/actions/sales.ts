@@ -386,5 +386,10 @@ export async function getSaleFormData() {
     }),
   ]);
 
-  return { clients, properties, agents, bookingsWithOffers };
+  const serializedProperties = properties.map((p) => ({
+    ...p,
+    priceFrom: p.priceFrom ? Number(p.priceFrom) : null,
+  }));
+
+  return { clients, properties: serializedProperties, agents, bookingsWithOffers };
 }
