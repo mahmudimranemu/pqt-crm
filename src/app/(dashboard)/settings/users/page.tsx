@@ -203,7 +203,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
       </div>
 
       {/* Tab Content */}
-      {activeTab === "users" && <UserManagementTab users={users} />}
+      {activeTab === "users" && <UserManagementTab users={users} userRole={session?.user?.role} />}
       {activeTab === "distribution" && <LeadDistributionTab users={users} />}
       {activeTab === "reallocation" && <ReallocationPool />}
       {activeTab === "performance" && <PerformanceTab />}
@@ -214,13 +214,13 @@ export default async function UsersPage({ searchParams }: PageProps) {
 }
 
 /* ========== USER MANAGEMENT TAB ========== */
-function UserManagementTab({ users }: { users: any[] }) {
+function UserManagementTab({ users, userRole }: { users: any[]; userRole?: string }) {
   return (
     <Card className="border border-gray-200">
       <div className="flex items-center justify-between border-b border-gray-100 p-5">
         <h2 className="text-lg font-semibold text-gray-900">User Management</h2>
         <div className="flex items-center gap-3">
-          <CreateUserDialog />
+          <CreateUserDialog userRole={userRole} />
         </div>
       </div>
       <CardContent className="p-0">
@@ -354,7 +354,7 @@ function UserManagementTab({ users }: { users: any[] }) {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <UserActions user={user} />
+                      <UserActions user={user} currentUserRole={userRole} />
                     </TableCell>
                   </TableRow>
                 );

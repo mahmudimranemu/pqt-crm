@@ -301,6 +301,9 @@ function PropertiesGridSkeleton() {
 }
 
 export default async function PropertiesPage({ searchParams }: PageProps) {
+  const allProperties = await fetchProperties();
+  const districts = [...new Set(allProperties.map((p) => p.district).filter(Boolean))].sort();
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -314,7 +317,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
       </div>
 
       {/* Filters */}
-      <PropertyFilters />
+      <PropertyFilters districts={districts} />
 
       {/* Properties Grid */}
       <Suspense fallback={<PropertiesGridSkeleton />}>

@@ -67,9 +67,10 @@ interface User {
 
 interface UserActionsProps {
   user: User;
+  currentUserRole?: string;
 }
 
-const roles: { value: UserRole; label: string }[] = [
+const allRoles: { value: UserRole; label: string }[] = [
   { value: "SUPER_ADMIN", label: "Super Admin" },
   { value: "ADMIN", label: "Admin" },
   { value: "SALES_MANAGER", label: "Senior Consultant" },
@@ -86,7 +87,13 @@ const offices: { value: Office; label: string }[] = [
   { value: "BANGLADESH", label: "Bangladesh" },
 ];
 
-export function UserActions({ user }: UserActionsProps) {
+export function UserActions({ user, currentUserRole = "SUPER_ADMIN" }: UserActionsProps) {
+  const isCurrentAdmin = currentUserRole === "ADMIN";
+  const adminAllowedRoles = ["ADMIN", "SALES_MANAGER", "SALES_AGENT"];
+  const canManageUser = currentUserRole === "SUPER_ADMIN" || (isCurrentAdmin && adminAllowedRoles.includes(user.role));
+  const roles = isCurrentAdmin
+    ? allRoles.filter((r) => adminAllowedRoles.includes(r.value))
+    : allRoles;
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -172,6 +179,8 @@ export function UserActions({ user }: UserActionsProps) {
     }
   };
 
+  if (!canManageUser) return null;
+
   return (
     <>
       <DropdownMenu>
@@ -215,7 +224,7 @@ export function UserActions({ user }: UserActionsProps) {
               )}
             </DropdownMenuItem>
           )}
-          {user.role !== "SUPER_ADMIN" && (
+          {currentUserRole === "SUPER_ADMIN" && user.role !== "SUPER_ADMIN" && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem

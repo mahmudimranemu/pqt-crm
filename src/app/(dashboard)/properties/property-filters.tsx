@@ -13,14 +13,6 @@ import {
 } from "@/components/ui/select";
 import { Search, X, Flag, LayoutGrid } from "lucide-react";
 
-const districtOptions = [
-  { value: "Büyükçekmece", label: "Büyükçekmece" },
-  { value: "Beylikdüzü", label: "Beylikdüzü" },
-  { value: "Kadikoy", label: "Kadikoy" },
-  { value: "Kağıthane", label: "Kağıthane" },
-  { value: "Taksim", label: "Taksim" },
-];
-
 const propertyTypeOptions = [
   { value: "Apartment", label: "Apartment" },
   { value: "Villa", label: "Villa" },
@@ -28,7 +20,7 @@ const propertyTypeOptions = [
   { value: "Commercial", label: "Commercial" },
 ];
 
-export function PropertyFilters() {
+export function PropertyFilters({ districts = [] }: { districts?: string[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -104,9 +96,9 @@ export function PropertyFilters() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All districts</SelectItem>
-            {districtOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
+            {districts.map((district) => (
+              <SelectItem key={district} value={district}>
+                {district}
               </SelectItem>
             ))}
           </SelectContent>

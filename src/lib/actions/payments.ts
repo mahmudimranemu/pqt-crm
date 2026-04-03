@@ -17,9 +17,7 @@ export async function getPayments(params?: {
   if (!session?.user) throw new Error("Unauthorized");
 
   const { dealId, clientId, status, page = 1, limit = 50 } = params || {};
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
 
   const where: any = {};
   if (dealId) where.dealId = dealId;

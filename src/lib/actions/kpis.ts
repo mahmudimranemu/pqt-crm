@@ -18,14 +18,8 @@ export async function getDailyKPIs(date?: Date) {
 
   const baseWhere: Record<string, unknown> = {};
 
-  if (session.user.role === "SALES_AGENT") {
+  if (session.user.role !== "SUPER_ADMIN") {
     baseWhere.agentId = session.user.id;
-  } else if (session.user.role !== "SUPER_ADMIN") {
-    const officeAgents = await prisma.user.findMany({
-      where: { office: session.user.office },
-      select: { id: true },
-    });
-    baseWhere.agentId = { in: officeAgents.map((a) => a.id) };
   }
 
   const [
@@ -116,14 +110,8 @@ export async function getMonthlyKPIs(year?: number, month?: number) {
 
   const baseWhere: Record<string, unknown> = {};
 
-  if (session.user.role === "SALES_AGENT") {
+  if (session.user.role !== "SUPER_ADMIN") {
     baseWhere.agentId = session.user.id;
-  } else if (session.user.role !== "SUPER_ADMIN") {
-    const officeAgents = await prisma.user.findMany({
-      where: { office: session.user.office },
-      select: { id: true },
-    });
-    baseWhere.agentId = { in: officeAgents.map((a) => a.id) };
   }
 
   // Get daily breakdown for chart
@@ -265,14 +253,8 @@ export async function getYearlyKPIs(year?: number) {
 
   const baseWhere: Record<string, unknown> = {};
 
-  if (session.user.role === "SALES_AGENT") {
+  if (session.user.role !== "SUPER_ADMIN") {
     baseWhere.agentId = session.user.id;
-  } else if (session.user.role !== "SUPER_ADMIN") {
-    const officeAgents = await prisma.user.findMany({
-      where: { office: session.user.office },
-      select: { id: true },
-    });
-    baseWhere.agentId = { in: officeAgents.map((a) => a.id) };
   }
 
   // Get monthly breakdown
@@ -422,7 +404,7 @@ export async function getAgentPerformance(
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  if (!["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(session.user.role)) {
+  if (session.user.role !== "SUPER_ADMIN") {
     throw new Error("Unauthorized");
   }
 

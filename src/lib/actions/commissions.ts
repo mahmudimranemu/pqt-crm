@@ -17,9 +17,7 @@ export async function getCommissions(params?: {
   if (!session?.user) throw new Error("Unauthorized");
 
   const { agentId, dealId, status, page = 1, limit = 50 } = params || {};
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
 
   const where: any = {};
   if (!viewAll) where.agentId = session.user.id;

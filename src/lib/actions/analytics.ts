@@ -7,7 +7,7 @@ export async function getConversionFunnel() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const isAgent = session.user.role === "SALES_AGENT";
+  const isAgent = session.user.role !== "SUPER_ADMIN";
   const userId = session.user.id;
 
   const [enquiries, leads, deals, wonDeals] = await Promise.all([
@@ -33,7 +33,7 @@ export async function getSourceBreakdown() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const isAgent = session.user.role === "SALES_AGENT";
+  const isAgent = session.user.role !== "SUPER_ADMIN";
 
   const sources = await prisma.lead.groupBy({
     by: ["source"],
@@ -52,7 +52,7 @@ export async function getWonVsLost() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const isAgent = session.user.role === "SALES_AGENT";
+  const isAgent = session.user.role !== "SUPER_ADMIN";
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -98,7 +98,7 @@ export async function getRevenueTrend() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const isAgent = session.user.role === "SALES_AGENT";
+  const isAgent = session.user.role !== "SUPER_ADMIN";
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 

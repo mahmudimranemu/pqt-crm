@@ -56,9 +56,7 @@ export async function getDeals(params?: {
   if (!session?.user) throw new Error("Unauthorized");
 
   const { search, stage, result, ownerId, page = 1, limit = 50 } = params || {};
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
 
   const where: any = {};
   if (!viewAll) where.ownerId = session.user.id;
@@ -108,9 +106,7 @@ export async function getDealsByStage() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   const where: any = { result: "PENDING" };
   if (!viewAll) where.ownerId = session.user.id;
 
@@ -179,9 +175,7 @@ export async function getDealById(id: string) {
 
   if (!deal) throw new Error("Deal not found");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   if (!viewAll && deal.ownerId !== session.user.id) {
     throw new Error("Access denied");
   }
@@ -367,9 +361,7 @@ export async function getDealStats() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   const where: any = viewAll ? {} : { ownerId: session.user.id };
 
   const [total, byStage, totalValue, wonDeals] = await Promise.all([

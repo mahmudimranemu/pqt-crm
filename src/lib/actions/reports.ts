@@ -8,9 +8,7 @@ export async function getPipelineReport() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   const ownerFilter: any = viewAll ? {} : { ownerId: session.user.id };
 
   const [byStage, totals, recentDeals] = await Promise.all([
@@ -82,9 +80,7 @@ export async function getConversionFunnel() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   const ownerFilter: any = viewAll ? {} : { ownerId: session.user.id };
 
   const [leadsByStage, totalLeads, totalDeals, wonDeals, lostLeads] =
@@ -141,9 +137,7 @@ export async function getRevenueReport() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   const ownerFilter: any = viewAll ? {} : { ownerId: session.user.id };
 
   const now = new Date();
@@ -228,9 +222,7 @@ export async function getSourceAnalysis() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   const ownerFilter: any = viewAll ? {} : { ownerId: session.user.id };
 
   const [bySource, byChannel, totalLeads] = await Promise.all([
@@ -285,9 +277,7 @@ export async function getCommissionBreakdown() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   const agentFilter: any = viewAll ? {} : { agentId: session.user.id };
 
   const [byStatus, byAgent, totals] = await Promise.all([
@@ -350,9 +340,7 @@ export async function getLostDealsAnalysis() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   const ownerFilter: any = viewAll ? {} : { ownerId: session.user.id };
 
   const [lostDeals, lostLeads, totalDeals, totalLeads] = await Promise.all([

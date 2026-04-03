@@ -225,7 +225,7 @@ export async function getEnquiries(params?: {
     prisma.enquiry.count({ where }),
     prisma.enquiry.count({
       where: {
-        ...(session.user.role === "SALES_AGENT"
+        ...(session.user.role !== "SUPER_ADMIN"
           ? {
               OR: [
                 { assignedAgentId: session.user.id },
@@ -238,7 +238,7 @@ export async function getEnquiries(params?: {
     }),
     prisma.enquiry.count({
       where: {
-        ...(session.user.role === "SALES_AGENT"
+        ...(session.user.role !== "SUPER_ADMIN"
           ? {
               OR: [
                 { assignedAgentId: session.user.id },
@@ -253,7 +253,7 @@ export async function getEnquiries(params?: {
     }),
     prisma.enquiry.count({
       where: {
-        ...(session.user.role === "SALES_AGENT"
+        ...(session.user.role !== "SUPER_ADMIN"
           ? {
               OR: [
                 { assignedAgentId: session.user.id },
@@ -371,9 +371,9 @@ export async function getEnquiry(id: string) {
     },
   });
 
-  // SALES_AGENT can only view enquiries assigned to them
+  // SUPER_ADMIN sees all, others can only view enquiries assigned to them
   if (
-    session.user.role === "SALES_AGENT" &&
+    session.user.role !== "SUPER_ADMIN" &&
     enquiry?.assignedAgentId &&
     enquiry.assignedAgentId !== session.user.id
   ) {

@@ -92,8 +92,8 @@ export async function getLeads(params?: {
   } = params || {};
   const where: any = {};
 
-  // SALES_AGENT can only see their own leads
-  if (session.user.role === "SALES_AGENT") {
+  // SUPER_ADMIN sees all, others see only their own leads
+  if (session.user.role !== "SUPER_ADMIN") {
     where.ownerId = session.user.id;
   } else if (ownerId?.startsWith("POOL_")) {
     where.tags = { has: ownerId };
@@ -225,7 +225,7 @@ export async function getLeads(params?: {
     where.tags = { has: tag };
   }
 
-  const roleWhere = session.user.role === "SALES_AGENT" ? { ownerId: session.user.id } : {};
+  const roleWhere = session.user.role !== "SUPER_ADMIN" ? { ownerId: session.user.id } : {};
 
   const [leads, total, futureCallCount, previousCallCount] = await Promise.all([
     prisma.lead.findMany({
@@ -300,8 +300,8 @@ export async function getLeadsByStage() {
 
   const where: any = {};
 
-  // SALES_AGENT can only see their own leads
-  if (session.user.role === "SALES_AGENT") {
+  // SUPER_ADMIN sees all, others see only their own leads
+  if (session.user.role !== "SUPER_ADMIN") {
     where.ownerId = session.user.id;
   }
 
@@ -377,8 +377,8 @@ export async function getLeadById(id: string) {
 
   if (!lead) throw new Error("Lead not found");
 
-  // SALES_AGENT can only view their own leads
-  if (session.user.role === "SALES_AGENT" && lead.ownerId !== session.user.id) {
+  // SUPER_ADMIN sees all, others can only view their own leads
+  if (session.user.role !== "SUPER_ADMIN" && lead.ownerId !== session.user.id) {
     throw new Error("Unauthorized");
   }
 
@@ -457,8 +457,8 @@ export async function updateLead(data: UpdateLeadData) {
 
   const { id, slaDeadline, ...rest } = data;
 
-  // SALES_AGENT can only update their own leads
-  if (session.user.role === "SALES_AGENT") {
+  // SUPER_ADMIN can update all, others can only update their own leads
+  if (session.user.role !== "SUPER_ADMIN") {
     const existing = await prisma.lead.findUnique({
       where: { id },
       select: { ownerId: true },
@@ -618,8 +618,8 @@ export async function updateLeadStage(id: string, stage: LeadStage) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  // SALES_AGENT can only update their own leads
-  if (session.user.role === "SALES_AGENT") {
+  // SUPER_ADMIN can update all, others can only update their own leads
+  if (session.user.role !== "SUPER_ADMIN") {
     const existing = await prisma.lead.findUnique({
       where: { id },
       select: { ownerId: true },
@@ -675,9 +675,7 @@ export async function getLeadStats() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   const where: any = viewAll ? {} : { ownerId: session.user.id };
 
   const [total, byStage, avgScore, recentLeads] = await Promise.all([
@@ -711,9 +709,7 @@ export async function getLeadAnalytics() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   const ownerFilter: any = viewAll ? {} : { ownerId: session.user.id };
 
   const now = new Date();

@@ -24,7 +24,7 @@ import { UserPlus } from "lucide-react";
 import { createUser } from "@/lib/actions/users";
 import type { UserRole, Office } from "@prisma/client";
 
-const roles: { value: UserRole; label: string }[] = [
+const allRoles: { value: UserRole; label: string }[] = [
   { value: "SUPER_ADMIN", label: "Super Admin" },
   { value: "ADMIN", label: "Admin" },
   { value: "SALES_MANAGER", label: "Senior Consultant" },
@@ -41,7 +41,10 @@ const offices: { value: Office; label: string }[] = [
   { value: "BANGLADESH", label: "Bangladesh Office" },
 ];
 
-export function CreateUserDialog() {
+export function CreateUserDialog({ userRole = "SUPER_ADMIN" }: { userRole?: string }) {
+  const roles = userRole === "ADMIN"
+    ? allRoles.filter((r) => ["ADMIN", "SALES_MANAGER", "SALES_AGENT"].includes(r.value))
+    : allRoles;
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

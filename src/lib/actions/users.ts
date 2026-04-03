@@ -50,9 +50,9 @@ export async function getUsers(params?: {
   if (role) where.role = role;
   if (office) where.office = office;
 
-  // Non-super admins can only see users in their office
-  if (session.user.role !== "SUPER_ADMIN") {
-    where.office = session.user.office;
+  // ADMIN can only see ADMIN, SALES_MANAGER, SALES_AGENT roles
+  if (session.user.role === "ADMIN") {
+    where.role = { in: ["ADMIN", "SALES_MANAGER", "SALES_AGENT"] };
   }
 
   const [users, total] = await Promise.all([
@@ -145,6 +145,14 @@ export async function createUser(data: {
     return { success: false, error: "Unauthorized - Admin access required" };
   }
 
+  // ADMIN can only create ADMIN, SALES_MANAGER, SALES_AGENT roles
+  if (session.user.role === "ADMIN") {
+    const allowedRoles: UserRole[] = ["ADMIN", "SALES_MANAGER", "SALES_AGENT"];
+    if (!allowedRoles.includes(data.role)) {
+      return { success: false, error: "You can only create Admin, Senior Consultant, or Consultant users" };
+    }
+  }
+
   // Validate password strength
   const passwordError = validatePassword(data.password);
   if (passwordError) {
@@ -204,6 +212,21 @@ export async function updateUser(
 
   if (!isSelfUpdate && !isAdmin) {
     throw new Error("Unauthorized");
+  }
+
+  // ADMIN can only edit ADMIN, SALES_MANAGER, SALES_AGENT users (not SUPER_ADMIN)
+  if (session.user.role === "ADMIN" && !isSelfUpdate) {
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { role: true },
+    });
+    if (!targetUser || !["ADMIN", "SALES_MANAGER", "SALES_AGENT"].includes(targetUser.role)) {
+      throw new Error("Unauthorized - You can only edit Admin, Senior Consultant, or Consultant users");
+    }
+    // ADMIN cannot promote users to SUPER_ADMIN
+    if (data.role && !["ADMIN", "SALES_MANAGER", "SALES_AGENT"].includes(data.role)) {
+      throw new Error("Unauthorized - Invalid role assignment");
+    }
   }
 
   // Non-admins can only update their own profile fields
@@ -273,9 +296,23 @@ export async function updatePassword(id: string, newPassword: string) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  // Users can update their own password, super admins can update anyone's
-  if (session.user.id !== id && session.user.role !== "SUPER_ADMIN") {
-    throw new Error("Unauthorized");
+  // Users can update their own password, SUPER_ADMIN can update anyone's
+  // ADMIN can update password for ADMIN, SALES_MANAGER, SALES_AGENT only
+  const isSelf = session.user.id === id;
+  if (!isSelf) {
+    if (session.user.role === "SUPER_ADMIN") {
+      // SUPER_ADMIN can reset anyone's password
+    } else if (session.user.role === "ADMIN") {
+      const targetUser = await prisma.user.findUnique({
+        where: { id },
+        select: { role: true },
+      });
+      if (!targetUser || !["ADMIN", "SALES_MANAGER", "SALES_AGENT"].includes(targetUser.role)) {
+        throw new Error("Unauthorized - You can only reset password for Admin, Senior Consultant, or Consultant users");
+      }
+    } else {
+      throw new Error("Unauthorized");
+    }
   }
 
   // Validate password strength
@@ -307,6 +344,17 @@ export async function deactivateUser(id: string) {
     throw new Error("Cannot deactivate your own account");
   }
 
+  // ADMIN can only deactivate ADMIN, SALES_MANAGER, SALES_AGENT
+  if (session.user.role === "ADMIN") {
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { role: true },
+    });
+    if (!targetUser || !["ADMIN", "SALES_MANAGER", "SALES_AGENT"].includes(targetUser.role)) {
+      throw new Error("Unauthorized - You can only manage Admin, Senior Consultant, or Consultant users");
+    }
+  }
+
   await prisma.user.update({
     where: { id },
     data: { isActive: false },
@@ -324,6 +372,17 @@ export async function reactivateUser(id: string) {
   if (!session?.user) throw new Error("Unauthorized");
   if (!["SUPER_ADMIN", "ADMIN"].includes(session.user.role)) {
     throw new Error("Unauthorized - Admin access required");
+  }
+
+  // ADMIN can only reactivate ADMIN, SALES_MANAGER, SALES_AGENT
+  if (session.user.role === "ADMIN") {
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { role: true },
+    });
+    if (!targetUser || !["ADMIN", "SALES_MANAGER", "SALES_AGENT"].includes(targetUser.role)) {
+      throw new Error("Unauthorized - You can only manage Admin, Senior Consultant, or Consultant users");
+    }
   }
 
   await prisma.user.update({

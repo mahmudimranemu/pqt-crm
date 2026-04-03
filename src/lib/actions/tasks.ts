@@ -30,9 +30,7 @@ export async function getTasks(params?: {
     page = 1,
     limit = 50,
   } = params || {};
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
 
   const where: any = {};
   if (!viewAll) where.assigneeId = session.user.id;
@@ -221,7 +219,7 @@ export async function getTodayAgenda() {
   const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(session.user.role);
+  const viewAll = session.user.role === "SUPER_ADMIN";
 
   const taskWhere: any = {
     dueDate: { gte: startOfDay, lt: endOfDay },
@@ -269,9 +267,7 @@ export async function getOverdueTasksCount() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
 
-  const viewAll = ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"].includes(
-    session.user.role,
-  );
+  const viewAll = session.user.role === "SUPER_ADMIN";
   const where: any = {
     status: { in: ["TODO", "IN_PROGRESS"] },
     dueDate: { lt: new Date() },
