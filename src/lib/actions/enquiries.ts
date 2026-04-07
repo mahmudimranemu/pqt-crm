@@ -490,6 +490,7 @@ export async function bulkCreateEnquiries(
     priority?: string;
     nextCallDate?: string;
     snooze?: string;
+    notes?: string;
   }>,
 ) {
   const session = (await auth()) as ExtendedSession | null;
@@ -515,30 +516,54 @@ export async function bulkCreateEnquiries(
   const baseRefId = await generateRefId();
   const baseNum = parseInt(baseRefId.replace("PQT-", ""), 10);
 
-  const data = rows.map((row, index) => ({
-    refId: `PQT-${String(baseNum + index).padStart(4, "0")}`,
-    firstName: row.firstName.trim(),
-    lastName: row.lastName.trim(),
-    email: row.email.trim(),
-    phone: row.phone.trim(),
-    message: row.message?.trim() || null,
-    source: (validSources.includes(row.source || "")
-      ? row.source
-      : "WEBSITE_FORM") as EnquirySource,
-    sourceUrl: row.sourceUrl?.trim() || null,
-    budget: row.budget?.trim() || null,
-    country: row.country?.trim() || null,
-    tags: row.tags ? row.tags.split(";").map((t) => t.trim()).filter(Boolean) : [],
-    segment: row.segment?.trim() && validSegments.includes(row.segment.trim()) ? row.segment.trim() : "Buyer",
-    leadStatus: row.leadStatus?.trim() || "New",
-    priority: row.priority?.trim() && validPriorities.includes(row.priority.trim()) ? row.priority.trim() : "Medium",
-    nextCallDate: row.nextCallDate?.trim() ? new Date(row.nextCallDate.trim()) : new Date(),
-    snooze: row.snooze?.trim() && validSnooze.includes(row.snooze.trim()) ? row.snooze.trim() : "Active",
-    assignedAgentId: session.user.id,
-    status: "ASSIGNED" as const,
-  }));
+  // Use a transaction so we can create enquiries and their notes together
+  const result = await prisma.$transaction(async (tx) => {
+    const createdIds: { id: string; note?: string }[] = [];
 
-  const result = await prisma.enquiry.createMany({ data });
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index];
+      const enquiry = await tx.enquiry.create({
+        data: {
+          refId: `PQT-${String(baseNum + index).padStart(4, "0")}`,
+          firstName: row.firstName.trim(),
+          lastName: row.lastName.trim(),
+          email: row.email.trim(),
+          phone: row.phone.trim(),
+          message: row.message?.trim() || null,
+          source: (validSources.includes(row.source || "")
+            ? row.source
+            : "WEBSITE_FORM") as EnquirySource,
+          sourceUrl: row.sourceUrl?.trim() || null,
+          budget: row.budget?.trim() || null,
+          country: row.country?.trim() || null,
+          tags: row.tags ? row.tags.split(";").map((t) => t.trim()).filter(Boolean) : [],
+          segment: row.segment?.trim() && validSegments.includes(row.segment.trim()) ? row.segment.trim() : "Buyer",
+          leadStatus: row.leadStatus?.trim() || "New",
+          priority: row.priority?.trim() && validPriorities.includes(row.priority.trim()) ? row.priority.trim() : "Medium",
+          nextCallDate: row.nextCallDate?.trim() ? new Date(row.nextCallDate.trim()) : new Date(),
+          snooze: row.snooze?.trim() && validSnooze.includes(row.snooze.trim()) ? row.snooze.trim() : "Active",
+          assignedAgentId: session.user.id,
+          status: "ASSIGNED" as const,
+        },
+      });
+      createdIds.push({ id: enquiry.id, note: row.notes?.trim() });
+    }
+
+    // Bulk create notes for enquiries that have them
+    const notesData = createdIds
+      .filter((e) => e.note)
+      .map((e) => ({
+        enquiryId: e.id,
+        agentId: session.user.id,
+        content: e.note!,
+      }));
+
+    if (notesData.length > 0) {
+      await tx.enquiryNote.createMany({ data: notesData });
+    }
+
+    return { count: createdIds.length };
+  });
 
   revalidatePath("/clients/enquiries");
   return { count: result.count };

@@ -66,11 +66,40 @@ function ImportCSVDialog({
     if (selected) setFile(selected);
   };
 
+  // Parse a CSV line respecting quoted fields (commas inside quotes)
+  const parseCSVLine = (line: string): string[] => {
+    const values: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"' && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else if (ch === '"') {
+          inQuotes = false;
+        } else {
+          current += ch;
+        }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ",") {
+        values.push(current.trim());
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+    values.push(current.trim());
+    return values;
+  };
+
   const parseCSV = (text: string) => {
     const lines = text.split("\n").filter((l) => l.trim());
     if (lines.length < 2) throw new Error("CSV must have a header row and at least one data row");
 
-    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+    const headers = parseCSVLine(lines[0]).map((h) => h.trim().toLowerCase());
     const requiredHeaders = ["firstname", "lastname", "email", "phone"];
     for (const req of requiredHeaders) {
       if (!headers.includes(req)) {
@@ -80,8 +109,7 @@ function ImportCSVDialog({
 
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(",").map((v) => v.trim());
-      if (values.length < headers.length) continue;
+      const values = parseCSVLine(lines[i]);
 
       const row: Record<string, string> = {};
       headers.forEach((h, idx) => {
@@ -106,6 +134,7 @@ function ImportCSVDialog({
         priority: row.priority || undefined,
         nextCallDate: row.nextcalldate || undefined,
         snooze: row.snooze || undefined,
+        notes: row.notes || undefined,
       });
     }
 
@@ -149,8 +178,8 @@ function ImportCSVDialog({
   };
 
   const handleDownloadTemplate = () => {
-    const headers = "firstName,lastName,email,phone,message,source,sourceUrl,budget,country,tags,segment,leadStatus,priority,nextCallDate,snooze";
-    const example = "John,Doe,john@example.com,+1234567890,Interested in villas,WEBSITE_FORM,https://example.com/form,$500k - $1M,United Kingdom,Cash Buyer;Investor,Buyer,New,High,2026-03-01,Active";
+    const headers = "firstName,lastName,email,phone,message,source,sourceUrl,budget,country,tags,segment,leadStatus,priority,nextCallDate,snooze,notes";
+    const example = "John,Doe,john@example.com,+1234567890,Interested in villas,WEBSITE_FORM,https://example.com/form,$500k - $1M,United Kingdom,Cash Buyer;Investor,Buyer,New,High,2026-03-01,Active,called and texted";
     const csv = `${headers}\n${example}`;
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
