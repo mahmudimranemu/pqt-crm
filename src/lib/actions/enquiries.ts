@@ -732,12 +732,20 @@ export async function convertToClientAndLead(
       },
     });
 
-    // 2. Delete the enquiry (cascades: EnquiryNotes deleted, Activity.enquiryId set to null)
+    // 2. Disconnect activities from enquiry BEFORE deleting (FK constraint)
+    if (enquiryActivityIds.length > 0) {
+      await tx.activity.updateMany({
+        where: { id: { in: enquiryActivityIds } },
+        data: { enquiryId: null },
+      });
+    }
+
+    // 3. Delete the enquiry (cascades: EnquiryNotes deleted)
     await tx.enquiry.delete({
       where: { id: enquiryId },
     });
 
-    // 3. Create Lead with the same ID as the enquiry
+    // 4. Create Lead with the same ID as the enquiry
     const lead = await tx.lead.create({
       data: {
         id: enquiryId,
@@ -766,7 +774,7 @@ export async function convertToClientAndLead(
       },
     });
 
-    // 4. Convert EnquiryNotes to LeadNotes
+    // 5. Convert EnquiryNotes to LeadNotes
     if (enquiryNotes.length > 0) {
       await tx.leadNote.createMany({
         data: enquiryNotes.map((note) => ({
@@ -778,15 +786,15 @@ export async function convertToClientAndLead(
       });
     }
 
-    // 5. Move existing activities from enquiry to the new lead
+    // 6. Link activities to the new lead
     if (enquiryActivityIds.length > 0) {
       await tx.activity.updateMany({
         where: { id: { in: enquiryActivityIds } },
-        data: { leadId: lead.id, enquiryId: null },
+        data: { leadId: lead.id },
       });
     }
 
-    // 6. Create conversion activity on the lead
+    // 7. Create conversion activity on the lead
     await tx.activity.create({
       data: {
         type: "NOTE",
