@@ -40,31 +40,50 @@ export function ConvertEnquiryDialog({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
 
+  // Budget range mapping for auto-fill
+  const BUDGET_RANGES: Record<string, { min: number; max: number; range: string }> = {
+    "Under $100K":   { min: 0, max: 100000, range: "UNDER_100K" },
+    "$100K - $250K": { min: 100000, max: 250000, range: "FROM_100K_TO_250K" },
+    "$250K - $500K": { min: 250000, max: 500000, range: "FROM_250K_TO_500K" },
+    "$500K - $1M":   { min: 500000, max: 1000000, range: "FROM_500K_TO_1M" },
+    "$500k - $1M":   { min: 500000, max: 1000000, range: "FROM_500K_TO_1M" },
+    "Over $1M":      { min: 1000000, max: 5000000, range: "OVER_1M" },
+  };
+
+  const RANGE_TO_BUDGET: Record<string, { min: number; max: number }> = {
+    UNDER_100K:       { min: 0, max: 100000 },
+    FROM_100K_TO_250K: { min: 100000, max: 250000 },
+    FROM_250K_TO_500K: { min: 250000, max: 500000 },
+    FROM_500K_TO_1M:   { min: 500000, max: 1000000 },
+    OVER_1M:           { min: 1000000, max: 5000000 },
+  };
+
+  // Parse budget string to get initial values
+  const parsedBudget = enquiryBudget ? BUDGET_RANGES[enquiryBudget] : null;
+
   // Client fields
   const [nationality, setNationality] = useState(enquiryCountry || "");
   const [country, setCountry] = useState(enquiryCountry || "");
-  const [budgetMin, setBudgetMin] = useState("");
-  const [budgetMax, setBudgetMax] = useState("");
+  const [budgetMin, setBudgetMin] = useState(parsedBudget ? String(parsedBudget.min) : "");
+  const [budgetMax, setBudgetMax] = useState(parsedBudget ? String(parsedBudget.max) : "");
   const [investmentPurpose, setInvestmentPurpose] = useState("RESIDENTIAL");
-
-  // Map budget string like "$500k - $1M" to a budget range enum
-  const inferBudgetRange = (budget: string | null): string => {
-    if (!budget) return "";
-    const b = budget.toLowerCase();
-    if (b.includes("under") || b.includes("< 100") || b.includes("<100")) return "UNDER_100K";
-    if (b.includes("100k") && b.includes("250k")) return "FROM_100K_TO_250K";
-    if (b.includes("250k") && b.includes("500k")) return "FROM_250K_TO_500K";
-    if (b.includes("500k") && b.includes("1m")) return "FROM_500K_TO_1M";
-    if (b.includes("over") || b.includes("> 1m") || b.includes(">1m") || b.includes("1m+")) return "OVER_1M";
-    return "";
-  };
 
   // Lead fields
   const [leadTitle, setLeadTitle] = useState(
     `${enquiryName} - New Opportunity`,
   );
   const [estimatedValue, setEstimatedValue] = useState("");
-  const [budgetRange, setBudgetRange] = useState(inferBudgetRange(enquiryBudget));
+  const [budgetRange, setBudgetRange] = useState(parsedBudget?.range || "");
+
+  // Sync Budget Min/Max when budget range dropdown changes
+  const handleBudgetRangeChange = (range: string) => {
+    setBudgetRange(range);
+    const mapped = RANGE_TO_BUDGET[range];
+    if (mapped) {
+      setBudgetMin(String(mapped.min));
+      setBudgetMax(String(mapped.max));
+    }
+  };
   const [propertyType, setPropertyType] = useState("");
   const [preferredLocation, setPreferredLocation] = useState("");
   const [description, setDescription] = useState(enquiryMessage || "");
@@ -227,7 +246,7 @@ export function ConvertEnquiryDialog({
                   <select
                     id="budgetRange"
                     value={budgetRange}
-                    onChange={(e) => setBudgetRange(e.target.value)}
+                    onChange={(e) => handleBudgetRangeChange(e.target.value)}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <option value="">Select range</option>
