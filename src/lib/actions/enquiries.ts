@@ -757,23 +757,18 @@ export async function convertToClientAndLead(
       },
     });
 
-    // 2. Disconnect activities from enquiry BEFORE deleting (FK constraint)
-    if (enquiryActivityIds.length > 0) {
-      await tx.activity.updateMany({
-        where: { id: { in: enquiryActivityIds } },
-        data: { enquiryId: null },
-      });
-    }
-
-    // 3. Delete the enquiry (cascades: EnquiryNotes deleted)
-    await tx.enquiry.delete({
+    // 2. Mark enquiry as converted (don't delete — page re-render needs it)
+    await tx.enquiry.update({
       where: { id: enquiryId },
+      data: {
+        status: "CONVERTED_TO_CLIENT",
+        convertedClientId: client.id,
+      },
     });
 
-    // 4. Create Lead with the same ID as the enquiry
+    // 3. Create Lead
     const lead = await tx.lead.create({
       data: {
-        id: enquiryId,
         refId: enquiry.refId,
         leadNumber,
         title: data.leadTitle,
@@ -811,7 +806,7 @@ export async function convertToClientAndLead(
       });
     }
 
-    // 6. Link activities to the new lead
+    // 6. Copy activities to the new lead (keep them on enquiry too)
     if (enquiryActivityIds.length > 0) {
       await tx.activity.updateMany({
         where: { id: { in: enquiryActivityIds } },
