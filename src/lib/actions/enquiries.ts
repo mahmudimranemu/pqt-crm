@@ -733,8 +733,16 @@ export async function convertToClientAndLead(
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const count = await tx.lead.count();
-      const leadNumber = `PQT-L-${String(count + 1).padStart(4, "0")}`;
+      const lastLead = await tx.lead.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { leadNumber: true },
+      });
+      let nextNum = 1;
+      if (lastLead?.leadNumber) {
+        const num = parseInt(lastLead.leadNumber.replace("PQT-L-", ""), 10);
+        if (!isNaN(num)) nextNum = num + 1;
+      }
+      const leadNumber = `PQT-L-${String(nextNum).padStart(4, "0")}`;
 
       // 1. Create Client
       const client = await tx.client.create({

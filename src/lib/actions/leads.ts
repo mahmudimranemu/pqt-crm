@@ -40,8 +40,16 @@ interface UpdateLeadData extends Partial<CreateLeadData> {
 }
 
 async function generateLeadNumber(): Promise<string> {
-  const count = await prisma.lead.count();
-  return `PQT-L-${String(count + 1).padStart(4, "0")}`;
+  const lastLead = await prisma.lead.findFirst({
+    orderBy: { createdAt: "desc" },
+    select: { leadNumber: true },
+  });
+  let next = 1;
+  if (lastLead?.leadNumber) {
+    const num = parseInt(lastLead.leadNumber.replace("PQT-L-", ""), 10);
+    if (!isNaN(num)) next = num + 1;
+  }
+  return `PQT-L-${String(next).padStart(4, "0")}`;
 }
 
 export async function getLeads(params?: {
