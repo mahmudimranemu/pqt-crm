@@ -126,13 +126,21 @@ export function EnquiryActions({ enquiry, agents }: EnquiryActionsProps) {
   const handleConvert = async () => {
     setIsLoading(true);
     try {
-      const { client } = await convertToClient(enquiry.id, convertData);
+      const result = await convertToClient(enquiry.id, convertData);
+      if (!result.success) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: result.error || "Failed to convert enquiry",
+        });
+        return;
+      }
       toast({
         title: "Converted to client",
-        description: "The enquiry has been converted to a client.",
+        description: "The enquiry has been converted to a client and lead.",
       });
       setShowConvertDialog(false);
-      router.push(`/clients/${client.id}`);
+      router.push(`/clients/${result.client!.id}`);
     } catch (error) {
       toast({
         variant: "destructive",

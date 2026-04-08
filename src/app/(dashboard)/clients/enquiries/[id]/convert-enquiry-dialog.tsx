@@ -111,8 +111,13 @@ export function ConvertEnquiryDialog({
           description: description || undefined,
         });
 
+        if (!result.success) {
+          setError(result.error || "Conversion failed");
+          return;
+        }
+
         setOpen(false);
-        router.push(`/leads/${result.lead.id}`);
+        router.push(`/leads/${result.lead!.id}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Conversion failed");
       }

@@ -709,10 +709,10 @@ export interface ConvertEnquiryData {
 export async function convertToClientAndLead(
   enquiryId: string,
   data: ConvertEnquiryData,
-) {
+): Promise<{ success: boolean; error?: string; lead?: { id: string }; client?: { id: string } }> {
   const session = (await auth()) as ExtendedSession | null;
-  if (!session?.user) throw new Error("Unauthorized");
-  if (session.user.role === "VIEWER") throw new Error("Unauthorized");
+  if (!session?.user) return { success: false, error: "Unauthorized" };
+  if (session.user.role === "VIEWER") return { success: false, error: "Unauthorized" };
 
   const enquiry = await prisma.enquiry.findUnique({
     where: { id: enquiryId },
@@ -722,8 +722,8 @@ export async function convertToClientAndLead(
     },
   });
 
-  if (!enquiry) throw new Error("Enquiry not found");
-  if (enquiry.convertedClientId) throw new Error("Already converted");
+  if (!enquiry) return { success: false, error: "Enquiry not found" };
+  if (enquiry.convertedClientId) return { success: false, error: "Already converted" };
 
   const ownerId = enquiry.assignedAgentId || session.user.id;
   const leadSource = mapEnquirySourceToLeadSource(enquiry.source);
@@ -732,9 +732,7 @@ export async function convertToClientAndLead(
   const enquiryActivityIds = enquiry.activities.map((a) => a.id);
 
   try {
-    // Run everything in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Generate lead number inside transaction for accurate count
       const count = await tx.lead.count();
       const leadNumber = `PQT-L-${String(count + 1).padStart(4, "0")}`;
 
@@ -825,7 +823,7 @@ export async function convertToClientAndLead(
         });
       }
 
-      // 6. Create conversion activity on the lead
+      // 6. Create conversion activity
       await tx.activity.create({
         data: {
           type: "NOTE",
@@ -840,7 +838,7 @@ export async function convertToClientAndLead(
       return { clientId: client.id, leadId: lead.id };
     });
 
-    // Notify super admins about conversion (non-blocking)
+    // Notify super admins (non-blocking)
     notifySuperAdmins(
       "DEAL_STAGE_CHANGED",
       "Enquiry Converted to Client & Lead",
@@ -851,11 +849,11 @@ export async function convertToClientAndLead(
     revalidatePath("/clients/enquiries");
     revalidatePath("/clients");
     revalidatePath("/leads");
-    return { client: { id: result.clientId }, lead: { id: result.leadId } };
+    return { success: true, client: { id: result.clientId }, lead: { id: result.leadId } };
   } catch (error) {
     console.error("[CONVERT] Conversion failed:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
-    throw new Error(`Conversion failed: ${message}`);
+    return { success: false, error: `Conversion failed: ${message}` };
   }
 }
 

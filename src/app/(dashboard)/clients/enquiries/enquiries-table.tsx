@@ -371,10 +371,14 @@ export function EnquiriesTable({
   const handleConvertToClient = async (enquiryId: string) => {
     setConvertLoading(true);
     try {
-      const { client } = await convertToClient(enquiryId, convertData);
+      const result = await convertToClient(enquiryId, convertData);
+      if (!result.success) {
+        toast({ variant: "destructive", title: "Error", description: result.error || "Failed to convert" });
+        return;
+      }
       toast({ title: "Converted to client", description: "Enquiry has been converted to a client and lead." });
-      if (bookingEnquiry) {
-        setBookingEnquiry({ ...bookingEnquiry, convertedClientId: client.id });
+      if (bookingEnquiry && result.client) {
+        setBookingEnquiry({ ...bookingEnquiry, convertedClientId: result.client.id });
       }
       setConvertData({ nationality: "", country: "", budgetMin: 200000, budgetMax: 500000 });
       startTransition(() => router.refresh());
