@@ -19,8 +19,6 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createSale } from "@/lib/actions/sales";
-import type { Decimal } from "@prisma/client/runtime/library";
-
 const saleSchema = z.object({
   bookingId: z.string().optional(),
   clientId: z.string().min(1, "Client is required"),
@@ -48,7 +46,7 @@ interface BookingWithOffer {
 
 interface SaleFormProps {
   clients: { id: string; firstName: string; lastName: string }[];
-  properties: { id: string; name: string; pqtNumber: string; district: string; priceFrom: Decimal | null }[];
+  properties: { id: string; name: string; pqtNumber: string; district: string; priceFrom: number | null }[];
   agents: { id: string; firstName: string; lastName: string }[];
   bookingsWithOffers: BookingWithOffer[];
 }
