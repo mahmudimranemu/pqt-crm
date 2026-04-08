@@ -831,7 +831,7 @@ export async function convertToClientAndLead(
       },
     });
 
-    return { client, lead };
+    return { clientId: client.id, leadId: lead.id };
   });
 
   // Notify super admins about conversion
@@ -839,13 +839,13 @@ export async function convertToClientAndLead(
     "DEAL_STAGE_CHANGED",
     "Enquiry Converted to Client & Lead",
     `${enquiry.firstName} ${enquiry.lastName} has been converted to a client and lead`,
-    `/leads/${result.lead.id}`,
+    `/leads/${result.leadId}`,
   );
 
   revalidatePath("/clients/enquiries");
   revalidatePath("/clients");
   revalidatePath("/leads");
-  return result;
+  return { client: { id: result.clientId }, lead: { id: result.leadId } };
 }
 
 // Keep old function for backward compatibility but have it use the new one

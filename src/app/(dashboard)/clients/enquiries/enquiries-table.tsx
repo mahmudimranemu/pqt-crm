@@ -372,7 +372,7 @@ export function EnquiriesTable({
     setConvertLoading(true);
     try {
       const { client } = await convertToClient(enquiryId, convertData);
-      toast({ title: "Converted to client", description: `${client.firstName} ${client.lastName} is now a client.` });
+      toast({ title: "Converted to client", description: "Enquiry has been converted to a client and lead." });
       if (bookingEnquiry) {
         setBookingEnquiry({ ...bookingEnquiry, convertedClientId: client.id });
       }
