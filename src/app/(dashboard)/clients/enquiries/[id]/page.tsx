@@ -58,12 +58,33 @@ const sourceLabels: Record<EnquirySource, string> = {
 export default async function EnquiryDetailPage({ params }: PageProps) {
   const session = (await auth()) as ExtendedSession | null;
   const { id } = await params;
-  const [enquiry, agents, properties, pools] = await Promise.all([
-    getEnquiry(id),
-    getAgents(),
-    getActiveProperties(),
-    session?.user ? getPoolsForUser(session.user.id) : Promise.resolve([]),
-  ]);
+
+  let enquiry: Awaited<ReturnType<typeof getEnquiry>>;
+  let agents: Awaited<ReturnType<typeof getAgents>>;
+  let properties: Awaited<ReturnType<typeof getActiveProperties>>;
+  let pools: { tag: string; name: string }[] = [];
+
+  try {
+    [enquiry, agents, properties, pools] = await Promise.all([
+      getEnquiry(id),
+      getAgents(),
+      getActiveProperties(),
+      session?.user ? getPoolsForUser(session.user.id) : Promise.resolve([]),
+    ]);
+  } catch (error) {
+    console.error("Enquiry detail page error:", error);
+    return (
+      <div className="py-12 text-center space-y-2">
+        <p className="text-gray-500">Could not load enquiry.</p>
+        <Link
+          href="/clients/enquiries"
+          className="mt-4 text-[#dc2626] hover:underline text-sm inline-block"
+        >
+          Back to enquiries
+        </Link>
+      </div>
+    );
+  }
 
   if (!enquiry) {
     notFound();

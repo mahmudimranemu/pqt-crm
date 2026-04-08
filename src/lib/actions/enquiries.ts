@@ -728,119 +728,135 @@ export async function convertToClientAndLead(
   const ownerId = enquiry.assignedAgentId || session.user.id;
   const leadSource = mapEnquirySourceToLeadSource(enquiry.source);
 
-  // Store enquiry notes and activity IDs before deletion
   const enquiryNotes = enquiry.notes;
   const enquiryActivityIds = enquiry.activities.map((a) => a.id);
 
-  // Run everything in a transaction
-  const result = await prisma.$transaction(async (tx) => {
-    // Generate lead number inside transaction for accurate count
-    const count = await tx.lead.count();
-    const leadNumber = `PQT-L-${String(count + 1).padStart(4, "0")}`;
+  try {
+    // Run everything in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Generate lead number inside transaction for accurate count
+      const count = await tx.lead.count();
+      const leadNumber = `PQT-L-${String(count + 1).padStart(4, "0")}`;
 
-    // 1. Create Client
-    const client = await tx.client.create({
-      data: {
-        firstName: enquiry.firstName,
-        lastName: enquiry.lastName,
-        email: enquiry.email,
-        phone: enquiry.phone,
-        nationality: data.nationality || enquiry.country || "Not specified",
-        country: data.country || enquiry.country || "Not specified",
-        budgetMin: data.budgetMin || 200000,
-        budgetMax: data.budgetMax || 500000,
-        source: leadSource,
-        status: "NEW_LEAD",
-        investmentPurpose: (data.investmentPurpose || "RESIDENTIAL") as any,
-        assignedAgentId: ownerId,
-        notes: enquiry.message || undefined,
-      },
-    });
+      // 1. Create Client
+      const client = await tx.client.create({
+        data: {
+          firstName: enquiry.firstName,
+          lastName: enquiry.lastName,
+          email: enquiry.email,
+          phone: enquiry.phone,
+          nationality: data.nationality || enquiry.country || "Not specified",
+          country: data.country || enquiry.country || "Not specified",
+          budgetMin: data.budgetMin || 200000,
+          budgetMax: data.budgetMax || 500000,
+          source: leadSource,
+          status: "NEW_LEAD",
+          investmentPurpose: (data.investmentPurpose || "RESIDENTIAL") as any,
+          assignedAgentId: ownerId,
+          notes: enquiry.message || undefined,
+        },
+      });
 
-    // 2. Mark enquiry as converted (don't delete — page re-render needs it)
-    await tx.enquiry.update({
-      where: { id: enquiryId },
-      data: {
-        status: "CONVERTED_TO_CLIENT",
-        convertedClientId: client.id,
-      },
-    });
+      // 2. Mark enquiry as converted
+      await tx.enquiry.update({
+        where: { id: enquiryId },
+        data: {
+          status: "CONVERTED_TO_CLIENT",
+          convertedClientId: client.id,
+        },
+      });
 
-    // 3. Create Lead
-    const lead = await tx.lead.create({
-      data: {
-        refId: enquiry.refId,
-        leadNumber,
-        title: data.leadTitle,
-        description: data.description || enquiry.message || undefined,
-        stage: "NEW_ENQUIRY",
-        estimatedValue: data.estimatedValue || undefined,
-        budgetRange: data.budgetRange || undefined,
-        source: leadSource,
-        sourceDetail: enquiry.sourceUrl || undefined,
-        propertyType: data.propertyType || undefined,
-        preferredLocation: data.preferredLocation || undefined,
-        clientId: client.id,
-        ownerId,
-        tags: enquiry.tags,
-        called: enquiry.called,
-        spoken: enquiry.spoken,
-        segment: enquiry.segment,
-        priority: enquiry.priority,
-        nextCallDate: enquiry.nextCallDate,
-        snooze: enquiry.snooze,
-        interestedPropertyId: enquiry.interestedPropertyId,
-        interestedPropertyRefs: enquiry.interestedPropertyRefs,
-      },
-    });
+      // 3. Create Lead (skip refId if it already exists on another lead)
+      let leadRefId: string | null = null;
+      if (enquiry.refId) {
+        const existingLead = await tx.lead.findUnique({
+          where: { refId: enquiry.refId },
+          select: { id: true },
+        });
+        if (!existingLead) {
+          leadRefId = enquiry.refId;
+        }
+      }
 
-    // 5. Convert EnquiryNotes to LeadNotes
-    if (enquiryNotes.length > 0) {
-      await tx.leadNote.createMany({
-        data: enquiryNotes.map((note) => ({
+      const lead = await tx.lead.create({
+        data: {
+          refId: leadRefId,
+          leadNumber,
+          title: data.leadTitle,
+          description: data.description || enquiry.message || undefined,
+          stage: "NEW_ENQUIRY",
+          estimatedValue: data.estimatedValue || undefined,
+          budgetRange: data.budgetRange || undefined,
+          source: leadSource,
+          sourceDetail: enquiry.sourceUrl || undefined,
+          propertyType: data.propertyType || undefined,
+          preferredLocation: data.preferredLocation || undefined,
+          clientId: client.id,
+          ownerId,
+          tags: enquiry.tags,
+          called: enquiry.called,
+          spoken: enquiry.spoken,
+          segment: enquiry.segment,
+          priority: enquiry.priority,
+          nextCallDate: enquiry.nextCallDate,
+          snooze: enquiry.snooze,
+          interestedPropertyId: enquiry.interestedPropertyId,
+          interestedPropertyRefs: enquiry.interestedPropertyRefs,
+        },
+      });
+
+      // 4. Convert EnquiryNotes to LeadNotes
+      if (enquiryNotes.length > 0) {
+        await tx.leadNote.createMany({
+          data: enquiryNotes.map((note) => ({
+            leadId: lead.id,
+            agentId: note.agentId,
+            content: note.content,
+            createdAt: note.createdAt,
+          })),
+        });
+      }
+
+      // 5. Link activities to the new lead
+      if (enquiryActivityIds.length > 0) {
+        await tx.activity.updateMany({
+          where: { id: { in: enquiryActivityIds } },
+          data: { leadId: lead.id },
+        });
+      }
+
+      // 6. Create conversion activity on the lead
+      await tx.activity.create({
+        data: {
+          type: "NOTE",
+          title: "Lead Created from Enquiry",
+          description: `Converted from enquiry for ${enquiry.firstName} ${enquiry.lastName}. Original source: ${enquiry.source}.`,
           leadId: lead.id,
-          agentId: note.agentId,
-          content: note.content,
-          createdAt: note.createdAt,
-        })),
+          clientId: client.id,
+          userId: session.user.id,
+        },
       });
-    }
 
-    // 6. Copy activities to the new lead (keep them on enquiry too)
-    if (enquiryActivityIds.length > 0) {
-      await tx.activity.updateMany({
-        where: { id: { in: enquiryActivityIds } },
-        data: { leadId: lead.id },
-      });
-    }
-
-    // 7. Create conversion activity on the lead
-    await tx.activity.create({
-      data: {
-        type: "NOTE",
-        title: "Lead Created from Enquiry",
-        description: `Converted from enquiry for ${enquiry.firstName} ${enquiry.lastName}. Original source: ${enquiry.source}.`,
-        leadId: lead.id,
-        clientId: client.id,
-        userId: session.user.id,
-      },
+      return { clientId: client.id, leadId: lead.id };
     });
 
-    return { clientId: client.id, leadId: lead.id };
-  });
+    // Notify super admins about conversion (non-blocking)
+    notifySuperAdmins(
+      "DEAL_STAGE_CHANGED",
+      "Enquiry Converted to Client & Lead",
+      `${enquiry.firstName} ${enquiry.lastName} has been converted to a client and lead`,
+      `/leads/${result.leadId}`,
+    ).catch(() => {});
 
-  // Notify super admins about conversion
-  await notifySuperAdmins(
-    "DEAL_STAGE_CHANGED",
-    "Enquiry Converted to Client & Lead",
-    `${enquiry.firstName} ${enquiry.lastName} has been converted to a client and lead`,
-    `/leads/${result.leadId}`,
-  );
-
-  revalidatePath("/clients/enquiries");
-  revalidatePath("/clients");
-  revalidatePath("/leads");
-  return { client: { id: result.clientId }, lead: { id: result.leadId } };
+    revalidatePath("/clients/enquiries");
+    revalidatePath("/clients");
+    revalidatePath("/leads");
+    return { client: { id: result.clientId }, lead: { id: result.leadId } };
+  } catch (error) {
+    console.error("[CONVERT] Conversion failed:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    throw new Error(`Conversion failed: ${message}`);
+  }
 }
 
 // Keep old function for backward compatibility but have it use the new one
