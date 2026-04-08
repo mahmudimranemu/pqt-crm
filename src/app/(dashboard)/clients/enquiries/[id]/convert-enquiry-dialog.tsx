@@ -47,12 +47,24 @@ export function ConvertEnquiryDialog({
   const [budgetMax, setBudgetMax] = useState("");
   const [investmentPurpose, setInvestmentPurpose] = useState("RESIDENTIAL");
 
+  // Map budget string like "$500k - $1M" to a budget range enum
+  const inferBudgetRange = (budget: string | null): string => {
+    if (!budget) return "";
+    const b = budget.toLowerCase();
+    if (b.includes("under") || b.includes("< 100") || b.includes("<100")) return "UNDER_100K";
+    if (b.includes("100k") && b.includes("250k")) return "FROM_100K_TO_250K";
+    if (b.includes("250k") && b.includes("500k")) return "FROM_250K_TO_500K";
+    if (b.includes("500k") && b.includes("1m")) return "FROM_500K_TO_1M";
+    if (b.includes("over") || b.includes("> 1m") || b.includes(">1m") || b.includes("1m+")) return "OVER_1M";
+    return "";
+  };
+
   // Lead fields
   const [leadTitle, setLeadTitle] = useState(
     `${enquiryName} - New Opportunity`,
   );
-  const [estimatedValue, setEstimatedValue] = useState(enquiryBudget || "");
-  const [budgetRange, setBudgetRange] = useState("");
+  const [estimatedValue, setEstimatedValue] = useState("");
+  const [budgetRange, setBudgetRange] = useState(inferBudgetRange(enquiryBudget));
   const [propertyType, setPropertyType] = useState("");
   const [preferredLocation, setPreferredLocation] = useState("");
   const [description, setDescription] = useState(enquiryMessage || "");
