@@ -763,16 +763,20 @@ export async function convertToClientAndLead(
         },
       });
 
-      // 2. Mark enquiry as converted
-      await tx.enquiry.update({
+      // 2. Disconnect activities from enquiry before deletion (FK constraint)
+      if (enquiryActivityIds.length > 0) {
+        await tx.activity.updateMany({
+          where: { id: { in: enquiryActivityIds } },
+          data: { enquiryId: null },
+        });
+      }
+
+      // 3. Delete the enquiry (cascades: EnquiryNotes deleted)
+      await tx.enquiry.delete({
         where: { id: enquiryId },
-        data: {
-          status: "CONVERTED_TO_CLIENT",
-          convertedClientId: client.id,
-        },
       });
 
-      // 3. Create Lead (skip refId if it already exists on another lead)
+      // 4. Create Lead (skip refId if it already exists on another lead)
       let leadRefId: string | null = null;
       if (enquiry.refId) {
         const existingLead = await tx.lead.findUnique({
@@ -811,7 +815,7 @@ export async function convertToClientAndLead(
         },
       });
 
-      // 4. Convert EnquiryNotes to LeadNotes
+      // 5. Convert EnquiryNotes to LeadNotes
       if (enquiryNotes.length > 0) {
         await tx.leadNote.createMany({
           data: enquiryNotes.map((note) => ({
@@ -823,7 +827,7 @@ export async function convertToClientAndLead(
         });
       }
 
-      // 5. Link activities to the new lead
+      // 6. Link activities to the new lead
       if (enquiryActivityIds.length > 0) {
         await tx.activity.updateMany({
           where: { id: { in: enquiryActivityIds } },
@@ -831,7 +835,7 @@ export async function convertToClientAndLead(
         });
       }
 
-      // 6. Create conversion activity
+      // 7. Create conversion activity
       await tx.activity.create({
         data: {
           type: "NOTE",
