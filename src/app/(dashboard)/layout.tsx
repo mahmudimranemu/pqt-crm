@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { redirect } from "next/navigation";
 import { auth, type ExtendedSession } from "@/lib/auth";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
