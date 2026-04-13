@@ -679,34 +679,39 @@ export async function verifyEmailChange(token: string) {
 
 // Request password reset (public — no auth required)
 export async function requestPasswordReset(email: string) {
-  const normalizedEmail = email.toLowerCase().trim();
+  try {
+    const normalizedEmail = email.toLowerCase().trim();
 
-  // Always return success to prevent email enumeration
-  const user = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
-    select: { id: true, firstName: true, isActive: true },
-  });
+    // Always return success to prevent email enumeration
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true, firstName: true, isActive: true },
+    });
 
-  if (!user || !user.isActive) {
-    // Don't reveal whether the email exists
+    if (!user || !user.isActive) {
+      // Don't reveal whether the email exists
+      return { success: true };
+    }
+
+    const token = randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: token,
+        passwordResetExpires: expires,
+      },
+    });
+
+    const { subject, html } = passwordResetTemplate(user.firstName, token);
+    await sendEmail(normalizedEmail, subject, html);
+
     return { success: true };
+  } catch (error) {
+    console.error("[requestPasswordReset]", error);
+    return { success: true }; // Don't reveal errors to prevent enumeration
   }
-
-  const token = randomBytes(32).toString("hex");
-  const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      passwordResetToken: token,
-      passwordResetExpires: expires,
-    },
-  });
-
-  const { subject, html } = passwordResetTemplate(user.firstName, token);
-  await sendEmail(normalizedEmail, subject, html);
-
-  return { success: true };
 }
 
 // Reset password using token (public — no auth required)
