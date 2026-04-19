@@ -38,6 +38,7 @@ import {
   Route,
   Activity,
   SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
 import type { UserRole } from "@prisma/client";
 
@@ -246,6 +247,12 @@ const navSections: NavSection[] = [
         href: "/settings/automation",
         icon: Zap,
         roles: ["SUPER_ADMIN", "ADMIN"],
+      },
+      {
+        title: "AI",
+        href: "/settings/ai",
+        icon: Sparkles,
+        roles: ["SUPER_ADMIN"],
       },
       {
         title: "Pipelines",

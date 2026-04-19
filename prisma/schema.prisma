@@ -1253,3 +1253,26 @@ model Pool {
 
   @@map("pools")
 }
+
+model AIProvider {
+  id              String   @id @default(cuid())
+  provider        String   @unique
+  apiKeyEncrypted String?  @db.Text
+  apiKeyHint      String?
+  isEnabled       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("ai_providers")
+}
+
+model AITaskConfig {
+  id        String   @id @default(cuid())
+  taskType  String   @unique
+  provider  String
+  model     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ai_task_configs")
+}

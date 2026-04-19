@@ -239,6 +239,7 @@ function mapToDisplayProperty(p: ExternalProperty): DisplayProperty {
   // Parse key_features (may be semicolon or newline separated in a single string)
   const keyFeatures: string[] = [];
   for (const kf of p.key_features || []) {
+    if (!kf?.feature) continue;
     const parts = kf.feature
       .split(/\s{2,}/)
       .map((s) => s.trim())

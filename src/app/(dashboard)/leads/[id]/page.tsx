@@ -23,6 +23,7 @@ import Link from "next/link";
 import { LeadDetailFields } from "./lead-detail-fields";
 import { LeadNotes } from "./lead-notes";
 import { LeadPropertySelector } from "./lead-property-selector";
+import { AIGeneratePanel } from "./ai-generate-panel";
 import { TagManager } from "@/components/tag-manager";
 
 const stageColors: Record<string, string> = {
@@ -302,6 +303,14 @@ export default async function LeadDetailPage({
 
         {/* Right Column: Notes + Activity */}
         <div className="lg:col-span-2 space-y-6">
+          {/* AI outreach */}
+          <AIGeneratePanel
+            leadId={lead.id}
+            clientEmail={lead.client.email}
+            clientPhone={lead.client.phone}
+            clientWhatsapp={lead.client.whatsapp}
+          />
+
           {/* Notes */}
           <LeadNotes leadId={lead.id} notes={serializedNotes} />
 
