@@ -79,6 +79,18 @@ export async function getEnquiries(params?: {
 
   if (agentId === "unassigned") {
     where.assignedAgentId = null;
+    const activePoolTags = (
+      await prisma.pool.findMany({
+        where: { isActive: true },
+        select: { tag: true },
+      })
+    ).map((p) => p.tag);
+    if (activePoolTags.length) {
+      where.AND = [
+        ...(where.AND || []),
+        { NOT: { tags: { hasSome: activePoolTags } } },
+      ];
+    }
   } else if (agentId?.startsWith("POOL_")) {
     where.tags = { has: agentId };
   } else if (agentId) {
@@ -992,8 +1004,17 @@ export async function getEnquiryCountsByConsultant() {
     select: { tag: true, name: true },
   });
 
+  const activePoolTags = activePools.map((p) => p.tag);
   const [unassigned, ...poolCountResults] = await Promise.all([
-    prisma.enquiry.count({ where: { ...baseWhere, assignedAgentId: null } }),
+    prisma.enquiry.count({
+      where: {
+        ...baseWhere,
+        assignedAgentId: null,
+        ...(activePoolTags.length
+          ? { NOT: { tags: { hasSome: activePoolTags } } }
+          : {}),
+      },
+    }),
     ...activePools.map((pool) =>
       prisma.enquiry.count({ where: { ...baseWhere, tags: { has: pool.tag } } }),
     ),
