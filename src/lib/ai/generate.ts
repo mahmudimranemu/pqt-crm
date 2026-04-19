@@ -2,7 +2,10 @@ import prisma from "@/lib/prisma";
 import { decryptSecret } from "@/lib/crypto";
 
 export type AIProviderId = "anthropic" | "openai" | "gemini" | "groq";
-export type AITaskType = "whatsapp_generation" | "email_generation";
+export type AITaskType =
+  | "whatsapp_generation"
+  | "email_generation"
+  | "assistant_chat";
 
 export const AI_PROVIDERS: { id: AIProviderId; label: string; defaultModel: string }[] = [
   { id: "anthropic", label: "Anthropic (Claude)", defaultModel: "claude-haiku-4-5-20251001" },
@@ -14,6 +17,7 @@ export const AI_PROVIDERS: { id: AIProviderId; label: string; defaultModel: stri
 export const AI_TASKS: { id: AITaskType; label: string }[] = [
   { id: "whatsapp_generation", label: "WhatsApp message generation" },
   { id: "email_generation", label: "Email generation" },
+  { id: "assistant_chat", label: "Assistant chat (intent extraction)" },
 ];
 
 interface CallArgs {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
+import { AssistantWidget } from "@/components/assistant/widget";
 import { cn } from "@/lib/utils";
 import type { UserRole, Office } from "@prisma/client";
 
@@ -46,6 +47,7 @@ export function DashboardLayout({
         <Topbar user={user} unreadNotifications={unreadNotifications} />
         <main className="p-6">{children}</main>
       </div>
+      {user.role === "SUPER_ADMIN" && <AssistantWidget />}
     </div>
   );
 }
