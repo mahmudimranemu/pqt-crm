@@ -295,6 +295,7 @@ model User {
   receivedMessages UserMessage[]  @relation("MessagesReceived")
   notesAbout       UserNote[]     @relation("NotesAbout")
   notesAuthored    UserNote[]     @relation("NotesAuthored")
+  apiKeys          ApiKey[]       @relation("ApiKeyCreator")
 
   @@map("users")
 }
@@ -1275,4 +1276,22 @@ model AITaskConfig {
   updatedAt DateTime @updatedAt
 
   @@map("ai_task_configs")
+}
+
+model ApiKey {
+  id           String    @id @default(cuid())
+  name         String
+  keyHash      String    @unique
+  keyPrefix    String
+  scopes       String[]  @default([])
+  isActive     Boolean   @default(true)
+  createdById  String
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdBy User @relation("ApiKeyCreator", fields: [createdById], references: [id])
+
+  @@index([keyHash])
+  @@map("api_keys")
 }

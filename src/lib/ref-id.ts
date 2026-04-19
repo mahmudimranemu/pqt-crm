@@ -20,3 +20,16 @@ export async function generateRefId(): Promise<string> {
   const nextNum = Math.max(lastEnqNum, lastLeadNum) + 1;
   return `PQT-${String(nextNum).padStart(4, "0")}`;
 }
+
+export async function generateLeadNumber(): Promise<string> {
+  const lastLead = await prisma.lead.findFirst({
+    orderBy: { createdAt: "desc" },
+    select: { leadNumber: true },
+  });
+  let next = 1;
+  if (lastLead?.leadNumber) {
+    const num = parseInt(lastLead.leadNumber.replace("PQT-L-", ""), 10);
+    if (!isNaN(num)) next = num + 1;
+  }
+  return `PQT-L-${String(next).padStart(4, "0")}`;
+}
