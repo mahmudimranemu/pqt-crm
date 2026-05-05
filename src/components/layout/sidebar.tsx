@@ -109,12 +109,7 @@ const navSections: NavSection[] = [
     label: "Properties",
     items: [
       { title: "Properties", href: "/properties", icon: Building2 },
-      {
-        title: "Bookings",
-        href: "/bookings",
-        icon: CalendarDays,
-        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
-      },
+      { title: "Bookings", href: "/bookings", icon: CalendarDays },
     ],
   },
   {
