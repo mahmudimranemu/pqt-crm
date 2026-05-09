@@ -243,28 +243,33 @@ enum CommunicationDirection {
 // =====================
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  firstName String
-  lastName  String
-  role      UserRole @default(SALES_AGENT)
-  office    Office
-  isActive            Boolean   @default(true)
-  phone               String?
-  avatar              String?
-  failedLoginAttempts Int       @default(0)
-  lockedUntil         DateTime?
-  twoFactorEnabled    Boolean   @default(false)
-  twoFactorSecret     String?
-  emailVerifyToken    String?
-  emailVerifyNewEmail String?
-  emailVerifyExpires  DateTime?
-  passwordResetToken  String?
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  password             String
+  firstName            String
+  lastName             String
+  role                 UserRole  @default(SALES_AGENT)
+  office               Office
+  isActive             Boolean   @default(true)
+  phone                String?
+  avatar               String?
+  failedLoginAttempts  Int       @default(0)
+  lockedUntil          DateTime?
+  twoFactorEnabled     Boolean   @default(false)
+  twoFactorSecret      String?
+  emailVerifyToken     String?
+  emailVerifyNewEmail  String?
+  emailVerifyExpires   DateTime?
+  passwordResetToken   String?
   passwordResetExpires DateTime?
-  lastSeen            DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  lastSeen             DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  // Set by the inbound user webhook from PMS (PR 3+). The receiver must
+  // explicitly bump this on every upsert; we don't use @updatedAt so a
+  // routine NextAuth login (which touches users.lastSeen) doesn't make the
+  // mirror look freshly synced.
+  syncedAt             DateTime  @default(now()) @db.Timestamptz
 
   // Relations
   clients        Client[]
@@ -279,14 +284,14 @@ model User {
   enquiryNotes   EnquiryNote[]
 
   // New CRM relations
-  ownedLeads       Lead[]       @relation("LeadOwner")
-  leadNotes        LeadNote[]   @relation("LeadNoteAgent")
-  ownedDeals       Deal[]       @relation("DealOwner")
-  assignedTasks    Task[]       @relation("TaskAssignee")
-  createdTasks     Task[]       @relation("TaskCreator")
+  ownedLeads       Lead[]         @relation("LeadOwner")
+  leadNotes        LeadNote[]     @relation("LeadNoteAgent")
+  ownedDeals       Deal[]         @relation("DealOwner")
+  assignedTasks    Task[]         @relation("TaskAssignee")
+  createdTasks     Task[]         @relation("TaskCreator")
   commissions      Commission[]
   auditLogs        AuditLog[]
-  managedTeams     Team[]       @relation("TeamManager")
+  managedTeams     Team[]         @relation("TeamManager")
   teamMemberships  TeamMember[]
   notifications    Notification[]
   activities       Activity[]
@@ -326,13 +331,13 @@ model Client {
   updatedAt             DateTime          @updatedAt
 
   // Relations
-  assignedAgent            User?                     @relation(fields: [assignedAgentId], references: [id])
-  bookings                 Booking[]
-  enquiries                Enquiry[]
-  documents                Document[]
-  communications           Communication[]
-  citizenshipApplications  CitizenshipApplication[]
-  sales                    Sale[]
+  assignedAgent           User?                    @relation(fields: [assignedAgentId], references: [id])
+  bookings                Booking[]
+  enquiries               Enquiry[]
+  documents               Document[]
+  communications          Communication[]
+  citizenshipApplications CitizenshipApplication[]
+  sales                   Sale[]
 
   // New CRM relations
   leads      Lead[]
@@ -375,10 +380,10 @@ model Property {
   updatedAt           DateTime       @updatedAt
 
   // Relations
-  bookings  Booking[]
-  sales     Sale[]
-  enquiries Enquiry[]
-  interestedLeads Lead[] @relation("LeadProperty")
+  bookings        Booking[]
+  sales           Sale[]
+  enquiries       Enquiry[]
+  interestedLeads Lead[]    @relation("LeadProperty")
 
   @@index([district])
   @@index([status])
@@ -402,23 +407,23 @@ model Enquiry {
   updatedAt         DateTime      @updatedAt
 
   // Extended fields
-  budget            String?
-  country           String?
-  tags              String[]      @default([])
-  called            Boolean       @default(false)
-  spoken            Boolean       @default(false)
-  segment           String?       @default("Buyer")
-  leadStatus        String?       @default("New")
-  priority          String?       @default("Medium")
-  nextCallDate      DateTime?
-  snooze              String?       @default("Active")
-  interestedPropertyId String?
-  interestedPropertyRefs String[]   @default([])
+  budget                 String?
+  country                String?
+  tags                   String[]  @default([])
+  called                 Boolean   @default(false)
+  spoken                 Boolean   @default(false)
+  segment                String?   @default("Buyer")
+  leadStatus             String?   @default("New")
+  priority               String?   @default("Medium")
+  nextCallDate           DateTime?
+  snooze                 String?   @default("Active")
+  interestedPropertyId   String?
+  interestedPropertyRefs String[]  @default([])
 
   // Relations
-  assignedAgent      User?          @relation(fields: [assignedAgentId], references: [id])
-  convertedClient    Client?        @relation(fields: [convertedClientId], references: [id])
-  interestedProperty Property?      @relation(fields: [interestedPropertyId], references: [id])
+  assignedAgent      User?         @relation(fields: [assignedAgentId], references: [id])
+  convertedClient    Client?       @relation(fields: [convertedClientId], references: [id])
+  interestedProperty Property?     @relation(fields: [interestedPropertyId], references: [id])
   notes              EnquiryNote[]
   activities         Activity[]
 
@@ -817,40 +822,40 @@ enum ActivityType {
 // =====================
 
 model Lead {
-  id               String       @id @default(cuid())
-  refId            String?      @unique
-  leadNumber       String       @unique @default(cuid())
-  title            String
-  description      String?      @db.Text
-  stage            LeadStage    @default(NEW_ENQUIRY)
-  estimatedValue   Decimal?     @db.Decimal(15, 2)
-  currency         Currency     @default(USD)
-  budgetRange      BudgetRange?
-  source           LeadSource   @default(WEBSITE)
-  sourceChannel    SourceChannel?
-  sourceDetail     String?
-  propertyType     PropertyType?
+  id                String         @id @default(cuid())
+  refId             String?        @unique
+  leadNumber        String         @unique @default(cuid())
+  title             String
+  description       String?        @db.Text
+  stage             LeadStage      @default(NEW_ENQUIRY)
+  estimatedValue    Decimal?       @db.Decimal(15, 2)
+  currency          Currency       @default(USD)
+  budgetRange       BudgetRange?
+  source            LeadSource     @default(WEBSITE)
+  sourceChannel     SourceChannel?
+  sourceDetail      String?
+  propertyType      PropertyType?
   preferredLocation String?
-  score            Int?         @default(0)
-  temperature      String?
-  slaDeadline      DateTime?
-  lostReason       String?      @db.Text
-  convertedDealId  String?      @unique
-  clientId         String
-  ownerId          String
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  score             Int?           @default(0)
+  temperature       String?
+  slaDeadline       DateTime?
+  lostReason        String?        @db.Text
+  convertedDealId   String?        @unique
+  clientId          String
+  ownerId           String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
   // Extended fields (mirror enquiry management features)
-  tags             String[]     @default([])
-  called           Boolean      @default(false)
-  spoken           Boolean      @default(false)
-  segment          String?      @default("Buyer")
-  priority         String?      @default("Medium")
-  nextCallDate     DateTime?
-  snooze           String?      @default("Active")
-  interestedPropertyId String?
-  interestedPropertyRefs String[] @default([])
+  tags                   String[]  @default([])
+  called                 Boolean   @default(false)
+  spoken                 Boolean   @default(false)
+  segment                String?   @default("Buyer")
+  priority               String?   @default("Medium")
+  nextCallDate           DateTime?
+  snooze                 String?   @default("Active")
+  interestedPropertyId   String?
+  interestedPropertyRefs String[]  @default([])
 
   // Relations
   client             Client     @relation(fields: [clientId], references: [id])
@@ -883,26 +888,26 @@ model LeadNote {
 }
 
 model Deal {
-  id                String     @id @default(cuid())
-  dealNumber        String     @unique @default(cuid())
+  id                String        @id @default(cuid())
+  dealNumber        String        @unique @default(cuid())
   title             String
-  description       String?    @db.Text
-  dealValue         Decimal    @db.Decimal(15, 2)
-  currency          Currency   @default(USD)
-  stage             DealStage  @default(RESERVATION)
-  result            DealResult @default(PENDING)
-  probability       Int?       @default(50)
+  description       String?       @db.Text
+  dealValue         Decimal       @db.Decimal(15, 2)
+  currency          Currency      @default(USD)
+  stage             DealStage     @default(RESERVATION)
+  result            DealResult    @default(PENDING)
+  probability       Int?          @default(50)
   propertyType      PropertyType?
   propertyName      String?
   unitNumber        String?
   expectedCloseDate DateTime?
   actualCloseDate   DateTime?
-  lostReason        String?    @db.Text
+  lostReason        String?       @db.Text
   clientId          String
   ownerId           String
-  fromLeadId        String?    @unique
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  fromLeadId        String?       @unique
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
   // Relations
   client      Client       @relation(fields: [clientId], references: [id])
@@ -953,19 +958,19 @@ model Task {
 }
 
 model Payment {
-  id         String        @id @default(cuid())
-  amount     Decimal       @db.Decimal(15, 2)
-  currency   Currency      @default(USD)
-  status     PaymentStatus @default(PENDING)
+  id         String         @id @default(cuid())
+  amount     Decimal        @db.Decimal(15, 2)
+  currency   Currency       @default(USD)
+  status     PaymentStatus  @default(PENDING)
   method     PaymentMethod?
   reference  String?
   dueDate    DateTime?
   receivedAt DateTime?
-  notes      String?       @db.Text
+  notes      String?        @db.Text
   dealId     String
   clientId   String
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 
   // Relations
   deal   Deal   @relation(fields: [dealId], references: [id])
@@ -1279,16 +1284,16 @@ model AITaskConfig {
 }
 
 model ApiKey {
-  id           String    @id @default(cuid())
-  name         String
-  keyHash      String    @unique
-  keyPrefix    String
-  scopes       String[]  @default([])
-  isActive     Boolean   @default(true)
-  createdById  String
-  lastUsedAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  name        String
+  keyHash     String    @unique
+  keyPrefix   String
+  scopes      String[]  @default([])
+  isActive    Boolean   @default(true)
+  createdById String
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   createdBy User @relation("ApiKeyCreator", fields: [createdById], references: [id])
 

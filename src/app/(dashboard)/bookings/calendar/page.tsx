@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -49,7 +49,7 @@ const statusLabels: Record<BookingStatus, string> = {
 };
 
 export default function BookingCalendarPage() {
-  const { data: sessionData } = useSession();
+  const { data: currentUser } = useCurrentUser();
   const [bookings, setBookings] = useState<CalendarBooking[]>([]);
   const [selectedBooking, setSelectedBooking] =
     useState<CalendarBooking | null>(null);
@@ -98,7 +98,7 @@ export default function BookingCalendarPage() {
             View and manage property viewings and appointments
           </p>
         </div>
-        {(sessionData?.user as any)?.role !== "VIEWER" && (
+        {currentUser?.role !== "VIEWER" && (
           <Link href="/bookings/create">
             <Button>
               <Plus className="mr-2 h-4 w-4" />

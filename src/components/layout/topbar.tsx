@@ -1,6 +1,6 @@
 "use client";
 
-import { signOut } from "next-auth/react";
+import { signOut } from "@/lib/auth-client";
 import {
   LogOut,
   User,
@@ -38,7 +38,9 @@ interface TopbarProps {
 
 export function Topbar({ user, unreadNotifications = 0 }: TopbarProps) {
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
+    // Bounces through PMS /auth/logout (which clears the parent-domain cookies)
+    // and lands on the PMS login page.
+    await signOut();
   };
 
   return (
