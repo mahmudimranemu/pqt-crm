@@ -98,3 +98,36 @@ export async function auth(): Promise<ExtendedSession | null> {
  *  imports `signOut` / `signInUrl` from `@/lib/auth` (server context) keeps
  *  working. Client components should import from `./auth-client` directly. */
 export { signOut, signInUrl } from "./auth-client";
+
+// ---------------------------------------------------------------------------
+// Role + office helpers — kept here so existing callsites in `access-control`
+// and elsewhere don't have to be re-pointed.
+// ---------------------------------------------------------------------------
+
+const ROLE_RANK: Record<UserRole, number> = {
+  SUPER_ADMIN: 100,
+  ADMIN: 80,
+  SALES_MANAGER: 60,
+  SALES_AGENT: 40,
+  VIEWER: 20,
+};
+
+/** True iff `userRole` is at least as privileged as `minimumRole`. */
+export function hasMinimumRole(
+  userRole: UserRole,
+  minimumRole: UserRole,
+): boolean {
+  return (ROLE_RANK[userRole] ?? 0) >= (ROLE_RANK[minimumRole] ?? 0);
+}
+
+/** True iff a user with the given role + office is allowed to read/operate
+ *  on data belonging to `targetOffice`. SUPER_ADMINs see everything; everyone
+ *  else is scoped to their own office. */
+export function canAccessOffice(
+  userRole: UserRole,
+  userOffice: Office,
+  targetOffice: Office,
+): boolean {
+  if (userRole === "SUPER_ADMIN") return true;
+  return userOffice === targetOffice;
+}
