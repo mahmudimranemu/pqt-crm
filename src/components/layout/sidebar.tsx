@@ -69,7 +69,15 @@ interface NavSection {
 const navSections: NavSection[] = [
   {
     label: "Main",
-    items: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
+    items: [
+      { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      {
+        title: "Executive",
+        href: "/dashboard/executive",
+        icon: Sparkles,
+        roles: ["SUPER_ADMIN", "ADMIN"],
+      },
+    ],
   },
   {
     label: "Pipeline",

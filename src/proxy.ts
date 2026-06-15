@@ -31,7 +31,12 @@ const PUBLIC_PATHS = [
   "/api/",
   "/_next/",
   "/favicon.ico",
+  // Dev-only local login shim (the route handler itself 404s in production),
+  // so it must bypass the proxy to be able to set the session cookie.
+  "/dev-login",
 ];
+
+const IS_DEV = process.env.NODE_ENV !== "production";
 
 /* Optional: legacy auth-flow paths now that NextAuth is gone. We redirect any
  * traffic to /login or /forgot-password etc. straight to PMS. */
@@ -42,6 +47,22 @@ function pmsLoginUrl(redirectTo: string): string {
   const u = new URL(`${base}/login`);
   u.searchParams.set("redirect", redirectTo);
   return u.toString();
+}
+
+/** Where to send an unauthenticated request. In production this is the PMS
+ *  SSO login; in local dev (no PMS running) we route to the dev-login shim so
+ *  the CRM is usable standalone instead of bouncing to a dead PMS URL. */
+function loginRedirectResponse(
+  request: NextRequest,
+  redirectTo: string,
+): NextResponse {
+  const host = request.nextUrl.hostname;
+  const isLocalhost =
+    host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "0.0.0.0";
+  if (IS_DEV && isLocalhost) {
+    return NextResponse.redirect(new URL("/dev-login", request.nextUrl.origin));
+  }
+  return NextResponse.redirect(pmsLoginUrl(redirectTo));
 }
 
 async function isAccessTokenValid(token: string): Promise<boolean> {
@@ -161,7 +182,7 @@ export async function proxy(request: NextRequest) {
 
   // 3. No cookies at all → genuinely logged out.
   if (!accessToken && !refreshToken) {
-    return NextResponse.redirect(pmsLoginUrl(loginRedirect));
+    return loginRedirectResponse(request, loginRedirect);
   }
 
   // 4. Happy path: a valid access token admits immediately.
@@ -195,8 +216,8 @@ export async function proxy(request: NextRequest) {
     return withSecurityHeaders(NextResponse.next());
   }
 
-  // 7. Refresh unavailable or failed → send to PMS login.
-  return NextResponse.redirect(pmsLoginUrl(loginRedirect));
+  // 7. Refresh unavailable or failed → send to login (PMS in prod, dev-login locally).
+  return loginRedirectResponse(request, loginRedirect);
 }
 
 export const config = {
