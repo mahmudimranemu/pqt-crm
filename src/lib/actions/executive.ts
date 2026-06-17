@@ -73,6 +73,106 @@ function buildDataset(cur: MetricTotals, prev: MetricTotals) {
   };
 }
 
+// Map ActivityType → the dashboard's call/email/spoken/note buckets.
+const ACT_BUCKET: Record<string, "call" | "email" | "spoken" | "note"> = {
+  CALL: "call",
+  EMAIL: "email",
+  MEETING: "spoken",
+  SITE_VISIT: "spoken",
+  NOTE: "note",
+  FOLLOW_UP: "note",
+  STAGE_CHANGE: "note",
+  DOCUMENT_UPLOAD: "note",
+  PAYMENT_RECEIVED: "note",
+  TASK_COMPLETED: "note",
+};
+
+/** Per-agent daily activity log (real `Activity` rows) for the team-activity
+ *  table and the chat's "last N days of <agent>". Day index 0 = today.
+ *  Returned shape matches the dashboard's genAgentDays output. */
+async function buildActivityDays(days = 30) {
+  const now = new Date();
+  const startMidnight = new Date(now);
+  startMidnight.setHours(0, 0, 0, 0);
+  const since = new Date(startMidnight.getTime() - (days - 1) * 86_400_000);
+
+  const users = await prisma.user.findMany({
+    where: { role: { in: ["SALES_AGENT", "SALES_MANAGER"] } },
+    select: { id: true, firstName: true, lastName: true, role: true },
+  });
+  const acts = await prisma.activity.findMany({
+    where: { userId: { in: users.map((u) => u.id) }, createdAt: { gte: since } },
+    orderBy: { createdAt: "asc" },
+    select: {
+      userId: true,
+      type: true,
+      title: true,
+      description: true,
+      createdAt: true,
+      lead: { select: { title: true } },
+      client: { select: { firstName: true, lastName: true } },
+      enquiry: { select: { firstName: true, lastName: true } },
+    },
+  });
+
+  const dayIndex = (d: Date) => {
+    const m = new Date(d);
+    m.setHours(0, 0, 0, 0);
+    return Math.round((startMidnight.getTime() - m.getTime()) / 86_400_000);
+  };
+  const contactName = (a: (typeof acts)[number]) => {
+    if (a.client) return `${a.client.firstName} ${a.client.lastName}`.trim();
+    if (a.lead) return a.lead.title;
+    if (a.enquiry) return `${a.enquiry.firstName} ${a.enquiry.lastName}`.trim();
+    return "";
+  };
+
+  const byUser = new Map<string, typeof acts>();
+  for (const a of acts) {
+    const arr = byUser.get(a.userId) ?? [];
+    arr.push(a);
+    byUser.set(a.userId, arr);
+  }
+
+  const result = users.map((u) => {
+    const blank = () => ({ call: 0, email: 0, spoken: 0, note: 0 });
+    const dayObjs = Array.from({ length: days }, (_, i) => ({
+      date: new Date(startMidnight.getTime() - i * 86_400_000),
+      started: null as Date | null,
+      counts: blank(),
+      entries: [] as { time: Date; type: string; text: string; client: string }[],
+    }));
+    for (const a of byUser.get(u.id) ?? []) {
+      const idx = dayIndex(a.createdAt);
+      if (idx < 0 || idx >= days) continue;
+      const day = dayObjs[idx];
+      const bucket = ACT_BUCKET[a.type] ?? "note";
+      day.counts[bucket] += 1;
+      if (!day.started || a.createdAt < day.started) day.started = a.createdAt;
+      if (day.entries.length < 8) {
+        day.entries.push({
+          time: a.createdAt,
+          type: bucket,
+          text: a.title || a.description || bucket,
+          client: contactName(a),
+        });
+      }
+    }
+    return {
+      name: `${u.firstName} ${u.lastName}`.trim().toUpperCase(),
+      role: titleCase(u.role),
+      days: dayObjs,
+    };
+  });
+
+  // Surface agents with real activity first; keep all so the team list isn't empty.
+  return result.sort(
+    (a, b) =>
+      b.days.reduce((s, d) => s + d.entries.length, 0) -
+      a.days.reduce((s, d) => s + d.entries.length, 0),
+  );
+}
+
 export async function getExecutiveData() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
@@ -223,7 +323,17 @@ export async function getExecutiveData() {
     concentrationPct: topShare,
   };
 
-  return { datasets, agents30d, sourceSplit, nationalities, totalClients, attention };
+  const activityDays = await buildActivityDays(30);
+
+  return {
+    datasets,
+    agents30d,
+    sourceSplit,
+    nationalities,
+    totalClients,
+    attention,
+    activityDays,
+  };
 }
 
 /* ---- AI: executive summary + free-form chat ----------------------------

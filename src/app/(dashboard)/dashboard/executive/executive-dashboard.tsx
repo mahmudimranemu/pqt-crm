@@ -1252,10 +1252,13 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
     }));
   }, [TODAY]);
 
+  // Live per-agent activity (from getExecutiveData) → falls back to the mock.
+  const ACTIVITY = data?.activityDays?.length ? data.activityDays : activityDays;
+
   const actWindow = actView === "daily" ? 1 : actView === "weekly" ? 7 : 30;
 
   const actRows = useMemo(() => {
-    const rows = activityDays.map((a) => {
+    const rows = ACTIVITY.map((a) => {
       const slice = a.days.slice(0, actWindow);
       const c = sumCounts(slice);
       const total = c.call + c.email + c.spoken + c.note;
@@ -1284,7 +1287,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
         : y[actSortKey] - x[actSortKey];
     });
     return rows;
-  }, [activityDays, actWindow, actSortKey, actSortDir]);
+  }, [ACTIVITY, actWindow, actSortKey, actSortDir]);
 
   // reset AI to the curated summary whenever the window changes
   useEffect(() => {
@@ -1335,13 +1338,107 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
      can't classify optionally goes to Claude live (preview only).
      ⚠️ DATA-WIRING: in the real CRM, send the question to YOUR backend, which
      runs the DB query and (optionally) has Claude phrase the result. */
+  // Match a query to a REAL agent (from the live activity feed), not the mock list.
+  function matchAgentReal(query) {
+    const ql = query.toLowerCase();
+    let best = null;
+    let score = 0;
+    for (const a of ACTIVITY) {
+      const nm = a.name.toLowerCase();
+      let s = 0;
+      if (ql.includes(nm)) s += 60;
+      nm.split(/\s+/).forEach((tok) => {
+        if (tok.length >= 3 && ql.includes(tok)) s += tok.length;
+      });
+      if (s > score) {
+        score = s;
+        best = a;
+      }
+    }
+    return score >= 4 ? best : null;
+  }
+
+  // Component-scope resolver — same intents as resolveQuery but over LIVE data
+  // (ACTIVITY = real per-agent days, `agents` = real leaderboard, kpi = real totals).
+  function resolveLocal(query) {
+    const ql = (query || "").toLowerCase().trim();
+    if (!ql) return { kind: "empty" };
+    const agent = matchAgentReal(query);
+    const period = matchPeriod(query);
+    const metric = METRICS.find((m) => m.re.test(ql));
+    const wantsRank =
+      /\bmost\b|\btop\b|highest|best|busiest|\bleast\b|fewest|lowest|laziest|rank|leaderboard|\bwho\b/.test(
+        ql,
+      );
+    const dir = /\bleast\b|fewest|lowest|laziest|quiet/.test(ql) ? "asc" : "desc";
+
+    if (
+      agent &&
+      !wantsRank &&
+      (period ||
+        /activity|timeline|breakdown|\blog\b|what.*(do|did)|update/.test(ql))
+    ) {
+      return {
+        kind: "timeline",
+        agent: { name: agent.name, role: agent.role },
+        days: period ? period.days : 5,
+      };
+    }
+
+    if (wantsRank && metric) {
+      const days = period ? period.days : 7;
+      const rows = ACTIVITY.map((a) => {
+        let value;
+        if (metric.fromLog) {
+          const c = sumCounts(a.days.slice(0, days));
+          value = metric.key === "total" ? totalOf(c) : c[metric.key];
+        } else {
+          const ag = agents.find((x) => x.name === a.name);
+          value = ag ? (metric.key === "leads" ? ag.leads : ag.enq) : 0;
+        }
+        return { name: a.name, role: a.role, value };
+      }).sort((x, y) => (dir === "asc" ? x.value - y.value : y.value - x.value));
+      return {
+        kind: "ranking",
+        metric,
+        dir,
+        periodLabel: period ? period.label : "the last 7 days",
+        rows,
+      };
+    }
+
+    if (metric) {
+      const days = period ? period.days : 30;
+      let total = 0;
+      if (metric.fromLog) {
+        ACTIVITY.forEach((a) => {
+          const c = sumCounts(a.days.slice(0, days));
+          total += metric.key === "total" ? totalOf(c) : c[metric.key];
+        });
+      } else {
+        total = metric.key === "leads" ? kpi.leads.v : kpi.enquiries.v;
+      }
+      return {
+        kind: "metric",
+        metric,
+        periodLabel: period ? period.label : "the selected period",
+        total,
+      };
+    }
+
+    if (agent) {
+      return { kind: "timeline", agent: { name: agent.name, role: agent.role }, days: 5 };
+    }
+    return { kind: "ai" };
+  }
+
   async function askCRM(qRaw) {
     const q = (qRaw ?? chatInput).trim();
     if (!q || chatLoading) return;
     setChatInput("");
     setChatMsgs((m) => [...m, { role: "user", text: q }]);
 
-    const result = resolveQuery(q);
+    const result = resolveLocal(q);
     if (result.kind !== "ai") {
       setChatMsgs((m) => [...m, { role: "bot", result }]);
       return;
@@ -1558,11 +1655,9 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
     }
 
     if (result.kind === "timeline") {
-      const days = genAgentDays(
-        result.agent.name,
-        TODAY.getTime(),
-        result.days,
-      );
+      const days = (
+        ACTIVITY.find((a) => a.name === result.agent.name)?.days ?? []
+      ).slice(0, result.days);
       return (
         <div className="ca-tl">
           <div className="ca-tl-h">
