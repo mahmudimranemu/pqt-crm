@@ -861,6 +861,10 @@ model Lead {
   interestedPropertyId   String?
   interestedPropertyRefs String[]  @default([])
 
+  // AI overview — an actionable "what to do next to win this lead" summary
+  aiOverview            String?   @db.Text
+  aiOverviewGeneratedAt DateTime?
+
   // Relations
   client             Client     @relation(fields: [clientId], references: [id])
   owner              User       @relation("LeadOwner", fields: [ownerId], references: [id])

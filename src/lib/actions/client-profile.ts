@@ -8,6 +8,7 @@ import { generateWithTask } from "@/lib/ai/generate";
 import {
   buildClientProfileContext,
   CLIENT_PROFILE_SYSTEM_PROMPT,
+  LEAD_OVERVIEW_SYSTEM_PROMPT,
   parseClientProfile,
 } from "@/lib/ai/prompts";
 import {
@@ -123,6 +124,78 @@ export async function saveClientProfile(
     return { ok: true, clientId: lead.clientId };
   } catch (e) {
     console.error("saveClientProfile failed:", e);
+    return { ok: false, error: "Couldn't save the profile. Please try again." };
+  }
+}
+
+/**
+ * Generate (and persist) an actionable "what to do next to win this lead"
+ * overview from the lead's latest notes/activity. Stored on the lead so the
+ * page can tell when it's gone stale (newer notes/call-date changes).
+ */
+export async function generateLeadOverview(
+  leadId: string,
+): Promise<{ ok: true; overview: string } | { ok: false; error: string }> {
+  try {
+    await requireSession();
+    const context = await buildClientProfileContext(leadId);
+    const raw = await generateWithTask(
+      "lead_overview",
+      LEAD_OVERVIEW_SYSTEM_PROMPT,
+      context,
+      "assistant_chat",
+      800,
+    );
+    const overview = raw.trim();
+    if (!overview) return { ok: false, error: "The AI returned an empty overview." };
+
+    await prisma.lead.update({
+      where: { id: leadId },
+      data: { aiOverview: overview, aiOverviewGeneratedAt: new Date() },
+    });
+    revalidatePath(`/leads/${leadId}`);
+    return { ok: true, overview };
+  } catch (e) {
+    console.error("generateLeadOverview failed:", e);
+    const msg =
+      e instanceof Error && /not configured|not enabled|no API key/i.test(e.message)
+        ? "AI isn't configured yet — set a provider in Settings → AI."
+        : "Couldn't generate the overview. Please try again.";
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * Manually update a client's profile directly from the client page (no lead /
+ * AI involved). Lets agents correct or fill in the profile by hand.
+ */
+export async function updateClientProfile(
+  clientId: string,
+  profile: ClientProfile,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireSession();
+    const now = new Date();
+    const stored: ClientProfile = {
+      ...profile,
+      meta: {
+        ...(profile.meta ?? {}),
+        generatedAt: now.toISOString(),
+        aiNotes: "Manually edited by an agent.",
+      },
+    };
+    await prisma.client.update({
+      where: { id: clientId },
+      data: {
+        aiProfile: JSON.parse(JSON.stringify(stored)),
+        aiProfileGeneratedAt: now,
+      },
+    });
+    await auditLog("UPDATE", "Client", clientId, { aiProfile: { manual: true } });
+    revalidatePath(`/clients/${clientId}`);
+    return { ok: true };
+  } catch (e) {
+    console.error("updateClientProfile failed:", e);
     return { ok: false, error: "Couldn't save the profile. Please try again." };
   }
 }

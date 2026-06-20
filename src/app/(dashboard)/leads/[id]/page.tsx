@@ -25,6 +25,7 @@ import { LeadNotes } from "./lead-notes";
 import { LeadPropertySelector } from "./lead-property-selector";
 import { AIGeneratePanel } from "./ai-generate-panel";
 import { CreateProfilePanel } from "./create-profile-panel";
+import { LeadOverviewPanel } from "./lead-overview-panel";
 import { TagManager } from "@/components/tag-manager";
 
 const stageColors: Record<string, string> = {
@@ -82,6 +83,21 @@ export default async function LeadDetailPage({
     ...note,
     createdAt: note.createdAt.toISOString(),
   }));
+
+  // AI overview state: shown once the client's profile exists. The Regenerate
+  // button is enabled only when a note or activity (incl. call-date changes)
+  // is newer than the stored overview.
+  const hasProfile = Boolean(lead.client.aiProfile);
+  const overviewAt = lead.aiOverviewGeneratedAt
+    ? new Date(lead.aiOverviewGeneratedAt)
+    : null;
+  const latestTouch = Math.max(
+    lead.notes[0] ? new Date(lead.notes[0].createdAt).getTime() : 0,
+    lead.activities[0] ? new Date(lead.activities[0].createdAt).getTime() : 0,
+  );
+  const overviewStale =
+    Boolean(lead.aiOverview) &&
+    (!overviewAt || latestTouch > overviewAt.getTime());
 
   return (
     <div className="space-y-6">
@@ -312,8 +328,18 @@ export default async function LeadDetailPage({
             clientWhatsapp={lead.client.whatsapp}
           />
 
-          {/* AI client profile */}
-          <CreateProfilePanel leadId={lead.id} clientId={lead.client.id} />
+          {/* AI client profile / overview */}
+          {hasProfile ? (
+            <LeadOverviewPanel
+              leadId={lead.id}
+              clientId={lead.client.id}
+              overview={lead.aiOverview ?? null}
+              generatedAt={overviewAt ? overviewAt.toISOString() : null}
+              isStale={overviewStale}
+            />
+          ) : (
+            <CreateProfilePanel leadId={lead.id} clientId={lead.client.id} />
+          )}
 
           {/* Notes */}
           <LeadNotes leadId={lead.id} notes={serializedNotes} />
