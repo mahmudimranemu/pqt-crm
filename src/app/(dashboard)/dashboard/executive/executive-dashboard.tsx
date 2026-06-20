@@ -496,6 +496,15 @@ function ChartTip({ active, payload, label }) {
 }
 
 
+// Activity-log types → label + icon, used by the team-activity table and the
+// chat timeline/ranking answers.
+const LOG_TYPES = [
+  { key: "call", label: "Calls", icon: Phone },
+  { key: "email", label: "Emails", icon: Mail },
+  { key: "spoken", label: "Spoken", icon: MessageSquare },
+  { key: "note", label: "Notes", icon: StickyNote },
+];
+
 const sumCounts = (days) =>
   days.reduce(
     (a, d) => ({
