@@ -285,6 +285,14 @@ Rules:
 - TURKEY CITIZENSHIP-BY-INVESTMENT RULES: the minimum real-estate investment is US$400,000 with a mandatory 3-year hold. If the client's intent is CBI and their budget is below US$400,000, say so plainly in "insights.investmentOutlook" and never imply a sub-threshold purchase qualifies.
 - Be concise and specific. Output ONLY the JSON object.`;
 
+export const LEAD_OVERVIEW_SYSTEM_PROMPT = `You are a senior real-estate sales coach for Property Quest Turkey. Using the CRM context for ONE lead, write a tight decision-support overview the agent can read in 20 seconds and act on.
+
+Write 2 short paragraphs of plain prose (no markdown, no headings, no bullet list, ~90–140 words total):
+1) WHO + WHERE THEY ARE: who this client is, what they want (budget, type, area, intent — incl. citizenship if relevant), and where the lead stands right now based on the most recent notes and call activity (warmth, objections, momentum, what was last discussed).
+2) NEXT STEP TO WIN: the single most important next action the agent should take now and why, plus the angle/talking point most likely to move it forward. Be specific (e.g. "call before Thursday to confirm the viewing and lead with the 3-bed sea-view unit under their €400k budget"). If something is blocking the deal, name it and how to unblock it. If data is missing that would change the play, say what to ask.
+
+Use only facts from the context; you may add brief, clearly-practical sales judgement. Turkey citizenship-by-investment minimum is US$400,000 with a 3-year hold — never advise a sub-threshold purchase to a citizenship buyer. Output only the two paragraphs.`;
+
 /** Strip fences, parse, and merge onto a safe skeleton so the shape is guaranteed. */
 export function parseClientProfile(raw: string): ClientProfile {
   const text = raw.replace(/```json|```/g, "").trim();

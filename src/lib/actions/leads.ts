@@ -357,6 +357,7 @@ export async function getLeadById(id: string) {
           phone: true,
           whatsapp: true,
           nationality: true,
+          aiProfile: true,
         },
       },
       convertedDeal: { select: { id: true, dealNumber: true, title: true } },

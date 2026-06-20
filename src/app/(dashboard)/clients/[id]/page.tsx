@@ -44,6 +44,7 @@ import type {
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ tab?: string }>;
 }
 
 const statusColors: Record<
@@ -144,7 +145,8 @@ const enquiryStatusLabels: Record<string, string> = {
   SPAM: "Spam",
 };
 
-export default async function ClientDetailPage({ params }: PageProps) {
+export default async function ClientDetailPage({ params, searchParams }: PageProps) {
+  const initialTab = (await searchParams)?.tab ?? "overview";
   const session = (await auth()) as ExtendedSession | null;
   const { id } = await params;
   const client = await getClient(id);
@@ -245,7 +247,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue={initialTab} className="space-y-4">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>

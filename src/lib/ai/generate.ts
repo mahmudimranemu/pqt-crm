@@ -6,7 +6,8 @@ export type AITaskType =
   | "whatsapp_generation"
   | "email_generation"
   | "assistant_chat"
-  | "client_profile";
+  | "client_profile"
+  | "lead_overview";
 
 export const AI_PROVIDERS: { id: AIProviderId; label: string; defaultModel: string }[] = [
   { id: "anthropic", label: "Anthropic (Claude)", defaultModel: "claude-haiku-4-5-20251001" },
@@ -20,6 +21,7 @@ export const AI_TASKS: { id: AITaskType; label: string }[] = [
   { id: "email_generation", label: "Email generation" },
   { id: "assistant_chat", label: "Assistant chat (intent extraction)" },
   { id: "client_profile", label: "Client profile generation" },
+  { id: "lead_overview", label: "Lead overview / next-step coaching" },
 ];
 
 interface CallArgs {
