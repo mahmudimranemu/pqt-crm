@@ -100,8 +100,19 @@ async function buildActivityDays(days = 30) {
     where: { role: { in: ["SALES_AGENT", "SALES_MANAGER"] } },
     select: { id: true, firstName: true, lastName: true, role: true },
   });
+  const ids = users.map((u) => u.id);
   const acts = await prisma.activity.findMany({
-    where: { userId: { in: users.map((u) => u.id) }, createdAt: { gte: since } },
+    where: {
+      createdAt: { gte: since },
+      // Owned-by OR performed-by a sales user (covers actions taken by a manager
+      // on another agent's record — we attribute those to the record's owner).
+      OR: [
+        { lead: { ownerId: { in: ids } } },
+        { enquiry: { assignedAgentId: { in: ids } } },
+        { client: { assignedAgentId: { in: ids } } },
+        { userId: { in: ids } },
+      ],
+    },
     orderBy: { createdAt: "asc" },
     select: {
       userId: true,
@@ -109,9 +120,9 @@ async function buildActivityDays(days = 30) {
       title: true,
       description: true,
       createdAt: true,
-      lead: { select: { title: true } },
-      client: { select: { firstName: true, lastName: true } },
-      enquiry: { select: { firstName: true, lastName: true } },
+      lead: { select: { title: true, ownerId: true } },
+      client: { select: { firstName: true, lastName: true, assignedAgentId: true } },
+      enquiry: { select: { firstName: true, lastName: true, assignedAgentId: true } },
     },
   });
 
@@ -127,11 +138,21 @@ async function buildActivityDays(days = 30) {
     return "";
   };
 
-  const byUser = new Map<string, typeof acts>();
+  // Attribute each activity to the agent who OWNS the related record (their book
+  // of business), not whoever performed the action — so a manager's bulk actions
+  // on other agents' leads don't flood the manager's timeline.
+  const ownerId = (a: (typeof acts)[number]) =>
+    a.lead?.ownerId ??
+    a.enquiry?.assignedAgentId ??
+    a.client?.assignedAgentId ??
+    a.userId;
+
+  const byAgent = new Map<string, typeof acts>();
   for (const a of acts) {
-    const arr = byUser.get(a.userId) ?? [];
+    const oid = ownerId(a);
+    const arr = byAgent.get(oid) ?? [];
     arr.push(a);
-    byUser.set(a.userId, arr);
+    byAgent.set(oid, arr);
   }
 
   const result = users.map((u) => {
@@ -142,7 +163,7 @@ async function buildActivityDays(days = 30) {
       counts: blank(),
       entries: [] as { time: Date; type: string; text: string; client: string }[],
     }));
-    for (const a of byUser.get(u.id) ?? []) {
+    for (const a of byAgent.get(u.id) ?? []) {
       const idx = dayIndex(a.createdAt);
       if (idx < 0 || idx >= days) continue;
       const day = dayObjs[idx];
