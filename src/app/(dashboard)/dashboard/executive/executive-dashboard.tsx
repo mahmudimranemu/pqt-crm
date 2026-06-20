@@ -1,5 +1,5 @@
-// @ts-nocheck — vendored design drop-in (loosely typed). Proper types land in
-// Phase 1 when the mock constants are refactored into typed props.
+// @ts-nocheck — vendored design drop-in (loosely typed). Data is wired live via
+// the `data` prop from getExecutiveData(); the mock constants have been removed.
 /* eslint-disable */
 "use client";
 /**
@@ -15,11 +15,12 @@
  *   - It renders inside your existing CRM shell (the red sidebar + top search
  *     bar are already provided by the CRM layout — this is just the page body).
  *
- * IMPORTANT — THE DATA IS PLACEHOLDER
- *   - Every number below is realistic *mock* data shaped from your screenshots
- *     so the design reads true. Before launch, an engineer replaces the
- *     `DATASETS` / `AGENTS_30D` constants and the AI call with live data from
- *     your API. Search for the word  DATA-WIRING  to find every spot to swap.
+ * DATA
+ *   - Every number is live, supplied by `getExecutiveData()` via the `data`
+ *     prop: KPI datasets, per-range leaderboard, daily trend series, source
+ *     split, nationalities, needs-attention and the per-agent activity log.
+ *   - The AI summary + chat route through the CRM's configured provider
+ *     (Settings → AI); the summary falls back to a real, computed digest.
  *
  * LIBRARIES (already in this preview; standard in a Next.js app)
  *   - recharts        (charts)        npm i recharts
@@ -494,405 +495,6 @@ function ChartTip({ active, payload, label }) {
   );
 }
 
-/* ============================================================================
-   MOCK DATA  —  ⚠️ DATA-WIRING: replace all of this with live API responses
-   Numbers are shaped from the screenshots so the design reads true.
-   ========================================================================== */
-
-// Per-period top-line KPIs. Each: value (v), delta % vs the previous period (d).
-const DATASETS = {
-  "7d": {
-    enquiries: { v: 118, d: 6.2 },
-    leads: { v: 17, d: 9.1 },
-    clients: { v: 13, d: 4.0 },
-    conv: { v: 14.4, d: 1.1 },
-    bookings: { v: 4, d: -12.0 },
-    revenue: { v: 0, d: 0 },
-    sales: 0,
-  },
-  "30d": {
-    enquiries: { v: 486, d: 18.4 },
-    leads: { v: 71, d: 12.0 },
-    clients: { v: 52, d: 9.3 },
-    conv: { v: 14.6, d: 2.2 },
-    bookings: { v: 18, d: 20.0 },
-    revenue: { v: 50000, d: 0 },
-    sales: 1,
-  },
-  "90d": {
-    enquiries: { v: 1284, d: 11.7 },
-    leads: { v: 192, d: 7.5 },
-    clients: { v: 141, d: 6.1 },
-    conv: { v: 15.0, d: 0.8 },
-    bookings: { v: 47, d: 14.6 },
-    revenue: { v: 50000, d: 0 },
-    sales: 1,
-  },
-};
-
-// Enquiry source split (proportions, applied to the period's enquiry total)
-const SOURCE_SPLIT = [
-  { name: "Website", p: 0.39 },
-  { name: "Referral", p: 0.24 },
-  { name: "Partner", p: 0.18 },
-  { name: "Facebook", p: 0.11 },
-  { name: "Other", p: 0.08 },
-];
-
-// Client base by nationality (structural — from the Clients screen). Total = 1,227.
-const NATIONALITIES = [
-  { name: "Bangladesh", v: 748 },
-  { name: "Pakistan", v: 172 },
-  { name: "Kuwait", v: 98 },
-  { name: "UAE", v: 74 },
-  { name: "Other", v: 135 },
-];
-const TOTAL_CLIENTS = NATIONALITIES.reduce((a, b) => a + b.v, 0);
-
-// "Needs attention" — pulled from the live filters in your screenshots
-const ATTENTION = [
-  {
-    icon: Phone,
-    tone: "red",
-    label: "Enquiries past their call-back date",
-    value: "1,119",
-    valClass: "warnr",
-    cta: "Review backlog",
-  },
-  {
-    icon: Inbox,
-    tone: "amber",
-    label: "Sitting in the reallocation pool",
-    value: "63",
-    valClass: "warna",
-    cta: "Assign owners",
-  },
-  {
-    icon: Users,
-    tone: "amber",
-    label: "Unassigned in Pool 2",
-    value: "17",
-    valClass: "warna",
-    cta: "Distribute",
-  },
-  {
-    icon: AlertTriangle,
-    tone: "slate",
-    label: "Client base concentrated — ~43% with one agent",
-    value: "Risk",
-    valClass: "muted",
-    cta: "Rebalance team load",
-  },
-];
-
-// Per-agent activity for the 30-day base period. 7d / 90d are scaled from this.
-const AGENTS_30D = [
-  {
-    name: "RAFIQUL HASAN RAFI",
-    role: "Senior Consultant",
-    enq: 74,
-    leads: 14,
-    clients: 9,
-    activity: 486,
-    rev: 0,
-  },
-  {
-    name: "NAZMUS SA DAAT",
-    role: "Senior Consultant",
-    enq: 58,
-    leads: 11,
-    clients: 7,
-    activity: 372,
-    rev: 50000,
-  },
-  {
-    name: "WEI CHEN",
-    role: "Consultant",
-    enq: 41,
-    leads: 9,
-    clients: 6,
-    activity: 410,
-    rev: 0,
-  },
-  {
-    name: "MAHMUD IMRAN",
-    role: "Consultant",
-    enq: 34,
-    leads: 7,
-    clients: 5,
-    activity: 268,
-    rev: 0,
-  },
-  {
-    name: "IKBAL MASOOD KHAN",
-    role: "Consultant",
-    enq: 28,
-    leads: 6,
-    clients: 4,
-    activity: 221,
-    rev: 0,
-  },
-  {
-    name: "RAKIB BIN WALI",
-    role: "Consultant",
-    enq: 19,
-    leads: 4,
-    clients: 3,
-    activity: 142,
-    rev: 0,
-  },
-  {
-    name: "ISHTIYAK AHMED",
-    role: "Junior Consultant",
-    enq: 13,
-    leads: 3,
-    clients: 2,
-    activity: 96,
-    rev: 0,
-  },
-  {
-    name: "SHAHEER HASSAN",
-    role: "Junior Consultant",
-    enq: 9,
-    leads: 2,
-    clients: 1,
-    activity: 61,
-    rev: 0,
-  },
-  {
-    name: "MOHAMMAD GOOGLE",
-    role: "Junior Consultant",
-    enq: 4,
-    leads: 1,
-    clients: 0,
-    activity: 24,
-    rev: 0,
-  },
-];
-
-// Curated AI summaries shown instantly per range (the "Regenerate" button can
-// call Claude live — see regenerateWithAI). ⚠️ DATA-WIRING: in production the
-// curated text is the fallback; the live call uses real metrics.
-const AI_SUMMARY = {
-  "7d": {
-    headline: "Quiet week — intake held steady but nothing closed.",
-    points: [
-      {
-        type: "watch",
-        text: "118 new enquiries this week, just below the previous week. Volume is steady, not growing.",
-      },
-      {
-        type: "risk",
-        text: "No sales landed in the last 7 days. With only 1 sale on the year, every open booking needs tighter follow-through.",
-      },
-      {
-        type: "good",
-        text: "WEI CHEN logged the most activity relative to assigned volume — a good model for follow-up discipline.",
-      },
-      {
-        type: "action",
-        text: "Focus the team on the 4 open bookings and the oldest call-backs before they age out.",
-      },
-    ],
-  },
-  "30d": {
-    headline:
-      "Healthy intake, but the call-back backlog is throttling conversion.",
-    points: [
-      {
-        type: "good",
-        text: "Enquiry volume reached 486 (+18% vs the prior 30 days), driven mainly by Website and Referral.",
-      },
-      {
-        type: "risk",
-        text: "1,119 enquiries are past their scheduled call-back date — the single biggest drag on conversion. Leads decay fast once they go cold.",
-      },
-      {
-        type: "watch",
-        text: "RAFIQUL HASAN RAFI carries ~43% of all client relationships. Strong output, but it concentrates risk in one person.",
-      },
-      {
-        type: "action",
-        text: "Clear the 63 reallocation-pool enquiries today, spread new enquiries more evenly, then attack the call-back backlog by priority.",
-      },
-    ],
-  },
-  "90d": {
-    headline: "Strong top-of-funnel, weak bottom-of-funnel.",
-    points: [
-      {
-        type: "good",
-        text: "1,284 enquiries and 192 leads over 90 days — the team is generating plenty of opportunity.",
-      },
-      {
-        type: "risk",
-        text: "Only 1 sale converted in the same window. The funnel leaks heavily between booking and close.",
-      },
-      {
-        type: "watch",
-        text: "Around 80 enquiries sit unassigned across pools at any time, slowing first response.",
-      },
-      {
-        type: "action",
-        text: "Tighten booking-to-sale: add a manager review on every booking and a 24-hour first-response rule on new enquiries.",
-      },
-    ],
-  },
-};
-
-/* ============================================================================
-   PER-AGENT DAILY ACTIVITY  (drives the Team-activity leaderboard + AI chatbox)
-   ⚠️ DATA-WIRING: in production this comes from your "Notes & Contact Log" and
-   "Activity Log" tables — grouped by agent and by day. Here it is generated
-   deterministically from a seed so the preview is stable and realistic.
-   ========================================================================== */
-
-// deterministic pseudo-random in [0,1) from a number seed
-const rng = (seed) => {
-  const x = Math.sin(seed * 12.9898) * 43758.5453;
-  return x - Math.floor(x);
-};
-
-// the FOUR real contact-log types (the Call / Email / Spoken / Note buttons in
-// the "Notes & Contact Log" panel). These are the daily "effort" columns.
-const LOG_TYPES = [
-  { key: "call", label: "Calls", icon: Phone },
-  { key: "email", label: "Emails", icon: Mail },
-  { key: "spoken", label: "Spoken", icon: MessageSquare },
-  { key: "note", label: "Notes", icon: StickyNote },
-];
-
-// people the notes are "about" — only to make the timeline read realistically
-const CLIENT_POOL = [
-  "Md Mamun Khan",
-  "Shafiqul Islam",
-  "Ayesha Rahman",
-  "Tariq Mahmood",
-  "Bilal Ahmed",
-  "Nadia Hossain",
-  "Omar Farooq",
-  "Sadia Karim",
-  "Imran Chowdhury",
-  "Yusuf Ali",
-  "Farhan Akhtar",
-  "Rumana Begum",
-];
-
-// realistic note snippets (shaped from your screenshots), per type
-const NOTE_SNIPPETS = {
-  call: [
-    "Sent a text about coming back — positive, will call again today",
-    "Discussed scheduling a call; pleasant chat, wants to invest but may take time",
-    "Group of 6–7 looking to relocate with family; concerned about safety and ROI",
-    "Called and texted — no answer, will retry tomorrow",
-    "Walked through the payment plan and citizenship timeline",
-  ],
-  email: [
-    "Emailed the Antalya shortlist with the latest price list",
-    "Sent the citizenship-by-investment FAQ and next steps",
-    "Followed up with the document checklist for the application",
-  ],
-  spoken: [
-    "Spoke briefly — comparing two projects before deciding",
-    "Quick check-in; still reviewing with spouse",
-    "Spoke during office visit — keen on the sea-view unit",
-  ],
-  note: [
-    "Converted from enquiry — original source PARTNER_REFERRAL",
-    "Next call date set; waiting on funds confirmation",
-    "Marked warm — strong intent, mid-range budget",
-  ],
-};
-
-// per-agent "work shape": [touches per active day, diligence 0..1, usual start hour]
-const ACTIVITY_PROFILE = {
-  "RAFIQUL HASAN RAFI": [22, 0.9, 9],
-  "NAZMUS SA DAAT": [18, 0.95, 9],
-  "WEI CHEN": [21, 0.88, 10],
-  "MAHMUD IMRAN": [13, 0.7, 10],
-  "IKBAL MASOOD KHAN": [11, 0.62, 9],
-  "RAKIB BIN WALI": [8, 0.55, 11],
-  "ISHTIYAK AHMED": [6, 0.48, 10],
-  "SHAHEER HASSAN": [4, 0.42, 11],
-  "MOHAMMAD GOOGLE": [2, 0.28, 12],
-};
-
-/* Build `nDays` of activity for one agent, ending today (index 0 = today).
-   Each day: { date, started:Date|null, counts:{call,email,spoken,note}, entries:[] } */
-function genAgentDays(name, todayMs, nDays) {
-  const [base, diligence, startHour] = ACTIVITY_PROFILE[name] || [5, 0.5, 10];
-  const seedBase = hash(name);
-  const out = [];
-  for (let d = 0; d < nDays; d++) {
-    const date = new Date(todayMs - d * 86400000);
-    const dow = date.getDay(); // 0 Sun … 6 Sat
-    const seed = seedBase + d * 97;
-    const activeChance =
-      (dow === 5 || dow === 6 ? 0.4 : 0.96) * (0.55 + 0.45 * diligence);
-    if (rng(seed) > activeChance) {
-      out.push({
-        date,
-        started: null,
-        counts: { call: 0, email: 0, spoken: 0, note: 0 },
-        entries: [],
-      });
-      continue;
-    }
-    const total = Math.max(1, Math.round(base * (0.6 + 0.85 * rng(seed + 1))));
-    const call = Math.round(total * (0.4 + 0.1 * rng(seed + 2)));
-    const note = Math.round(total * (0.18 + 0.16 * diligence));
-    const spoken = Math.round(total * (0.14 + 0.1 * rng(seed + 4)));
-    const email = Math.max(0, total - call - note - spoken);
-    const counts = { call, email, spoken, note };
-
-    const startMin = Math.round(rng(seed + 5) * 85);
-    const started = new Date(date);
-    started.setHours(startHour, startMin, 0, 0);
-
-    // a few representative timeline entries spread across the working day
-    const bag = [];
-    LOG_TYPES.forEach((t) => {
-      for (let i = 0; i < counts[t.key]; i++) bag.push(t.key);
-    });
-    const showN = Math.min(bag.length, 6);
-    const entries = [];
-    for (let i = 0; i < showN; i++) {
-      const type = bag[Math.floor(rng(seed + 11 + i) * bag.length)];
-      const text =
-        NOTE_SNIPPETS[type][
-          Math.floor(rng(seed + 23 + i) * NOTE_SNIPPETS[type].length)
-        ];
-      const client =
-        CLIENT_POOL[Math.floor(rng(seed + 41 + i) * CLIENT_POOL.length)];
-      const t = new Date(date);
-      t.setHours(startHour, startMin, 0, 0);
-      t.setMinutes(
-        t.getMinutes() + Math.round(((i + 1) / (showN + 1)) * 8 * 60),
-      );
-      entries.push({ time: t, type, text, client });
-    }
-    entries.sort((a, b) => a.time - b.time);
-    out.push({ date, started, counts, entries });
-  }
-  return out;
-}
-
-/* ============================================================================
-   AI CHATBOX — natural-language query engine over the data above.
-   In the preview we resolve common questions LOCALLY (instant, reliable). For
-   anything unrecognised we can optionally ask Claude live (see askCRM).
-   ⚠️ DATA-WIRING: in production every question goes to YOUR backend, which runs
-   the query against Postgres and (optionally) has Claude phrase the answer.
-   ========================================================================== */
-
-const CHAT_TODAY_MS = new Date("2026-06-08T00:00:00").getTime();
-
-const CHAT_EXAMPLES = [
-  "Show me the last 5 days of Nazmus Sadat",
-  "Who made the most calls this week?",
-  "Who logged the fewest notes today?",
-  "How many leads converted in the last 30 days?",
-];
 
 const sumCounts = (days) =>
   days.reduce(
@@ -907,25 +509,6 @@ const sumCounts = (days) =>
 
 const totalOf = (c) => c.call + c.email + c.spoken + c.note;
 
-// fuzzy-match an agent by any name token (first name, surname, or full name)
-function matchAgent(q) {
-  const ql = q.toLowerCase();
-  let best = null,
-    score = 0;
-  AGENTS_30D.forEach((a) => {
-    const nm = a.name.toLowerCase();
-    let s = 0;
-    if (ql.includes(nm)) s += 60;
-    nm.split(/\s+/).forEach((tok) => {
-      if (tok.length >= 3 && ql.includes(tok)) s += tok.length;
-    });
-    if (s > score) {
-      score = s;
-      best = a;
-    }
-  });
-  return score >= 4 ? best : null;
-}
 
 function matchPeriod(q) {
   const ql = q.toLowerCase();
@@ -982,112 +565,7 @@ const METRICS = [
   },
 ];
 
-const scaleFromBase = (value, days) => Math.round(value * (days / 30));
 
-// main resolver → returns a structured answer object the UI can render
-function resolveQuery(q) {
-  const ql = (q || "").toLowerCase().trim();
-  if (!ql) return { kind: "empty" };
-
-  const agent = matchAgent(q);
-  const period = matchPeriod(q);
-  const metric = METRICS.find((m) => m.re.test(ql));
-  const wantsRank =
-    /\bmost\b|\btop\b|highest|best|busiest|\bleast\b|fewest|lowest|laziest|rank|leaderboard|\bwho\b/.test(
-      ql,
-    );
-  const wantsCount = /how many|number of|count|total|how much/.test(ql);
-  const dir = /\bleast\b|fewest|lowest|laziest|quiet/.test(ql) ? "asc" : "desc";
-
-  // 1) one agent + (a period OR "activity/timeline/log") → day-by-day timeline
-  if (
-    agent &&
-    !wantsRank &&
-    (period ||
-      /activity|timeline|breakdown|\blog\b|what.*(do|did)|update/.test(ql))
-  ) {
-    return { kind: "timeline", agent, days: period ? period.days : 5 };
-  }
-
-  // 2) ranking: who did the most / fewest X
-  if (wantsRank && metric) {
-    const days = period ? period.days : 7;
-    const rows = AGENTS_30D.map((a) => {
-      let value;
-      if (metric.fromLog) {
-        const c = sumCounts(genAgentDays(a.name, CHAT_TODAY_MS, days));
-        value = metric.key === "total" ? totalOf(c) : c[metric.key];
-      } else
-        value = scaleFromBase(metric.key === "leads" ? a.leads : a.enq, days);
-      return { name: a.name, role: a.role, value };
-    }).sort((x, y) => (dir === "asc" ? x.value - y.value : y.value - x.value));
-    return {
-      kind: "ranking",
-      metric,
-      dir,
-      periodLabel: period ? period.label : "the last 7 days",
-      rows,
-    };
-  }
-
-  // 3) aggregate count: how many X in <period>
-  if (metric) {
-    const days = period ? period.days : 30;
-    let total = 0;
-    if (metric.fromLog) {
-      AGENTS_30D.forEach((a) => {
-        const c = sumCounts(genAgentDays(a.name, CHAT_TODAY_MS, days));
-        total += metric.key === "total" ? totalOf(c) : c[metric.key];
-      });
-    } else {
-      const base =
-        metric.key === "leads"
-          ? DATASETS["30d"].leads.v
-          : DATASETS["30d"].enquiries.v;
-      total = scaleFromBase(base, days);
-    }
-    return {
-      kind: "metric",
-      metric,
-      periodLabel: period ? period.label : "the last 30 days",
-      total,
-    };
-  }
-
-  // 4) bare agent name → default 5-day timeline
-  if (agent) return { kind: "timeline", agent, days: 5 };
-
-  // 5) nothing matched → hand off to the live model (or show suggestions)
-  return { kind: "ai" };
-}
-
-/* generate a time-series whose totals match the period KPI, spanning [start,end] */
-function genSeries(n, totalEnq, totalLeads, start, end) {
-  const wE = [],
-    wL = [];
-  for (let i = 0; i < n; i++) {
-    const t = n > 1 ? i / (n - 1) : 0;
-    const trend = 0.75 + 0.55 * t;
-    wE.push(
-      trend * (1 + 0.18 * Math.sin(i * 0.6) + 0.1 * Math.sin(i * 0.27 + 1)),
-    );
-    wL.push(trend * (1 + 0.16 * Math.sin(i * 0.55 + 0.4)));
-  }
-  const sE = wE.reduce((a, b) => a + b, 0),
-    sL = wL.reduce((a, b) => a + b, 0);
-  const ms = start.getTime(),
-    span = end.getTime() - start.getTime();
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const d = new Date(ms + (n > 1 ? span * (i / (n - 1)) : 0));
-    out.push({
-      label: d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
-      enquiries: Math.round((totalEnq * wE[i]) / sE),
-      leads: Math.round((totalLeads * wL[i]) / sL),
-    });
-  }
-  return out;
-}
 
 /* ============================================================================
    MAIN COMPONENT
@@ -1096,15 +574,23 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
   // Live CRM aggregates (from getExecutiveData) with the mock constants as a
   // fallback so the design still renders if data is unavailable. The activity
   // log + chat remain demo until the per-event / AI phase.
-  const DS = data?.datasets ?? DATASETS;
-  const AGENTS = data?.agents30d?.length ? data.agents30d : AGENTS_30D;
-  const SRC = data?.sourceSplit?.length ? data.sourceSplit : SOURCE_SPLIT;
-  const NATS = data?.nationalities?.length ? data.nationalities : NATIONALITIES;
-  const TOTAL = data?.totalClients ?? TOTAL_CLIENTS;
+  const EMPTY_DS = {
+    enquiries: { v: 0, d: 0 },
+    leads: { v: 0, d: 0 },
+    clients: { v: 0, d: 0 },
+    conv: { v: 0, d: 0 },
+    bookings: { v: 0, d: 0 },
+    revenue: { v: 0, d: 0 },
+    sales: 0,
+  };
+  const DS = data?.datasets ?? { "7d": EMPTY_DS, "30d": EMPTY_DS, "90d": EMPTY_DS };
+  const SRC = data?.sourceSplit ?? [];
+  const NATS = data?.nationalities ?? [];
+  const TOTAL = data?.totalClients ?? 0;
   const ATTN = data?.attention
     ? [
         {
-          icon: ATTENTION[0].icon,
+          icon: Phone,
           tone: "red",
           label: "New enquiries untouched for 7+ days",
           value: fmt(data.attention.staleEnquiries),
@@ -1112,7 +598,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
           cta: "Review backlog",
         },
         {
-          icon: ATTENTION[1].icon,
+          icon: Inbox,
           tone: "amber",
           label: "Unassigned enquiries (no owner)",
           value: fmt(data.attention.unassigned),
@@ -1120,7 +606,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
           cta: "Assign owners",
         },
         {
-          icon: ATTENTION[3].icon,
+          icon: AlertTriangle,
           tone: "slate",
           label: `Client base concentration — top agent holds ${data.attention.concentrationPct}%`,
           value: data.attention.concentrationPct >= 35 ? "Risk" : "OK",
@@ -1128,7 +614,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
           cta: "Rebalance team load",
         },
       ]
-    : ATTENTION;
+    : [];
 
   const TODAY = useMemo(() => new Date(), []);
   const [range, setRange] = useState("30d"); // 7d | 30d | 90d | custom
@@ -1167,32 +653,26 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
   }, [range, cStart, cEnd, TODAY]);
 
   const kpi = DS[bucket];
-  const factor = bucket === "7d" ? 0.26 : bucket === "90d" ? 2.64 : 1;
-  const includeSale = bucket !== "7d";
 
-  // scale agents to the active period + compute conversion & a 0–100 score
+  // Real per-range leaderboard (agentsByRange) → conversion + a 0–100 score.
   const agents = useMemo(() => {
-    const scaled = AGENTS.map((a) => {
-      const enq = Math.max(0, Math.round(a.enq * factor));
-      const leads = Math.max(0, Math.round(a.leads * factor));
-      const clients = Math.max(0, Math.round(a.clients * factor));
-      const activity = Math.max(0, Math.round(a.activity * factor));
-      const rev = includeSale ? a.rev : 0;
-      const conv = enq ? (leads / enq) * 100 : 0;
+    const list = data?.agentsByRange?.[bucket] ?? data?.agents30d ?? [];
+    const scored = list.map((a) => {
+      const conv = a.enq ? (a.leads / a.enq) * 100 : 0;
       const raw =
-        leads * 5 +
-        clients * 7 +
+        a.leads * 5 +
+        a.clients * 7 +
         conv * 1.0 +
-        activity * 0.06 +
-        (rev > 0 ? 22 : 0);
-      return { ...a, enq, leads, clients, activity, rev, conv, raw };
+        a.activity * 0.06 +
+        (a.rev > 0 ? 22 : 0);
+      return { ...a, conv, raw };
     });
-    const maxRaw = Math.max(...scaled.map((a) => a.raw), 1);
-    return scaled.map((a) => ({
+    const maxRaw = Math.max(...scored.map((a) => a.raw), 1);
+    return scored.map((a) => ({
       ...a,
       score: Math.round((a.raw / maxRaw) * 100),
     }));
-  }, [factor, includeSale]);
+  }, [data, bucket]);
 
   const agentsSorted = useMemo(() => {
     const arr = [...agents];
@@ -1209,12 +689,28 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
     return arr;
   }, [agents, sortKey, sortDir]);
 
-  // time-series for the activity chart
+  // Real daily time-series (data.series, last 90d) sliced to the active window.
   const series = useMemo(() => {
-    const spanDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
-    const n = Math.min(spanDays, 30);
-    return genSeries(n, kpi.enquiries.v, kpi.leads.v, start, end);
-  }, [start, end, kpi]);
+    const raw = data?.series ?? [];
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    const within = raw.filter((p) => {
+      const t = new Date(p.date).getTime();
+      return t >= startMs - 86400000 && t <= endMs + 86400000;
+    });
+    const pts = within.length ? within : raw;
+    return pts.map((p) => ({
+      label: new Date(p.date).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+      }),
+      enquiries: p.enquiries,
+      leads: p.leads,
+      clients: p.clients,
+      bookings: p.bookings,
+      revenue: p.revenue,
+    }));
+  }, [data, start, end]);
 
   // funnel + sources from the period totals
   const funnel = useMemo(() => {
@@ -1242,18 +738,8 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
     [kpi],
   );
 
-  // ---- per-agent activity (Team-activity leaderboard) ----
-  const activityDays = useMemo(() => {
-    const todayMs = TODAY.getTime();
-    return AGENTS_30D.map((a) => ({
-      name: a.name,
-      role: a.role,
-      days: genAgentDays(a.name, todayMs, 30),
-    }));
-  }, [TODAY]);
-
-  // Live per-agent activity (from getExecutiveData) → falls back to the mock.
-  const ACTIVITY = data?.activityDays?.length ? data.activityDays : activityDays;
+  // ---- Real per-agent activity (from getExecutiveData) ----
+  const ACTIVITY = data?.activityDays ?? [];
 
   const actWindow = actView === "daily" ? 1 : actView === "weekly" ? 7 : 30;
 
@@ -1480,7 +966,57 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
     }
   }
 
-  const summary = aiSummary || AI_SUMMARY[bucket];
+  // Default summary computed from the REAL metrics (no AI required); the
+  // "Regenerate" button swaps in a live AI-written version when configured.
+  const localSummary = useMemo(() => {
+    const top = agentsSorted[0];
+    const sign = (x) => (x >= 0 ? "+" + x : "" + x);
+    const points = [
+      {
+        type: kpi.enquiries.d >= 0 ? "good" : "watch",
+        text: `${fmt(kpi.enquiries.v)} enquiries in ${rangeLabel} (${sign(kpi.enquiries.d)}% vs the prior ${prevLabel}).`,
+      },
+      {
+        type: "watch",
+        text: `${fmt(kpi.leads.v)} leads and ${fmt(kpi.clients.v)} new clients — ${kpi.conv.v}% enquiry→lead conversion.`,
+      },
+    ];
+    if (top) {
+      points.push({
+        type: "good",
+        text: `${top.name} leads the team with ${top.leads} leads, ${top.clients} clients and ${fmt(top.activity)} logged actions.`,
+      });
+    }
+    points.push({
+      type: kpi.sales > 0 ? "good" : "risk",
+      text:
+        kpi.sales > 0
+          ? `${kpi.sales} sale${kpi.sales === 1 ? "" : "s"} won — ${kpi.revenue.v ? "$" + fmt(kpi.revenue.v) : "$0"} revenue. ${fmt(kpi.bookings.v)} bookings in progress.`
+          : `No sales closed yet in ${rangeLabel}; ${fmt(kpi.bookings.v)} bookings in progress need follow-through.`,
+    });
+    return {
+      headline: `${fmt(kpi.enquiries.v)} enquiries, ${fmt(kpi.leads.v)} leads and ${kpi.sales} sale${kpi.sales === 1 ? "" : "s"} in ${rangeLabel}.`,
+      points,
+    };
+  }, [kpi, agentsSorted, rangeLabel, prevLabel]);
+
+  const summary = aiSummary || localSummary;
+
+  // Chat suggestion chips, seeded with a real top agent's name when available.
+  const chatExamples = useMemo(() => {
+    const top = ACTIVITY[0]?.name;
+    const proper = top
+      ? top.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+      : null;
+    return [
+      proper
+        ? `Show me the last 5 days of ${proper}`
+        : "Show me an agent's last 5 days",
+      "Who made the most calls this week?",
+      "Who logged the fewest notes today?",
+      "How many leads in the last 30 days?",
+    ];
+  }, [ACTIVITY]);
   const ptIcon = {
     good: CheckCircle2,
     watch: AlertCircle,
@@ -1489,13 +1025,14 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
     note: Sparkles,
   };
 
-  // sparkline series
-  const sparkE = downsample(
-    series.map((s) => s.enquiries),
-    12,
-  );
-  const sparkL = downsample(
-    series.map((s) => s.leads),
+  // Real KPI sparklines, downsampled from the daily series.
+  const sparkE = downsample(series.map((s) => s.enquiries), 12);
+  const sparkL = downsample(series.map((s) => s.leads), 12);
+  const sparkC = downsample(series.map((s) => s.clients), 12);
+  const sparkB = downsample(series.map((s) => s.bookings), 12);
+  const sparkR = downsample(series.map((s) => s.revenue), 12);
+  const sparkConv = downsample(
+    series.map((s) => (s.enquiries ? (s.leads / s.enquiries) * 100 : 0)),
     12,
   );
 
@@ -1522,7 +1059,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
       icon: Users,
       tone: "t-violet",
       color: "#7C3AED",
-      spark: [2, 3, 3, 4, 4, 5, 6, 6, 7, 7, 8, 9],
+      spark: sparkC,
     },
     {
       key: "conv",
@@ -1533,7 +1070,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
       sub: "enquiry → lead",
       pts: true,
       unit: "%",
-      spark: [12, 12, 13, 13, 14, 14, 14, 15, 15, 15, 14, 15],
+      spark: sparkConv,
     },
     {
       key: "bookings",
@@ -1541,7 +1078,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
       icon: Calendar,
       tone: "t-amber",
       color: "#D97706",
-      spark: [3, 4, 4, 5, 6, 6, 7, 8, 8, 9, 10, 11],
+      spark: sparkB,
     },
     {
       key: "revenue",
@@ -1550,9 +1087,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
       tone: "t-teal",
       color: "#0D9488",
       money: true,
-      spark: includeSale
-        ? [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
-        : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      spark: sparkR,
     },
   ];
 
@@ -1920,7 +1455,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
         </div>
 
         <div className="chat-chips">
-          {CHAT_EXAMPLES.map((ex) => (
+          {chatExamples.map((ex) => (
             <button className="chat-chip" key={ex} onClick={() => askCRM(ex)}>
               {ex}
             </button>
@@ -2453,10 +1988,6 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
         </div>
       </div>
 
-      <div className="pe-note">
-        <AlertCircle size={13} /> Placeholder data for design review — connect
-        live CRM endpoints before launch (search the file for “DATA-WIRING”).
-      </div>
     </div>
   );
 }
