@@ -173,6 +173,131 @@ async function buildActivityDays(days = 30) {
   );
 }
 
+function mapCount<T extends { _count?: { _all: number } }>(
+  rows: T[],
+  key: keyof T,
+) {
+  const m = new Map<string, number>();
+  for (const r of rows) {
+    const id = r[key] as unknown as string | null;
+    if (id) m.set(id, r._count?._all ?? 0);
+  }
+  return m;
+}
+
+type AgentUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+};
+
+/** Per-agent leaderboard aggregates for an arbitrary window. Returns only
+ *  agents with some activity, sorted by leads+clients. */
+async function agentsForWindow(agentUsers: AgentUser[], gte: Date, lt: Date) {
+  const win = { gte, lt };
+  const [enqByAgent, leadByOwner, clientByAgent, actByUser, saleByAgent] =
+    await Promise.all([
+      prisma.enquiry.groupBy({
+        by: ["assignedAgentId"],
+        where: { createdAt: win, assignedAgentId: { not: null } },
+        _count: { _all: true },
+      }),
+      prisma.lead.groupBy({
+        by: ["ownerId"],
+        where: { createdAt: win },
+        _count: { _all: true },
+      }),
+      prisma.client.groupBy({
+        by: ["assignedAgentId"],
+        where: { createdAt: win, assignedAgentId: { not: null } },
+        _count: { _all: true },
+      }),
+      prisma.activity.groupBy({
+        by: ["userId"],
+        where: { createdAt: win },
+        _count: { _all: true },
+      }),
+      prisma.sale.groupBy({
+        by: ["agentId"],
+        where: { status: WON, createdAt: win },
+        _sum: { salePrice: true },
+      }),
+    ]);
+  const enqM = mapCount(enqByAgent, "assignedAgentId");
+  const leadM = mapCount(leadByOwner, "ownerId");
+  const clientM = mapCount(clientByAgent, "assignedAgentId");
+  const actM = mapCount(actByUser, "userId");
+  const revM = new Map<string, number>();
+  for (const r of saleByAgent) revM.set(r.agentId, Number(r._sum.salePrice ?? 0));
+
+  return agentUsers
+    .map((u) => ({
+      name: `${u.firstName} ${u.lastName}`.trim().toUpperCase(),
+      role: titleCase(u.role),
+      enq: enqM.get(u.id) ?? 0,
+      leads: leadM.get(u.id) ?? 0,
+      clients: clientM.get(u.id) ?? 0,
+      activity: actM.get(u.id) ?? 0,
+      rev: revM.get(u.id) ?? 0,
+    }))
+    .filter((a) => a.enq || a.leads || a.clients || a.activity || a.rev)
+    .sort((a, b) => b.leads + b.clients - (a.leads + a.clients));
+}
+
+/** Real daily time-series for the trend chart + KPI sparklines. One row per
+ *  day (oldest→newest) carrying every KPI we can bucket by createdAt. */
+async function buildSeries(days = 90) {
+  const now = new Date();
+  const startMidnight = new Date(now);
+  startMidnight.setHours(0, 0, 0, 0);
+  const since = new Date(startMidnight.getTime() - (days - 1) * 86_400_000);
+  const win = { gte: since };
+
+  const [enq, leads, clients, bookings, sales] = await Promise.all([
+    prisma.enquiry.findMany({ where: { createdAt: win }, select: { createdAt: true } }),
+    prisma.lead.findMany({ where: { createdAt: win }, select: { createdAt: true } }),
+    prisma.client.findMany({ where: { createdAt: win }, select: { createdAt: true } }),
+    prisma.booking.findMany({ where: { createdAt: win }, select: { createdAt: true } }),
+    prisma.sale.findMany({
+      where: { status: WON, createdAt: win },
+      select: { createdAt: true, salePrice: true },
+    }),
+  ]);
+
+  const idxOf = (d: Date) => {
+    const m = new Date(d);
+    m.setHours(0, 0, 0, 0);
+    return Math.round((m.getTime() - since.getTime()) / 86_400_000);
+  };
+  const buckets = Array.from({ length: days }, (_, i) => ({
+    date: new Date(since.getTime() + i * 86_400_000),
+    enquiries: 0,
+    leads: 0,
+    clients: 0,
+    bookings: 0,
+    revenue: 0,
+  }));
+  const tally = (
+    rows: { createdAt: Date }[],
+    field: "enquiries" | "leads" | "clients" | "bookings",
+  ) => {
+    for (const r of rows) {
+      const i = idxOf(r.createdAt);
+      if (i >= 0 && i < days) buckets[i][field] += 1;
+    }
+  };
+  tally(enq, "enquiries");
+  tally(leads, "leads");
+  tally(clients, "clients");
+  tally(bookings, "bookings");
+  for (const s of sales) {
+    const i = idxOf(s.createdAt);
+    if (i >= 0 && i < days) buckets[i].revenue += Number(s.salePrice ?? 0);
+  }
+  return buckets;
+}
+
 export async function getExecutiveData() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
@@ -199,77 +324,18 @@ export async function getExecutiveData() {
     "90d": buildDataset(d90, p90),
   };
 
-  // --- Per-agent leaderboard (30-day base; client scales other ranges) ---
-  const win30 = { gte: at(30), lt: now };
-  const [
-    agentUsers,
-    enqByAgent,
-    leadByOwner,
-    clientByAgent,
-    actByUser,
-    saleByAgent,
-  ] = await Promise.all([
-    prisma.user.findMany({
-      where: { role: { in: ["SALES_AGENT", "SALES_MANAGER"] } },
-      select: { id: true, firstName: true, lastName: true, role: true },
-    }),
-    prisma.enquiry.groupBy({
-      by: ["assignedAgentId"],
-      where: { createdAt: win30, assignedAgentId: { not: null } },
-      _count: { _all: true },
-    }),
-    prisma.lead.groupBy({
-      by: ["ownerId"],
-      where: { createdAt: win30 },
-      _count: { _all: true },
-    }),
-    prisma.client.groupBy({
-      by: ["assignedAgentId"],
-      where: { createdAt: win30, assignedAgentId: { not: null } },
-      _count: { _all: true },
-    }),
-    prisma.activity.groupBy({
-      by: ["userId"],
-      where: { createdAt: win30 },
-      _count: { _all: true },
-    }),
-    prisma.sale.groupBy({
-      by: ["agentId"],
-      where: { status: WON, createdAt: win30 },
-      _sum: { salePrice: true },
-    }),
+  // --- Per-agent leaderboard, real for each range (7d / 30d / 90d) ---
+  const agentUsers = await prisma.user.findMany({
+    where: { role: { in: ["SALES_AGENT", "SALES_MANAGER"] } },
+    select: { id: true, firstName: true, lastName: true, role: true },
+  });
+  const [agents7d, agents30d, agents90d, series] = await Promise.all([
+    agentsForWindow(agentUsers, at(7), now),
+    agentsForWindow(agentUsers, at(30), now),
+    agentsForWindow(agentUsers, at(90), now),
+    buildSeries(90),
   ]);
-
-  const map = <T extends { _count?: { _all: number } }>(
-    rows: T[],
-    key: keyof T,
-  ) => {
-    const m = new Map<string, number>();
-    for (const r of rows) {
-      const id = r[key] as unknown as string | null;
-      if (id) m.set(id, r._count?._all ?? 0);
-    }
-    return m;
-  };
-  const enqM = map(enqByAgent, "assignedAgentId");
-  const leadM = map(leadByOwner, "ownerId");
-  const clientM = map(clientByAgent, "assignedAgentId");
-  const actM = map(actByUser, "userId");
-  const revM = new Map<string, number>();
-  for (const r of saleByAgent) revM.set(r.agentId, Number(r._sum.salePrice ?? 0));
-
-  const agents30d = agentUsers
-    .map((u) => ({
-      name: `${u.firstName} ${u.lastName}`.trim().toUpperCase(),
-      role: titleCase(u.role),
-      enq: enqM.get(u.id) ?? 0,
-      leads: leadM.get(u.id) ?? 0,
-      clients: clientM.get(u.id) ?? 0,
-      activity: actM.get(u.id) ?? 0,
-      rev: revM.get(u.id) ?? 0,
-    }))
-    .filter((a) => a.enq || a.leads || a.clients || a.activity || a.rev)
-    .sort((a, b) => b.leads + b.clients - (a.leads + a.clients));
+  const agentsByRange = { "7d": agents7d, "30d": agents30d, "90d": agents90d };
 
   // --- Source split (structural, last 90d of leads) ---
   const leadSources = await prisma.lead.groupBy({
@@ -328,6 +394,8 @@ export async function getExecutiveData() {
   return {
     datasets,
     agents30d,
+    agentsByRange,
+    series,
     sourceSplit,
     nationalities,
     totalClients,
