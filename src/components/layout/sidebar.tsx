@@ -42,6 +42,7 @@ import {
   Plug,
 } from "lucide-react";
 import type { UserRole } from "@prisma/client";
+import { AppSwitcher } from "@/components/layout/app-switcher";
 
 interface SidebarProps {
   userRole: UserRole;
@@ -345,6 +346,11 @@ export function Sidebar({
             </div>
           )}
         </Link>
+      </div>
+
+      {/* App switcher — hop to PMS / After Sales (shared login) */}
+      <div className="px-3 pb-2">
+        <AppSwitcher collapsed={collapsed} />
       </div>
 
       {/* Quick Add - hidden for VIEWER */}
