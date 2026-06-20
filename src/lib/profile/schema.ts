@@ -316,6 +316,52 @@ export function validateMinimum(p: ClientProfile): string[] {
   return missing;
 }
 
+/**
+ * Coerce any stored/partial profile object into a complete, safe ClientProfile
+ * (every group present) so the view and form never crash on missing nesting.
+ */
+export function normalizeProfile(raw: unknown): ClientProfile {
+  const base = emptyProfile();
+  if (!raw || typeof raw !== "object") return base;
+  const p = raw as Record<string, unknown>;
+  const grp = (k: string) => (p[k] && typeof p[k] === "object" ? (p[k] as Record<string, unknown>) : {});
+  const obj = <T extends object>(a: T, k: string): T => ({ ...a, ...grp(k) }) as T;
+  const arr = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  const intentGrp = grp("intent");
+  const reqGrp = grp("requirements");
+  const locGrp = grp("location");
+  const sigGrp = grp("signals");
+  return {
+    identity: obj(base.identity, "identity"),
+    budget: obj(base.budget, "budget"),
+    intent: { ...obj(base.intent, "intent"), primaryGoals: arr(intentGrp.primaryGoals) },
+    requirements: {
+      ...obj(base.requirements, "requirements"),
+      propertyTypes: arr(reqGrp.propertyTypes),
+      mustHaves: arr(reqGrp.mustHaves),
+      niceToHaves: arr(reqGrp.niceToHaves),
+    },
+    location: {
+      ...obj(base.location, "location"),
+      regions: arr(locGrp.regions),
+      districts: arr(locGrp.districts),
+      proximity: arr(locGrp.proximity),
+    },
+    family: obj(base.family, "family"),
+    investment: p.investment
+      ? ({ ...(base.investment ?? {}), ...grp("investment") } as ClientProfile["investment"])
+      : null,
+    citizenship: p.citizenship
+      ? ({ ...(base.citizenship ?? {}), ...grp("citizenship") } as ClientProfile["citizenship"])
+      : null,
+    dealBreakers: arr(p.dealBreakers),
+    signals: { ...obj(base.signals, "signals"), viewedProperties: arr(sigGrp.viewedProperties) },
+    insights: obj(base.insights, "insights"),
+    meta: p.meta && typeof p.meta === "object" ? (p.meta as ClientProfile["meta"]) : undefined,
+  };
+}
+
 /** An empty profile skeleton (every field null/empty) for safe rendering. */
 export function emptyProfile(): ClientProfile {
   return {

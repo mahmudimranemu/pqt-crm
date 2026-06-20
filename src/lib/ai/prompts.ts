@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { emptyProfile, type ClientProfile } from "@/lib/profile/schema";
+import { normalizeProfile, type ClientProfile } from "@/lib/profile/schema";
 
 export async function buildLeadContext(leadId: string): Promise<string> {
   const lead = await prisma.lead.findUnique({
@@ -293,51 +293,11 @@ Write 2 short paragraphs of plain prose (no markdown, no headings, no bullet lis
 
 Use only facts from the context; you may add brief, clearly-practical sales judgement. Turkey citizenship-by-investment minimum is US$400,000 with a 3-year hold — never advise a sub-threshold purchase to a citizenship buyer. Output only the two paragraphs.`;
 
-/** Strip fences, parse, and merge onto a safe skeleton so the shape is guaranteed. */
+/** Strip fences, parse, and coerce to a guaranteed-complete ClientProfile. */
 export function parseClientProfile(raw: string): ClientProfile {
   const text = raw.replace(/```json|```/g, "").trim();
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   const json = start >= 0 && end > start ? text.slice(start, end + 1) : text;
-  const parsed = JSON.parse(json) as Partial<ClientProfile>;
-
-  const base = emptyProfile();
-  const merge = <T extends object>(a: T, b: unknown): T =>
-    ({ ...a, ...(b && typeof b === "object" ? b : {}) }) as T;
-  const arr = (v: unknown): string[] =>
-    Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
-
-  const intent = merge(base.intent, parsed.intent);
-  intent.primaryGoals = arr(parsed.intent?.primaryGoals);
-
-  const requirements = merge(base.requirements, parsed.requirements);
-  requirements.propertyTypes = arr(parsed.requirements?.propertyTypes);
-  requirements.mustHaves = arr(parsed.requirements?.mustHaves);
-  requirements.niceToHaves = arr(parsed.requirements?.niceToHaves);
-
-  const location = merge(base.location, parsed.location);
-  location.regions = arr(parsed.location?.regions);
-  location.districts = arr(parsed.location?.districts);
-  location.proximity = arr(parsed.location?.proximity);
-
-  const signals = merge(base.signals, parsed.signals);
-  signals.viewedProperties = arr(parsed.signals?.viewedProperties);
-
-  return {
-    identity: merge(base.identity, parsed.identity),
-    budget: merge(base.budget, parsed.budget),
-    intent,
-    requirements,
-    location,
-    family: merge(base.family, parsed.family),
-    investment: parsed.investment
-      ? (merge(base.investment ?? {}, parsed.investment) as ClientProfile["investment"])
-      : null,
-    citizenship: parsed.citizenship
-      ? (merge(base.citizenship ?? {}, parsed.citizenship) as ClientProfile["citizenship"])
-      : null,
-    dealBreakers: arr(parsed.dealBreakers),
-    signals,
-    insights: merge(base.insights, parsed.insights),
-  };
+  return normalizeProfile(JSON.parse(json));
 }

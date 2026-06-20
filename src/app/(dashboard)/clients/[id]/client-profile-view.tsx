@@ -4,6 +4,7 @@ import { Sparkles, ShieldAlert } from "lucide-react";
 import {
   PROFILE_GROUPS,
   INSIGHT_FIELDS,
+  normalizeProfile,
   type ClientProfile,
 } from "@/lib/profile/schema";
 
@@ -29,12 +30,14 @@ function display(value: unknown): React.ReactNode {
 
 /** Read-only render of a saved Client Profile, grouped by the schema sections. */
 export function ClientProfileView({
-  profile,
+  profile: rawProfile,
   generatedAt,
 }: {
-  profile: ClientProfile;
+  profile: unknown;
   generatedAt?: string | null;
 }) {
+  // Coerce any stored/partial shape into a complete profile so render is safe.
+  const profile: ClientProfile = normalizeProfile(rawProfile);
   const get = (groupKey: string, fieldKey: string): unknown => {
     if (groupKey === "dealBreakers") return profile.dealBreakers;
     const g = (profile as Record<string, unknown>)[groupKey];

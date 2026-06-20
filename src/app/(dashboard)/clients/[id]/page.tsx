@@ -28,6 +28,7 @@ import {
   Target,
   Handshake,
   Inbox,
+  Sparkles,
 } from "lucide-react";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { ClientProfileView } from "./client-profile-view";
@@ -155,6 +156,19 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
     notFound();
   }
 
+  // The freshest lead AI overview ("next step to win") across this client's leads.
+  const latestOverviewLead = client.leads
+    .filter((l) => l.aiOverview)
+    .sort(
+      (a, b) =>
+        (b.aiOverviewGeneratedAt
+          ? new Date(b.aiOverviewGeneratedAt).getTime()
+          : 0) -
+        (a.aiOverviewGeneratedAt
+          ? new Date(a.aiOverviewGeneratedAt).getTime()
+          : 0),
+    )[0];
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -273,6 +287,35 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
 
         {/* Overview Tab */}
         <TabsContent value="overview">
+          {latestOverviewLead?.aiOverview && (
+            <Card className="mb-6 border-l-4 border-l-[#dc2626]">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Sparkles className="h-4 w-4 text-[#dc2626]" />
+                  AI overview — next step to win this lead
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
+                  {latestOverviewLead.aiOverview}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                  <Link
+                    href={`/leads/${latestOverviewLead.id}`}
+                    className="font-medium text-[#dc2626] hover:underline"
+                  >
+                    Open lead{latestOverviewLead.leadNumber ? ` ${latestOverviewLead.leadNumber}` : ""} →
+                  </Link>
+                  {latestOverviewLead.aiOverviewGeneratedAt && (
+                    <span>
+                      updated{" "}
+                      {formatDateTime(latestOverviewLead.aiOverviewGeneratedAt)}
+                    </span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>

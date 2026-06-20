@@ -15,7 +15,7 @@ import { toast } from "@/components/ui/use-toast";
 import { Pencil, Plus, Save, Loader2 } from "lucide-react";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { updateClientProfile } from "@/lib/actions/client-profile";
-import { emptyProfile, type ClientProfile } from "@/lib/profile/schema";
+import { normalizeProfile, type ClientProfile } from "@/lib/profile/schema";
 
 /**
  * Lets an agent manually create or edit a client's profile straight from the
@@ -31,14 +31,14 @@ export function ClientProfileEditor({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState<ClientProfile>(
-    initialProfile ?? emptyProfile(),
+    normalizeProfile(initialProfile),
   );
   const [pending, start] = useTransition();
   const hasProfile = initialProfile != null;
 
   // Reset the draft to the latest saved profile whenever the dialog opens.
   const openEditor = () => {
-    setProfile(initialProfile ?? emptyProfile());
+    setProfile(normalizeProfile(initialProfile));
     setOpen(true);
   };
 
