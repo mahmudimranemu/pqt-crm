@@ -30,6 +30,8 @@ import {
   Inbox,
 } from "lucide-react";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { ClientProfileView } from "./client-profile-view";
+import type { ClientProfile } from "@/lib/profile/schema";
 import type {
   ClientStatus,
   BookingStatus,
@@ -245,6 +247,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="enquiries">
             Enquiries ({client.enquiries.length})
           </TabsTrigger>
@@ -334,6 +337,27 @@ export default async function ClientDetailPage({ params }: PageProps) {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Profile Tab — AI-generated structured client profile */}
+        <TabsContent value="profile">
+          {client.aiProfile ? (
+            <ClientProfileView
+              profile={client.aiProfile as unknown as ClientProfile}
+              generatedAt={
+                client.aiProfileGeneratedAt
+                  ? new Date(client.aiProfileGeneratedAt).toISOString()
+                  : null
+              }
+            />
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-gray-500">
+                No profile yet. Open one of this client&apos;s leads and click{" "}
+                <span className="font-medium">Create Profile</span> to generate one.
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Enquiries Tab */}

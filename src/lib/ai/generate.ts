@@ -5,7 +5,8 @@ export type AIProviderId = "anthropic" | "openai" | "gemini" | "groq";
 export type AITaskType =
   | "whatsapp_generation"
   | "email_generation"
-  | "assistant_chat";
+  | "assistant_chat"
+  | "client_profile";
 
 export const AI_PROVIDERS: { id: AIProviderId; label: string; defaultModel: string }[] = [
   { id: "anthropic", label: "Anthropic (Claude)", defaultModel: "claude-haiku-4-5-20251001" },
@@ -18,6 +19,7 @@ export const AI_TASKS: { id: AITaskType; label: string }[] = [
   { id: "whatsapp_generation", label: "WhatsApp message generation" },
   { id: "email_generation", label: "Email generation" },
   { id: "assistant_chat", label: "Assistant chat (intent extraction)" },
+  { id: "client_profile", label: "Client profile generation" },
 ];
 
 interface CallArgs {
@@ -97,8 +99,16 @@ export async function generateWithTask(
   taskType: AITaskType,
   systemPrompt: string,
   userPrompt: string,
+  fallbackTask?: AITaskType,
 ): Promise<string> {
-  const taskCfg = await prisma.aITaskConfig.findUnique({ where: { taskType } });
+  let taskCfg = await prisma.aITaskConfig.findUnique({ where: { taskType } });
+  // Reuse a sibling task's provider when this one hasn't been assigned yet, so
+  // a new task type works out of the box once any provider is configured.
+  if (!taskCfg && fallbackTask) {
+    taskCfg = await prisma.aITaskConfig.findUnique({
+      where: { taskType: fallbackTask },
+    });
+  }
   if (!taskCfg) {
     throw new Error(
       `No AI provider configured for "${taskType}". Set one in Settings → AI.`,

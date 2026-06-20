@@ -327,6 +327,10 @@ model Client {
   notes                 String?           @db.Text
   tags                  String[]          @default([])
   assignedAgentId       String?
+  // AI-generated structured client profile (see src/lib/profile/schema.ts)
+  aiProfile             Json?
+  aiProfileGeneratedAt  DateTime?
+  aiProfileSourceLeadId String?
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 
