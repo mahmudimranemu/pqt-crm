@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { ClientProfileView } from "./client-profile-view";
+import { ClientProfileEditor } from "./client-profile-editor";
 import type { ClientProfile } from "@/lib/profile/schema";
 import type {
   ClientStatus,
@@ -341,6 +342,20 @@ export default async function ClientDetailPage({ params }: PageProps) {
 
         {/* Profile Tab — AI-generated structured client profile */}
         <TabsContent value="profile">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">Client profile</h3>
+              <p className="text-sm text-gray-500">
+                AI-generated from leads, editable by hand.
+              </p>
+            </div>
+            <ClientProfileEditor
+              clientId={client.id}
+              initialProfile={
+                (client.aiProfile as unknown as ClientProfile) ?? null
+              }
+            />
+          </div>
           {client.aiProfile ? (
             <ClientProfileView
               profile={client.aiProfile as unknown as ClientProfile}
@@ -353,7 +368,9 @@ export default async function ClientDetailPage({ params }: PageProps) {
           ) : (
             <Card>
               <CardContent className="py-12 text-center text-sm text-gray-500">
-                No profile yet. Open one of this client&apos;s leads and click{" "}
+                No profile yet. Click{" "}
+                <span className="font-medium">Add profile</span> to fill it in by
+                hand, or open one of this client&apos;s leads and use{" "}
                 <span className="font-medium">Create Profile</span> to generate one.
               </CardContent>
             </Card>

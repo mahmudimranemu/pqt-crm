@@ -126,3 +126,38 @@ export async function saveClientProfile(
     return { ok: false, error: "Couldn't save the profile. Please try again." };
   }
 }
+
+/**
+ * Manually update a client's profile directly from the client page (no lead /
+ * AI involved). Lets agents correct or fill in the profile by hand.
+ */
+export async function updateClientProfile(
+  clientId: string,
+  profile: ClientProfile,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await requireSession();
+    const now = new Date();
+    const stored: ClientProfile = {
+      ...profile,
+      meta: {
+        ...(profile.meta ?? {}),
+        generatedAt: now.toISOString(),
+        aiNotes: "Manually edited by an agent.",
+      },
+    };
+    await prisma.client.update({
+      where: { id: clientId },
+      data: {
+        aiProfile: JSON.parse(JSON.stringify(stored)),
+        aiProfileGeneratedAt: now,
+      },
+    });
+    await auditLog("UPDATE", "Client", clientId, { aiProfile: { manual: true } });
+    revalidatePath(`/clients/${clientId}`);
+    return { ok: true };
+  } catch (e) {
+    console.error("updateClientProfile failed:", e);
+    return { ok: false, error: "Couldn't save the profile. Please try again." };
+  }
+}

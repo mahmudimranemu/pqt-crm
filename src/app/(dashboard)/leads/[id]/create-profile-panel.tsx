@@ -19,7 +19,7 @@ import {
   saveClientProfile,
 } from "@/lib/actions/client-profile";
 import { type ClientProfile } from "@/lib/profile/schema";
-import { ProfileForm } from "./profile-form";
+import { ProfileForm } from "@/components/profile/profile-form";
 
 export function CreateProfilePanel({
   leadId,
