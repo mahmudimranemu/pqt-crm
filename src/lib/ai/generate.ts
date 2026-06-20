@@ -28,9 +28,11 @@ interface CallArgs {
   apiKey: string;
   systemPrompt: string;
   userPrompt: string;
+  /** Output token cap. Defaults to 1024 — raise for large structured outputs. */
+  maxTokens?: number;
 }
 
-async function callAnthropic({ model, apiKey, systemPrompt, userPrompt }: CallArgs): Promise<string> {
+async function callAnthropic({ model, apiKey, systemPrompt, userPrompt, maxTokens }: CallArgs): Promise<string> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -40,7 +42,7 @@ async function callAnthropic({ model, apiKey, systemPrompt, userPrompt }: CallAr
     },
     body: JSON.stringify({
       model,
-      max_tokens: 1024,
+      max_tokens: maxTokens ?? 1024,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     }),
@@ -50,7 +52,7 @@ async function callAnthropic({ model, apiKey, systemPrompt, userPrompt }: CallAr
   return data.content?.[0]?.text ?? "";
 }
 
-async function callOpenAICompat(url: string, { model, apiKey, systemPrompt, userPrompt }: CallArgs): Promise<string> {
+async function callOpenAICompat(url: string, { model, apiKey, systemPrompt, userPrompt, maxTokens }: CallArgs): Promise<string> {
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -64,6 +66,7 @@ async function callOpenAICompat(url: string, { model, apiKey, systemPrompt, user
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
+      max_tokens: maxTokens ?? 1024,
     }),
   });
   if (!res.ok) throw new Error(`${url} ${res.status}: ${await res.text()}`);
@@ -71,7 +74,7 @@ async function callOpenAICompat(url: string, { model, apiKey, systemPrompt, user
   return data.choices?.[0]?.message?.content ?? "";
 }
 
-async function callGemini({ model, apiKey, systemPrompt, userPrompt }: CallArgs): Promise<string> {
+async function callGemini({ model, apiKey, systemPrompt, userPrompt, maxTokens }: CallArgs): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const res = await fetch(url, {
     method: "POST",
@@ -79,6 +82,7 @@ async function callGemini({ model, apiKey, systemPrompt, userPrompt }: CallArgs)
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: { maxOutputTokens: maxTokens ?? 1024 },
     }),
   });
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
@@ -100,6 +104,7 @@ export async function generateWithTask(
   systemPrompt: string,
   userPrompt: string,
   fallbackTask?: AITaskType,
+  maxTokens?: number,
 ): Promise<string> {
   let taskCfg = await prisma.aITaskConfig.findUnique({ where: { taskType } });
   // Reuse a sibling task's provider when this one hasn't been assigned yet, so
@@ -129,5 +134,6 @@ export async function generateWithTask(
     apiKey,
     systemPrompt,
     userPrompt,
+    maxTokens,
   });
 }

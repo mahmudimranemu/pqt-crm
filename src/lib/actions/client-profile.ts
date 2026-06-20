@@ -63,10 +63,14 @@ export async function generateClientProfile(
       CLIENT_PROFILE_SYSTEM_PROMPT,
       context,
       "assistant_chat",
+      4096, // large structured JSON — must not truncate
     );
     const profile = applyOverrides(parseClientProfile(raw), overrides);
-    return { ok: true, profile, missing: validateMinimum(profile) };
+    // Guarantee a plain, serializable object crosses the action boundary.
+    const plain = JSON.parse(JSON.stringify(profile)) as ClientProfile;
+    return { ok: true, profile: plain, missing: validateMinimum(plain) };
   } catch (e) {
+    console.error("generateClientProfile failed:", e);
     const msg =
       e instanceof Error && /not configured|not enabled|no API key/i.test(e.message)
         ? "AI isn't configured yet — set a provider in Settings → AI."
@@ -117,7 +121,8 @@ export async function saveClientProfile(
     revalidatePath(`/clients/${lead.clientId}`);
     revalidatePath(`/leads/${leadId}`);
     return { ok: true, clientId: lead.clientId };
-  } catch {
+  } catch (e) {
+    console.error("saveClientProfile failed:", e);
     return { ok: false, error: "Couldn't save the profile. Please try again." };
   }
 }
