@@ -33,10 +33,14 @@ export function LeadOverviewPanel({
   const [pending, start] = useTransition();
   const autoRan = useRef(false);
 
+  const [error, setError] = useState<string | null>(null);
+
   const generate = () => {
+    setError(null);
     start(async () => {
       const res = await generateLeadOverview(leadId);
       if (!res.ok) {
+        setError(res.error);
         toast({ title: "Overview unavailable", description: res.error, variant: "destructive" });
         return;
       }
@@ -72,8 +76,14 @@ export function LeadOverviewPanel({
             {text}
           </p>
         ) : (
-          <p className="py-2 text-sm text-gray-500">
-            No overview yet.
+          <p className="py-1 text-sm text-gray-500">
+            No overview generated yet.
+          </p>
+        )}
+
+        {error && (
+          <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+            {error}
           </p>
         )}
 
@@ -84,24 +94,36 @@ export function LeadOverviewPanel({
             </Link>
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={generate}
-            disabled={!isStale || pending}
-            title={
-              isStale
-                ? "New notes/updates since the last overview — regenerate"
-                : "Enabled when notes or call dates change"
-            }
-          >
-            {pending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Regenerate overview
-          </Button>
+          {!text ? (
+            // No overview stored — let the agent generate it manually.
+            <Button variant="outline" size="sm" onClick={generate} disabled={pending}>
+              {pending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              Generate overview
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={generate}
+              disabled={!isStale || pending}
+              title={
+                isStale
+                  ? "New notes/updates since the last overview — regenerate"
+                  : "Enabled when notes or call dates change"
+              }
+            >
+              {pending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Regenerate overview
+            </Button>
+          )}
 
           {generatedAt && (
             <span className="text-[11px] text-gray-400">
