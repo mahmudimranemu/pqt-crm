@@ -24,6 +24,7 @@ import { LeadDetailFields } from "./lead-detail-fields";
 import { LeadNotes } from "./lead-notes";
 import { LeadPropertySelector } from "./lead-property-selector";
 import { AIGeneratePanel } from "./ai-generate-panel";
+import { CreateProfilePanel } from "./create-profile-panel";
 import { TagManager } from "@/components/tag-manager";
 
 const stageColors: Record<string, string> = {
@@ -310,6 +311,9 @@ export default async function LeadDetailPage({
             clientPhone={lead.client.phone}
             clientWhatsapp={lead.client.whatsapp}
           />
+
+          {/* AI client profile */}
+          <CreateProfilePanel leadId={lead.id} clientId={lead.client.id} />
 
           {/* Notes */}
           <LeadNotes leadId={lead.id} notes={serializedNotes} />
