@@ -7,7 +7,7 @@ export default async function IntegrationsPage() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) return null;
 
-  if (session.user.role !== "SUPER_ADMIN") {
+  if (session.user.role !== "SUPER_ADMIN" && session.user.role !== "ADMIN") {
     return (
       <div className="py-12 text-center">
         <p className="text-gray-500">

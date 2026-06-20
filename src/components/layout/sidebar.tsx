@@ -262,7 +262,7 @@ const navSections: NavSection[] = [
         title: "Integrations",
         href: "/settings/integrations",
         icon: Plug,
-        roles: ["SUPER_ADMIN"],
+        roles: ["SUPER_ADMIN", "ADMIN"],
       },
       {
         title: "Pipelines",
