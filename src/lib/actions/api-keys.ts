@@ -10,17 +10,17 @@ import {
   type ApiScope,
 } from "@/lib/api/auth";
 
-async function requireSuperAdmin() {
+async function requireAdmin() {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
-  if (session.user.role !== "SUPER_ADMIN") {
-    throw new Error("Unauthorized - Super Admin access required");
+  if (session.user.role !== "SUPER_ADMIN" && session.user.role !== "ADMIN") {
+    throw new Error("Unauthorized - Admin access required");
   }
   return session;
 }
 
 export async function listApiKeys() {
-  await requireSuperAdmin();
+  await requireAdmin();
   const rows = await prisma.apiKey.findMany({
     orderBy: { createdAt: "desc" },
     include: {
@@ -40,7 +40,7 @@ export async function listApiKeys() {
 }
 
 export async function createApiKey(input: { name: string; scopes: string[] }) {
-  const session = await requireSuperAdmin();
+  const session = await requireAdmin();
 
   const name = input.name.trim();
   if (!name) throw new Error("Name is required");
@@ -70,7 +70,7 @@ export async function createApiKey(input: { name: string; scopes: string[] }) {
 }
 
 export async function setApiKeyActive(id: string, isActive: boolean) {
-  await requireSuperAdmin();
+  await requireAdmin();
   const row = await prisma.apiKey.update({
     where: { id },
     data: { isActive },
@@ -81,7 +81,7 @@ export async function setApiKeyActive(id: string, isActive: boolean) {
 }
 
 export async function deleteApiKey(id: string) {
-  await requireSuperAdmin();
+  await requireAdmin();
   await prisma.apiKey.delete({ where: { id } });
   await auditLog("DELETE", "ApiKey", id, null);
   revalidatePath("/settings/integrations");
