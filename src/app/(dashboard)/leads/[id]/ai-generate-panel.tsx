@@ -52,35 +52,27 @@ export function AIGeneratePanel({
   const generateWa = () => {
     setWaOpen(true);
     startWaTransition(async () => {
-      try {
-        const { text } = await generateLeadWhatsApp(leadId);
-        setWaText(text);
-      } catch (err) {
-        toast({
-          variant: "destructive",
-          title: "Generation failed",
-          description: err instanceof Error ? err.message : "Unknown error",
-        });
+      const res = await generateLeadWhatsApp(leadId);
+      if (!res.ok) {
+        toast({ variant: "destructive", title: "Generation failed", description: res.error });
         setWaOpen(false);
+        return;
       }
+      setWaText(res.text);
     });
   };
 
   const generateEmail = () => {
     setEmailOpen(true);
     startEmailGen(async () => {
-      try {
-        const { subject, body } = await generateLeadEmail(leadId);
-        setEmailSubject(subject);
-        setEmailBody(body);
-      } catch (err) {
-        toast({
-          variant: "destructive",
-          title: "Generation failed",
-          description: err instanceof Error ? err.message : "Unknown error",
-        });
+      const res = await generateLeadEmail(leadId);
+      if (!res.ok) {
+        toast({ variant: "destructive", title: "Generation failed", description: res.error });
         setEmailOpen(false);
+        return;
       }
+      setEmailSubject(res.subject);
+      setEmailBody(res.body);
     });
   };
 

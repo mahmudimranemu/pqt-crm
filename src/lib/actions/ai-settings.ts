@@ -149,26 +149,50 @@ export async function upsertAITaskConfig(input: {
   return { ok: true };
 }
 
-export async function generateLeadWhatsApp(leadId: string) {
-  await requireSession();
-  const context = await buildLeadContext(leadId);
-  const text = await generateWithTask(
-    "whatsapp_generation",
-    WHATSAPP_SYSTEM_PROMPT,
-    context,
-  );
-  return { text: text.trim() };
+/** Surface the real failure reason to the client (caught errors aren't redacted
+ *  by Next the way thrown server-action errors are). */
+function aiError(e: unknown): string {
+  const m = e instanceof Error ? e.message : String(e);
+  return m.slice(0, 400);
 }
 
-export async function generateLeadEmail(leadId: string) {
-  await requireSession();
-  const context = await buildLeadContext(leadId);
-  const raw = await generateWithTask(
-    "email_generation",
-    EMAIL_SYSTEM_PROMPT,
-    context,
-  );
-  return parseEmailOutput(raw);
+export async function generateLeadWhatsApp(
+  leadId: string,
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  try {
+    await requireSession();
+    const context = await buildLeadContext(leadId);
+    const text = await generateWithTask(
+      "whatsapp_generation",
+      WHATSAPP_SYSTEM_PROMPT,
+      context,
+    );
+    return { ok: true, text: text.trim() };
+  } catch (e) {
+    console.error("generateLeadWhatsApp failed:", e);
+    return { ok: false, error: aiError(e) };
+  }
+}
+
+export async function generateLeadEmail(
+  leadId: string,
+): Promise<
+  | { ok: true; subject: string; body: string }
+  | { ok: false; error: string }
+> {
+  try {
+    await requireSession();
+    const context = await buildLeadContext(leadId);
+    const raw = await generateWithTask(
+      "email_generation",
+      EMAIL_SYSTEM_PROMPT,
+      context,
+    );
+    return { ok: true, ...parseEmailOutput(raw) };
+  } catch (e) {
+    console.error("generateLeadEmail failed:", e);
+    return { ok: false, error: aiError(e) };
+  }
 }
 
 export async function sendLeadEmail(input: {

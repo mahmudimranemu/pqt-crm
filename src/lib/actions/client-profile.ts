@@ -72,12 +72,13 @@ export async function generateClientProfile(
     return { ok: true, profile: plain, missing: validateMinimum(plain) };
   } catch (e) {
     console.error("generateClientProfile failed:", e);
+    const detail = e instanceof Error ? e.message : String(e);
     const msg =
-      e instanceof Error && /not configured|not enabled|no API key/i.test(e.message)
+      /not configured|not enabled|no API key/i.test(detail)
         ? "AI isn't configured yet — set a provider in Settings → AI."
-        : e instanceof Error && /unauthorized|forbidden/i.test(e.message)
+        : /unauthorized|forbidden/i.test(detail)
           ? "Your session looks expired — refresh and try again."
-          : "Couldn't generate the profile. Please try again.";
+          : `Couldn't generate the profile: ${detail.slice(0, 300)}`;
     return { ok: false, error: msg };
   }
 }
@@ -157,10 +158,10 @@ export async function generateLeadOverview(
     return { ok: true, overview };
   } catch (e) {
     console.error("generateLeadOverview failed:", e);
-    const msg =
-      e instanceof Error && /not configured|not enabled|no API key/i.test(e.message)
-        ? "AI isn't configured yet — set a provider in Settings → AI."
-        : "Couldn't generate the overview. Please try again.";
+    const detail = e instanceof Error ? e.message : String(e);
+    const msg = /not configured|not enabled|no API key/i.test(detail)
+      ? "AI isn't configured yet — set a provider in Settings → AI."
+      : `Couldn't generate the overview: ${detail.slice(0, 300)}`;
     return { ok: false, error: msg };
   }
 }
