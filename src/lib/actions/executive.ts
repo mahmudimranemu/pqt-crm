@@ -424,22 +424,25 @@ export async function getExecutiveSummary(payload: {
   kpi: KpiSet;
   topAgents: { name: string; leads: number; clients: number; conv: number; activity: number }[];
 }): Promise<{ headline: string; points: { type: string; text: string }[] } | null> {
-  await requireExec();
-  const { rangeLabel, kpi, topAgents } = payload;
-  const top = topAgents
-    .map(
-      (a) =>
-        `${a.name} (${a.leads} leads, ${a.clients} clients, ${a.conv.toFixed(1)}% enq→lead, ${a.activity} actions)`,
-    )
-    .join("; ");
-  const system =
-    "You are an analytics assistant for a real-estate CRM (Property Quest Turkey). Reply with ONLY valid JSON — no markdown, no backticks.";
-  const prompt = `Write a SHORT executive summary for the CEO for the period ${rangeLabel}.
+  // Everything is inside the try so an expired session / provider hiccup
+  // degrades to `null` (client keeps the computed summary) instead of throwing
+  // an unhandled server-action error.
+  try {
+    await requireExec();
+    const { rangeLabel, kpi, topAgents } = payload;
+    const top = topAgents
+      .map(
+        (a) =>
+          `${a.name} (${a.leads} leads, ${a.clients} clients, ${a.conv.toFixed(1)}% enq→lead, ${a.activity} actions)`,
+      )
+      .join("; ");
+    const system =
+      "You are an analytics assistant for a real-estate CRM (Property Quest Turkey). Reply with ONLY valid JSON — no markdown, no backticks.";
+    const prompt = `Write a SHORT executive summary for the CEO for the period ${rangeLabel}.
 Metrics: enquiries ${kpi.enquiries.v} (${kpi.enquiries.d >= 0 ? "+" : ""}${kpi.enquiries.d}% vs previous), leads ${kpi.leads.v}, new clients ${kpi.clients.v}, enquiry→lead ${kpi.conv.v}%, bookings ${kpi.bookings.v}, revenue ${kpi.revenue.v ? "$" + kpi.revenue.v : "$0"}, sales ${kpi.sales}.
 Top agents: ${top || "n/a"}.
 Return exactly this shape, 3–4 points, referencing the real numbers in plain business English:
 {"headline":"one punchy sentence","points":[{"type":"good|watch|risk|action","text":"one specific sentence"}]}`;
-  try {
     const raw = await generateWithTask("assistant_chat", system, prompt);
     const text = raw.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(text);
@@ -466,18 +469,21 @@ export async function askExecutive(
     }[];
   },
 ): Promise<string> {
-  await requireExec();
-  const { rangeLabel, kpi, agents } = payload;
-  const ctx = agents
-    .slice(0, 14)
-    .map(
-      (a) =>
-        `${a.name} (${a.role}): enq ${a.enq}, leads ${a.leads}, clients ${a.clients}, activity ${a.activity}, revenue $${a.rev}`,
-    )
-    .join("\n");
-  const system =
-    "You are an analytics assistant for the Property Quest Turkey CRM. Answer the CEO's question briefly and specifically using ONLY the data provided. If it can't be answered from this data, say so and suggest what to ask.";
-  const prompt = `Question: "${question}"
+  // Fully guarded: any failure (expired session, unconfigured provider, network)
+  // returns a friendly string rather than throwing an unhandled server error.
+  try {
+    await requireExec();
+    const { rangeLabel, kpi, agents } = payload;
+    const ctx = agents
+      .slice(0, 14)
+      .map(
+        (a) =>
+          `${a.name} (${a.role}): enq ${a.enq}, leads ${a.leads}, clients ${a.clients}, activity ${a.activity}, revenue $${a.rev}`,
+      )
+      .join("\n");
+    const system =
+      "You are an analytics assistant for the Property Quest Turkey CRM. Answer the CEO's question briefly and specifically using ONLY the data provided. If it can't be answered from this data, say so and suggest what to ask.";
+    const prompt = `Question: "${question}"
 
 CRM totals (${rangeLabel}): enquiries ${kpi.enquiries.v}, leads ${kpi.leads.v}, new clients ${kpi.clients.v}, enquiry→lead ${kpi.conv.v}%, bookings ${kpi.bookings.v}, revenue ${kpi.revenue.v ? "$" + kpi.revenue.v : "$0"}, sales ${kpi.sales}.
 
@@ -485,10 +491,12 @@ Per-agent (${rangeLabel}):
 ${ctx || "n/a"}
 
 Answer in 1–3 short sentences, plain business English.`;
-  try {
     const raw = await generateWithTask("assistant_chat", system, prompt);
     return raw.trim() || "I couldn't find an answer for that.";
   } catch (e) {
+    if (e instanceof Error && /unauthorized|forbidden/i.test(e.message)) {
+      return "Your session looks expired — refresh the page and sign in again, then ask me once more.";
+    }
     if (e instanceof Error && /not configured|not enabled|no API key/i.test(e.message)) {
       return "AI isn't configured yet — set a provider in Settings → AI. Meanwhile I can answer agent, activity, lead and enquiry questions from the data.";
     }
