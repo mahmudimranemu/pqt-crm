@@ -258,6 +258,12 @@ const navSections: NavSection[] = [
             roles: ["SUPER_ADMIN", "ADMIN"],
           },
           {
+            title: "PMS Properties",
+            href: "/settings/pms",
+            icon: Building2,
+            roles: ["SUPER_ADMIN", "ADMIN"],
+          },
+          {
             title: "Pipelines",
             href: "/settings/pipelines",
             icon: GitBranch,

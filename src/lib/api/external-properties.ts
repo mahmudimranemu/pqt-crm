@@ -1,3 +1,8 @@
+import {
+  fetchPmsProperties,
+  fetchPmsPropertyByCode,
+} from "@/lib/api/pms-properties";
+
 const API_URL = "https://propertyquestturkey.com/api/properties?limit=100";
 
 // --- Raw API types ---
@@ -305,6 +310,11 @@ function mapToDisplayProperty(p: ExternalProperty): DisplayProperty {
 // --- Fetch functions ---
 
 export async function fetchProperties(): Promise<DisplayProperty[]> {
+  // Prefer the PMS feed when configured (Settings → PMS Properties); otherwise
+  // fall back to the legacy website catalog.
+  const pms = await fetchPmsProperties();
+  if (pms !== null) return pms;
+
   try {
     const res = await fetch(API_URL, {
       next: { revalidate: 300 },
@@ -330,6 +340,10 @@ export async function fetchProperties(): Promise<DisplayProperty[]> {
 export async function fetchPropertyBySlug(
   slugOrId: string,
 ): Promise<DisplayProperty | null> {
+  // PMS detail by PQT code when configured.
+  const fromPms = await fetchPmsPropertyByCode(slugOrId);
+  if (fromPms) return fromPms;
+
   const properties = await fetchProperties();
   return (
     properties.find((p) => p.slug === slugOrId || p.id === slugOrId) || null
