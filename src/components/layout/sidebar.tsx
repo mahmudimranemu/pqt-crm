@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import {
+  ChevronDown,
+  User,
   LayoutDashboard,
   Users,
   Building2,
@@ -60,6 +63,7 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   roles?: UserRole[];
+  children?: NavItem[];
 }
 
 interface NavSection {
@@ -224,78 +228,85 @@ const navSections: NavSection[] = [
     label: "Admin",
     items: [
       {
-        title: "Users",
-        href: "/settings/users",
-        icon: Shield,
-        roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+        title: "Settings",
+        href: "/settings",
+        icon: Settings,
+        children: [
+          { title: "Profile", href: "/settings/profile", icon: User },
+          {
+            title: "Users",
+            href: "/settings/users",
+            icon: Shield,
+            roles: ["SUPER_ADMIN", "ADMIN", "SALES_MANAGER"],
+          },
+          {
+            title: "Teams",
+            href: "/settings/teams",
+            icon: UsersRound,
+            roles: ["SUPER_ADMIN", "ADMIN"],
+          },
+          {
+            title: "AI",
+            href: "/settings/ai",
+            icon: Sparkles,
+            roles: ["SUPER_ADMIN"],
+          },
+          {
+            title: "Integrations",
+            href: "/settings/integrations",
+            icon: Plug,
+            roles: ["SUPER_ADMIN", "ADMIN"],
+          },
+          {
+            title: "Pipelines",
+            href: "/settings/pipelines",
+            icon: GitBranch,
+            roles: ["SUPER_ADMIN", "ADMIN"],
+          },
+          {
+            title: "Automation",
+            href: "/settings/automation",
+            icon: Zap,
+            roles: ["SUPER_ADMIN", "ADMIN"],
+          },
+          {
+            title: "Lead Routing",
+            href: "/settings/routing",
+            icon: Route,
+            roles: ["SUPER_ADMIN", "ADMIN"],
+          },
+          {
+            title: "Commissions",
+            href: "/settings/commission-setup",
+            icon: Percent,
+            roles: ["SUPER_ADMIN", "ADMIN"],
+          },
+          {
+            title: "Email Templates",
+            href: "/settings/email-templates",
+            icon: Mail,
+            roles: ["SUPER_ADMIN", "ADMIN"],
+          },
+          {
+            title: "Import/Export",
+            href: "/settings/import-export",
+            icon: FileSpreadsheet,
+            roles: ["SUPER_ADMIN", "ADMIN"],
+          },
+          {
+            title: "Audit Log",
+            href: "/settings/audit",
+            icon: ClipboardList,
+            roles: ["SUPER_ADMIN", "ADMIN"],
+          },
+          {
+            title: "CRM Settings",
+            href: "/settings/crm",
+            icon: SlidersHorizontal,
+            roles: ["SUPER_ADMIN"],
+          },
+        ],
       },
-      {
-        title: "Teams",
-        href: "/settings/teams",
-        icon: UsersRound,
-        roles: ["SUPER_ADMIN", "ADMIN"],
-      },
-      {
-        title: "Audit Log",
-        href: "/settings/audit",
-        icon: ClipboardList,
-        roles: ["SUPER_ADMIN", "ADMIN"],
-      },
-      {
-        title: "Email Templates",
-        href: "/settings/email-templates",
-        icon: Mail,
-        roles: ["SUPER_ADMIN", "ADMIN"],
-      },
-      {
-        title: "Automation",
-        href: "/settings/automation",
-        icon: Zap,
-        roles: ["SUPER_ADMIN", "ADMIN"],
-      },
-      {
-        title: "AI",
-        href: "/settings/ai",
-        icon: Sparkles,
-        roles: ["SUPER_ADMIN"],
-      },
-      {
-        title: "Integrations",
-        href: "/settings/integrations",
-        icon: Plug,
-        roles: ["SUPER_ADMIN", "ADMIN"],
-      },
-      {
-        title: "Pipelines",
-        href: "/settings/pipelines",
-        icon: GitBranch,
-        roles: ["SUPER_ADMIN", "ADMIN"],
-      },
-      {
-        title: "Commissions",
-        href: "/settings/commission-setup",
-        icon: Percent,
-        roles: ["SUPER_ADMIN", "ADMIN"],
-      },
-      {
-        title: "Lead Routing",
-        href: "/settings/routing",
-        icon: Route,
-        roles: ["SUPER_ADMIN", "ADMIN"],
-      },
-      {
-        title: "Import/Export",
-        href: "/settings/import-export",
-        icon: FileSpreadsheet,
-        roles: ["SUPER_ADMIN", "ADMIN"],
-      },
-      {
-        title: "CRM Settings",
-        href: "/settings/crm",
-        icon: SlidersHorizontal,
-        roles: ["SUPER_ADMIN"],
-      },
-      { title: "Settings", href: "/settings", icon: Settings },
     ],
   },
 ];
@@ -315,6 +326,11 @@ export function Sidebar({
   user,
 }: SidebarProps) {
   const pathname = usePathname();
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
+  const matchPath = (href: string) =>
+    pathname === href || pathname.startsWith(href + "/");
+  const canSee = (item: NavItem) =>
+    !item.roles || item.roles.includes(userRole) || userRole === "SUPER_ADMIN";
 
   return (
     <aside
@@ -389,13 +405,83 @@ export function Sidebar({
               {collapsed && <div className="my-1 border-t border-white/10" />}
               <div className="space-y-0.5">
                 {visibleItems.map((item) => {
+                  // Collapsible parent (e.g. Settings) — reveals child sub-pages.
+                  if (item.children && item.children.length) {
+                    const kids = item.children.filter(canSee);
+                    if (kids.length === 0) return null;
+                    const anyChildActive = kids.some((c) => matchPath(c.href));
+
+                    // Collapsed rail → just a link to the parent index.
+                    if (collapsed) {
+                      return (
+                        <Link
+                          key={item.title}
+                          href={item.href}
+                          title={item.title}
+                          className={cn(
+                            "flex items-center justify-center rounded-lg px-0 py-2 text-sm font-medium transition-colors",
+                            anyChildActive
+                              ? "bg-white text-[#dc2626]"
+                              : "text-white/90 hover:bg-white/15 hover:text-white",
+                          )}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                        </Link>
+                      );
+                    }
+
+                    const open = openMenus[item.title] ?? anyChildActive;
+                    return (
+                      <div key={item.title}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenMenus((m) => ({ ...m, [item.title]: !open }))
+                          }
+                          className={cn(
+                            "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                            anyChildActive
+                              ? "bg-white/15 text-white"
+                              : "text-white/90 hover:bg-white/15 hover:text-white",
+                          )}
+                        >
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          <span className="flex-1 text-left">{item.title}</span>
+                          <ChevronDown
+                            className={cn(
+                              "h-4 w-4 shrink-0 transition-transform",
+                              open && "rotate-180",
+                            )}
+                          />
+                        </button>
+                        {open && (
+                          <div className="ml-4 mt-0.5 space-y-0.5 border-l border-white/15 pl-2">
+                            {kids.map((child) => (
+                              <Link
+                                key={child.title}
+                                href={child.href}
+                                className={cn(
+                                  "flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                                  matchPath(child.href)
+                                    ? "bg-white text-[#dc2626]"
+                                    : "text-white/80 hover:bg-white/15 hover:text-white",
+                                )}
+                              >
+                                <child.icon className="h-4 w-4 shrink-0" />
+                                <span>{child.title}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // Regular leaf item.
                   const isActive =
                     item.href === "/dashboard"
                       ? pathname === "/dashboard"
-                      : item.href === "/settings"
-                        ? pathname === "/settings" ||
-                          pathname === "/settings/profile"
-                        : pathname.startsWith(item.href);
+                      : pathname.startsWith(item.href);
 
                   return (
                     <Link
