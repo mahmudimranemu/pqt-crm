@@ -44,6 +44,30 @@ interface PmsDetail extends PmsListItem {
   amenities: string[];
   distances: Array<Record<string, unknown>>;
   images: string[];
+  total_units: number | null;
+  developer: { name: string } | null;
+  units: PmsUnit[];
+  is_child: boolean;
+  parent_pqt_code: string | null;
+  siblings: PmsSibling[];
+}
+
+interface PmsUnit {
+  type: string;
+  bedrooms: number;
+  bathrooms: number;
+  net_sqm: number | string | null;
+  gross_sqm: number | string | null;
+  price_usd: number | string | null;
+  available_count: number;
+}
+
+interface PmsSibling {
+  pqt_code: string;
+  listing_title: string;
+  bedrooms: number | null;
+  starting_price_usd: number | string | null;
+  price_usd: number | string | null;
 }
 
 // --- helpers ---
@@ -122,6 +146,7 @@ function mapList(p: PmsListItem): DisplayProperty {
 
 function mapDetail(p: PmsDetail): DisplayProperty {
   const base = mapList(p);
+  const u0 = p.units?.[0];
   return {
     ...base,
     type: titleCase(p.property_types?.[0] ?? p.category),
@@ -129,8 +154,12 @@ function mapDetail(p: PmsDetail): DisplayProperty {
     city: p.neighbourhood || p.district?.name || base.city,
     district: p.district?.name || base.district,
     totalFloors: p.floors ?? null,
-    imageUrl: p.images?.[0] ?? p.cover_image_url,
-    thumbnailUrl: p.images?.[0] ?? p.cover_image_url,
+    bedrooms: u0?.bedrooms ?? base.bedrooms,
+    bathrooms: u0?.bathrooms ?? null,
+    netArea: num(u0?.net_sqm),
+    grossArea: num(u0?.gross_sqm),
+    imageUrl: p.images?.[0] ?? null,
+    thumbnailUrl: p.images?.[0] ?? null,
     galleryUrls: p.images ?? [],
     amenities: p.amenities ?? [],
     keyFeatures: p.key_features ?? [],
@@ -142,6 +171,23 @@ function mapDetail(p: PmsDetail): DisplayProperty {
       .filter((d) => d.label),
     shortDescription: p.description_short ?? "",
     fullDescription: p.description_full ?? null,
+    developerName: p.developer?.name ?? null,
+    isChild: p.is_child,
+    parentCode: p.parent_pqt_code,
+    siblings: (p.siblings ?? []).map((s) => ({
+      code: s.pqt_code,
+      title: s.listing_title,
+      bedrooms: s.bedrooms ?? null,
+      priceUsd: num(s.price_usd ?? s.starting_price_usd),
+    })),
+    units: (p.units ?? []).map((u) => ({
+      type: u.type,
+      bedrooms: u.bedrooms,
+      bathrooms: u.bathrooms,
+      netSqm: num(u.net_sqm),
+      priceUsd: num(u.price_usd),
+      available: u.available_count,
+    })),
   };
 }
 
