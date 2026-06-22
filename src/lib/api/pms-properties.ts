@@ -13,7 +13,8 @@ interface PmsListItem {
   side: string | null;
   neighbourhood: string | null;
   category: string;
-  status: string;
+  status: string; // development phase (off_plan/ready/…)
+  sale_status: string; // transactional state (available/reserved/sold/…)
   cbi_eligible: boolean;
   suitable_for_residence: boolean;
   starting_price_usd: number | string | null;
@@ -95,10 +96,12 @@ function mapList(p: PmsListItem): DisplayProperty {
     slug: p.pqt_code,
     name: p.listing_title,
     reference: p.pqt_code,
-    status: titleCase(p.status),
+    // "Status" = transactional sale state (Available / Reserved / Sold …).
+    status: titleCase(p.sale_status),
     type: titleCase(p.category),
     category: titleCase(p.category),
-    developmentStatus: null,
+    // Development/construction phase is shown separately, not as the status badge.
+    developmentStatus: p.status ? titleCase(p.status) : null,
     constructionYear: null,
     city: p.neighbourhood || p.district_name || "",
     district: p.district_name || "",
@@ -150,7 +153,7 @@ function mapDetail(p: PmsDetail): DisplayProperty {
   return {
     ...base,
     type: titleCase(p.property_types?.[0] ?? p.category),
-    developmentStatus: p.completion_status ? titleCase(p.completion_status) : null,
+    // status (sale state) + developmentStatus (build phase) come from `base`.
     city: p.neighbourhood || p.district?.name || base.city,
     district: p.district?.name || base.district,
     totalFloors: p.floors ?? null,
