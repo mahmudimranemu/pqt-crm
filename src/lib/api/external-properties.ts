@@ -165,6 +165,24 @@ export interface DisplayProperty {
   exclusive: boolean;
   videoUrl: string | null;
   virtualTourUrl: string | null;
+  // PMS project linkage / units (populated on the detail view).
+  developerName?: string | null;
+  isChild?: boolean;
+  parentCode?: string | null;
+  siblings?: {
+    code: string;
+    title: string;
+    bedrooms: number | null;
+    priceUsd: number | null;
+  }[];
+  units?: {
+    type: string;
+    bedrooms: number;
+    bathrooms: number;
+    netSqm: number | null;
+    priceUsd: number | null;
+    available: number;
+  }[];
 }
 
 // --- Helpers ---

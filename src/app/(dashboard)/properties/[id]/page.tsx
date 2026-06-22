@@ -322,6 +322,104 @@ function ExternalPropertyDetail({
         </Card>
       </div>
 
+      {/* Project (developer, parent link, sibling units) */}
+      {(property.isChild ||
+        property.developerName ||
+        (property.siblings?.length ?? 0) > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Project
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              {property.developerName && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Developer</p>
+                  <p className="font-medium">{property.developerName}</p>
+                </div>
+              )}
+              {property.isChild && property.parentCode && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Part of project</p>
+                  <Link
+                    href={`/properties/${property.parentCode}`}
+                    className="inline-flex items-center gap-1 font-medium text-[#dc2626] hover:underline"
+                  >
+                    {property.parentCode} <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              )}
+            </div>
+            {(property.siblings?.length ?? 0) > 0 && (
+              <div>
+                <p className="mb-2 text-sm text-muted-foreground">
+                  Other units in this project
+                </p>
+                <div className="space-y-1">
+                  {property.siblings!.map((s) => (
+                    <Link
+                      key={s.code}
+                      href={`/properties/${s.code}`}
+                      className="flex items-center justify-between rounded-md border px-3 py-2 text-sm transition-colors hover:bg-gray-50"
+                    >
+                      <span className="font-medium">{s.title}</span>
+                      <span className="text-muted-foreground">
+                        {s.bedrooms != null ? `${s.bedrooms} bed` : ""}
+                        {s.bedrooms != null && s.priceUsd ? " · " : ""}
+                        {s.priceUsd ? formatCurrency(s.priceUsd, "USD") : ""}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Unit types (multi-variant standalone / project) */}
+      {(property.units?.length ?? 0) > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bed className="h-5 w-5" />
+              Unit types
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Beds</TableHead>
+                  <TableHead>Baths</TableHead>
+                  <TableHead>Size</TableHead>
+                  <TableHead>From</TableHead>
+                  <TableHead>Available</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {property.units!.map((u, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-medium">{u.type}</TableCell>
+                    <TableCell>{u.bedrooms}</TableCell>
+                    <TableCell>{u.bathrooms}</TableCell>
+                    <TableCell>{u.netSqm ? `${u.netSqm} m²` : "—"}</TableCell>
+                    <TableCell>
+                      {u.priceUsd ? formatCurrency(u.priceUsd, "USD") : "—"}
+                    </TableCell>
+                    <TableCell>{u.available}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Property Details */}
         <Card>
