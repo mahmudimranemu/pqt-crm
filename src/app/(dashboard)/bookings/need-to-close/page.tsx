@@ -89,14 +89,14 @@ export default async function NeedToClosePage() {
                       </TableCell>
                       <TableCell>
                         <Link
-                          href={`/properties/${booking.property.id}`}
+                          href={`/properties/${booking.property?.id ?? booking.propertyRef ?? ""}`}
                           className="text-gray-900 hover:underline"
                         >
-                          {booking.property.name}
+                          {booking.property?.name ?? booking.propertyName ?? "—"}
                         </Link>
                         <br />
                         <span className="text-xs text-muted-foreground">
-                          {booking.property.pqtNumber}
+                          {booking.property?.pqtNumber ?? booking.propertyRef ?? ""}
                         </span>
                       </TableCell>
                       <TableCell>{formatDateTime(booking.bookingDate)}</TableCell>

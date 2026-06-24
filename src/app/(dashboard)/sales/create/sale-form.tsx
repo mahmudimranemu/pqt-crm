@@ -22,7 +22,7 @@ import { createSale } from "@/lib/actions/sales";
 const saleSchema = z.object({
   bookingId: z.string().optional(),
   clientId: z.string().min(1, "Client is required"),
-  propertyId: z.string().min(1, "Property is required"),
+  propertyRef: z.string().min(1, "Property is required"),
   agentId: z.string().min(1, "Agent is required"),
   unitNumber: z.string().optional(),
   salePrice: z.number().min(1, "Sale price is required"),
@@ -41,12 +41,20 @@ type SaleFormData = z.infer<typeof saleSchema>;
 interface BookingWithOffer {
   id: string;
   client: { id: string; firstName: string; lastName: string };
-  property: { id: string; name: string; pqtNumber: string };
+  property: { id: string; name: string; pqtNumber: string } | null;
+  propertyRef: string | null;
+  propertyName: string | null;
 }
 
 interface SaleFormProps {
   clients: { id: string; firstName: string; lastName: string }[];
-  properties: { id: string; name: string; pqtNumber: string; district: string; priceFrom: number | null }[];
+  properties: {
+    ref: string;
+    name: string;
+    pqtNumber: string;
+    district: string | null;
+    priceFrom: number | null;
+  }[];
   agents: { id: string; firstName: string; lastName: string }[];
   bookingsWithOffers: BookingWithOffer[];
 }
@@ -77,7 +85,11 @@ export function SaleForm({ clients, properties, agents, bookingsWithOffers }: Sa
       setSelectedBooking(booking);
       setValue("bookingId", booking.id);
       setValue("clientId", booking.client.id);
-      setValue("propertyId", booking.property.id);
+      // Carry the booking's property code (new bookings) or its legacy code.
+      setValue(
+        "propertyRef",
+        booking.propertyRef ?? booking.property?.pqtNumber ?? "",
+      );
     }
   };
 
@@ -86,8 +98,16 @@ export function SaleForm({ clients, properties, agents, bookingsWithOffers }: Sa
       setIsSubmitting(true);
       setError(null);
 
+      const selectedProperty = properties.find((p) => p.ref === data.propertyRef);
+      const propertyName =
+        selectedProperty?.name ??
+        selectedBooking?.propertyName ??
+        selectedBooking?.property?.name ??
+        "";
+
       await createSale({
         ...data,
+        propertyName,
         depositDate: data.depositDate ? new Date(data.depositDate) : undefined,
         completionDate: data.completionDate ? new Date(data.completionDate) : undefined,
       });
@@ -124,7 +144,8 @@ export function SaleForm({ clients, properties, agents, bookingsWithOffers }: Sa
               <SelectContent>
                 {bookingsWithOffers.map((booking) => (
                   <SelectItem key={booking.id} value={booking.id}>
-                    {booking.client.firstName} {booking.client.lastName} - {booking.property.name}
+                    {booking.client.firstName} {booking.client.lastName} -{" "}
+                    {booking.propertyName ?? booking.property?.name ?? "Property"}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -157,24 +178,24 @@ export function SaleForm({ clients, properties, agents, bookingsWithOffers }: Sa
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="propertyId">Property *</Label>
+          <Label htmlFor="propertyRef">Property *</Label>
           <Select
-            value={watch("propertyId")}
-            onValueChange={(value) => setValue("propertyId", value)}
+            value={watch("propertyRef")}
+            onValueChange={(value) => setValue("propertyRef", value)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a property" />
             </SelectTrigger>
             <SelectContent>
               {properties.map((property) => (
-                <SelectItem key={property.id} value={property.id}>
+                <SelectItem key={property.ref} value={property.ref}>
                   {property.name} ({property.pqtNumber})
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {errors.propertyId && (
-            <p className="text-sm text-red-500">{errors.propertyId.message}</p>
+          {errors.propertyRef && (
+            <p className="text-sm text-red-500">{errors.propertyRef.message}</p>
           )}
         </div>
       </div>

@@ -160,7 +160,7 @@ export function TodayDropdown() {
                         {booking.client.firstName} {booking.client.lastName}
                       </p>
                       <p className="truncate text-xs text-gray-500">
-                        {booking.property.name}
+                        {booking.property?.name ?? booking.propertyName ?? "—"}
                       </p>
                     </div>
                     <span className="text-xs text-gray-500">

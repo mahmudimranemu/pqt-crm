@@ -40,6 +40,8 @@ export async function getCitizenshipApplications(params?: {
           select: {
             id: true,
             salePrice: true,
+            propertyName: true,
+            propertyRef: true,
             property: { select: { id: true, name: true } },
             agent: { select: { id: true, firstName: true, lastName: true } },
           },

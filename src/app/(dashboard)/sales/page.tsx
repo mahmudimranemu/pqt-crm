@@ -160,14 +160,14 @@ export default async function SalesPage() {
                     </TableCell>
                     <TableCell>
                       <Link
-                        href={`/properties/${sale.property.id}`}
+                        href={`/properties/${sale.property?.id ?? sale.propertyRef ?? ""}`}
                         className="text-gray-900 hover:underline"
                       >
-                        {sale.property.name}
+                        {sale.property?.name ?? sale.propertyName ?? "—"}
                       </Link>
                       <br />
                       <span className="text-xs text-muted-foreground">
-                        {sale.property.pqtNumber}
+                        {sale.property?.pqtNumber ?? sale.propertyRef ?? ""}
                         {sale.unitNumber && ` - Unit ${sale.unitNumber}`}
                       </span>
                     </TableCell>

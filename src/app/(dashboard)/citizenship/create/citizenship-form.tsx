@@ -21,7 +21,8 @@ interface EligibleSale {
   id: string;
   salePrice: Decimal;
   client: { id: string; firstName: string; lastName: string };
-  property: { id: string; name: string };
+  property: { id: string; name: string } | null;
+  propertyName?: string | null;
 }
 
 interface CitizenshipFormProps {
@@ -98,7 +99,7 @@ export function CitizenshipForm({ eligibleSales }: CitizenshipFormProps) {
           <SelectContent>
             {eligibleSales.map((sale) => (
               <SelectItem key={sale.id} value={sale.id}>
-                {sale.client.firstName} {sale.client.lastName} - {sale.property.name} ({formatCurrency(Number(sale.salePrice))})
+                {sale.client.firstName} {sale.client.lastName} - {sale.property?.name ?? sale.propertyName ?? "—"} ({formatCurrency(Number(sale.salePrice))})
               </SelectItem>
             ))}
           </SelectContent>
@@ -118,7 +119,7 @@ export function CitizenshipForm({ eligibleSales }: CitizenshipFormProps) {
             </div>
             <div>
               <span className="text-muted-foreground">Property:</span>{" "}
-              {selectedSale.property.name}
+              {selectedSale.property?.name ?? selectedSale.propertyName ?? "—"}
             </div>
             <div>
               <span className="text-muted-foreground">Investment:</span>{" "}

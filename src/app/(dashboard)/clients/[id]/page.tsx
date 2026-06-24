@@ -721,14 +721,14 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
                         </TableCell>
                         <TableCell>
                           <Link
-                            href={`/properties/${booking.property.id}`}
+                            href={`/properties/${booking.property?.id ?? booking.propertyRef ?? ""}`}
                             className="text-gray-900 hover:underline"
                           >
-                            {booking.property.name}
+                            {booking.property?.name ?? booking.propertyName ?? "—"}
                           </Link>
                           <br />
                           <span className="text-sm text-muted-foreground">
-                            {booking.property.pqtNumber}
+                            {booking.property?.pqtNumber ?? booking.propertyRef ?? ""}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -836,10 +836,10 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
                       <TableRow key={sale.id}>
                         <TableCell>
                           <Link
-                            href={`/properties/${sale.property.id}`}
+                            href={`/properties/${sale.property?.id ?? sale.propertyRef ?? ""}`}
                             className="text-gray-900 hover:underline"
                           >
-                            {sale.property.name}
+                            {sale.property?.name ?? sale.propertyName ?? "—"}
                           </Link>
                         </TableCell>
                         <TableCell>{sale.unitNumber || "-"}</TableCell>
@@ -903,7 +903,7 @@ export default async function ClientDetailPage({ params, searchParams }: PagePro
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Property: {app.sale.property.name}
+                        Property: {app.sale.property?.name ?? app.sale.propertyName ?? "—"}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         Started: {formatDate(app.startDate)}

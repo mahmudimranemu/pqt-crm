@@ -86,7 +86,7 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
         </Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">
-            Sale: {sale.property.name}
+            Sale: {sale.property?.name ?? sale.propertyName ?? "—"}
             {sale.unitNumber && ` - Unit ${sale.unitNumber}`}
           </h1>
           <p className="text-muted-foreground">
@@ -251,12 +251,12 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
             <div>
               <p className="text-sm text-muted-foreground">Property</p>
               <Link
-                href={`/properties/${sale.property.id}`}
+                href={`/properties/${sale.property?.id ?? sale.propertyRef ?? ""}`}
                 className="font-medium text-gray-900 hover:underline"
               >
-                {sale.property.name}
+                {sale.property?.name ?? sale.propertyName ?? "—"}
               </Link>
-              <p className="text-sm text-muted-foreground">{sale.property.pqtNumber}</p>
+              <p className="text-sm text-muted-foreground">{sale.property?.pqtNumber ?? sale.propertyRef ?? ""}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -265,15 +265,15 @@ export default async function SaleDetailPage({ params }: SaleDetailPageProps) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">District</p>
-                <p className="font-medium">{sale.property.district}</p>
+                <p className="font-medium">{sale.property?.district ?? "-"}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Type</p>
-                <p className="font-medium">{sale.property.propertyType.replace("_", " ")}</p>
+                <p className="font-medium">{sale.property?.propertyType?.replace("_", " ") ?? "-"}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Developer</p>
-                <p className="font-medium">{sale.property.developer || "-"}</p>
+                <p className="font-medium">{sale.property?.developer || "-"}</p>
               </div>
             </div>
           </CardContent>

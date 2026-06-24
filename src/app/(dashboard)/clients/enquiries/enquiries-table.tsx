@@ -349,9 +349,13 @@ export function EnquiriesTable({
     }
     setBookingLoading(true);
     try {
+      const selectedProperty = properties.find(
+        (p) => p.id === bookingData.propertyId,
+      );
       await createBooking({
         clientId: bookingEnquiry.convertedClientId,
-        propertyId: bookingData.propertyId,
+        propertyRef: bookingData.propertyId,
+        propertyName: selectedProperty?.name ?? "",
         agentId: bookingEnquiry.assignedAgentId || "",
         bookingDate: new Date(bookingData.bookingDate),
         bookingType: bookingData.bookingType as "PROPERTY_VIEWING" | "FOLLOW_UP_MEETING" | "DOCUMENT_SIGNING" | "TITLE_DEED",
