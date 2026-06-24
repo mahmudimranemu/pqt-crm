@@ -301,6 +301,7 @@ model User {
   notesAbout       UserNote[]     @relation("NotesAbout")
   notesAuthored    UserNote[]     @relation("NotesAuthored")
   apiKeys          ApiKey[]       @relation("ApiKeyCreator")
+  calendarNotes    CalendarNote[]
 
   @@map("users")
 }
@@ -430,6 +431,7 @@ model Enquiry {
   interestedProperty Property?     @relation(fields: [interestedPropertyId], references: [id])
   notes              EnquiryNote[]
   activities         Activity[]
+  calendarNotes      CalendarNote[]
 
   @@index([status])
   @@index([assignedAgentId])
@@ -873,6 +875,7 @@ model Lead {
   activities         Activity[]
   tasks              Task[]     @relation("LeadTasks")
   notes              LeadNote[]
+  calendarNotes      CalendarNote[]
 
   @@index([stage])
   @@index([ownerId])
@@ -893,6 +896,29 @@ model LeadNote {
 
   @@index([leadId])
   @@map("lead_notes")
+}
+
+/// Personal, date-based note/reminder a user places on their calendar.
+/// Optionally linked to a lead or enquiry. Powers the Google-Calendar-like
+/// /calendar page (alongside tasks, lead/enquiry notes, and follow-ups).
+model CalendarNote {
+  id          String   @id @default(cuid())
+  userId      String
+  date        DateTime
+  title       String
+  description String?  @db.Text
+  color       String?
+  leadId      String?
+  enquiryId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id])
+  lead    Lead?    @relation(fields: [leadId], references: [id])
+  enquiry Enquiry? @relation(fields: [enquiryId], references: [id])
+
+  @@index([userId, date])
+  @@map("calendar_notes")
 }
 
 model Deal {
