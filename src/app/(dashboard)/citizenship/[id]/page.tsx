@@ -145,10 +145,10 @@ export default async function CitizenshipDetailPage({ params }: CitizenshipDetai
             <div>
               <p className="text-xs text-muted-foreground">Property</p>
               <Link
-                href={`/properties/${application.sale.property.id}`}
+                href={`/properties/${application.sale.property?.id ?? application.sale.propertyRef ?? ""}`}
                 className="font-medium text-gray-900 hover:underline text-sm"
               >
-                {application.sale.property.name}
+                {application.sale.property?.name ?? application.sale.propertyName ?? "—"}
               </Link>
             </div>
             <div>

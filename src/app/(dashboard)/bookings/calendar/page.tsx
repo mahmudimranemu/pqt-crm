@@ -26,7 +26,9 @@ interface CalendarBooking {
   bookingType: string;
   status: BookingStatus;
   client: { id: string; firstName: string; lastName: string };
-  property: { id: string; name: string; pqtNumber: string };
+  property: { id: string; name: string; pqtNumber: string } | null;
+  propertyRef?: string | null;
+  propertyName?: string | null;
   agent: { id: string; firstName: string; lastName: string };
 }
 
@@ -81,7 +83,7 @@ export default function BookingCalendarPage() {
 
   const events = bookings.map((booking) => ({
     id: booking.id,
-    title: `${booking.client.firstName} ${booking.client.lastName} - ${booking.property.name}`,
+    title: `${booking.client.firstName} ${booking.client.lastName} - ${booking.property?.name ?? booking.propertyName ?? "Property"}`,
     start: booking.bookingDate,
     backgroundColor: statusColors[booking.status],
     borderColor: statusColors[booking.status],
@@ -206,13 +208,13 @@ export default function BookingCalendarPage() {
                   <div>
                     <p className="font-medium">Property</p>
                     <Link
-                      href={`/properties/${selectedBooking.property.id}`}
+                      href={`/properties/${selectedBooking.property?.id ?? selectedBooking.propertyRef ?? ""}`}
                       className="text-sm text-gray-900 hover:underline"
                     >
-                      {selectedBooking.property.name}
+                      {selectedBooking.property?.name ?? selectedBooking.propertyName ?? "—"}
                     </Link>
                     <p className="text-xs text-muted-foreground">
-                      {selectedBooking.property.pqtNumber}
+                      {selectedBooking.property?.pqtNumber ?? selectedBooking.propertyRef ?? ""}
                     </p>
                   </div>
                 </div>

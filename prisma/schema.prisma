@@ -455,7 +455,11 @@ model EnquiryNote {
 model Booking {
   id           String          @id @default(cuid())
   clientId     String
-  propertyId   String
+  // Legacy local-catalog link (kept for old rows). New bookings reference a
+  // PMS property by code via propertyRef + a propertyName snapshot.
+  propertyId   String?
+  propertyRef  String?
+  propertyName String?
   agentId      String
   bookingDate  DateTime
   bookingType  BookingType     @default(PROPERTY_VIEWING)
@@ -467,9 +471,9 @@ model Booking {
   updatedAt    DateTime        @updatedAt
 
   // Relations
-  client   Client   @relation(fields: [clientId], references: [id])
-  property Property @relation(fields: [propertyId], references: [id])
-  agent    User     @relation(fields: [agentId], references: [id])
+  client   Client    @relation(fields: [clientId], references: [id])
+  property Property? @relation(fields: [propertyId], references: [id])
+  agent    User      @relation(fields: [agentId], references: [id])
   sale     Sale?
 
   @@index([clientId])
@@ -484,7 +488,11 @@ model Sale {
   id                  String     @id @default(cuid())
   bookingId           String?    @unique
   clientId            String
-  propertyId          String
+  // Legacy local-catalog link (kept for old rows). New sales reference a PMS
+  // property by code via propertyRef + a propertyName snapshot.
+  propertyId          String?
+  propertyRef         String?
+  propertyName        String?
   agentId             String
   unitNumber          String?
   salePrice           Decimal    @db.Decimal(15, 2)
@@ -503,7 +511,7 @@ model Sale {
   // Relations
   booking                Booking?                @relation(fields: [bookingId], references: [id])
   client                 Client                  @relation(fields: [clientId], references: [id])
-  property               Property                @relation(fields: [propertyId], references: [id])
+  property               Property?               @relation(fields: [propertyId], references: [id])
   agent                  User                    @relation(fields: [agentId], references: [id])
   citizenshipApplication CitizenshipApplication?
 

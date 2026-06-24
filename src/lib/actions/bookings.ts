@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { auth, type ExtendedSession } from "@/lib/auth";
+import { getPropertyOptions } from "@/lib/actions/property-options";
 import type {
   BookingStatus,
   BookingOutcome,
@@ -11,7 +12,9 @@ import type {
 
 export interface BookingFormData {
   clientId: string;
-  propertyId: string;
+  // PMS property code + name snapshot (replaces the old local-catalog FK).
+  propertyRef: string;
+  propertyName: string;
   agentId: string;
   bookingDate: Date;
   bookingType: BookingType;
@@ -474,11 +477,7 @@ export async function getBookingFormData() {
       select: { id: true, firstName: true, lastName: true },
       orderBy: { firstName: "asc" },
     }),
-    prisma.property.findMany({
-      where: { status: "ACTIVE" },
-      select: { id: true, name: true, pqtNumber: true, district: true },
-      orderBy: { name: "asc" },
-    }),
+    getPropertyOptions(),
     prisma.user.findMany({
       where: {
         isActive: true,

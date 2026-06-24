@@ -21,7 +21,7 @@ import { createBooking } from "@/lib/actions/bookings";
 
 const bookingSchema = z.object({
   clientId: z.string().min(1, "Client is required"),
-  propertyId: z.string().min(1, "Property is required"),
+  propertyRef: z.string().min(1, "Property is required"),
   agentId: z.string().min(1, "Agent is required"),
   bookingDate: z.string().min(1, "Booking date is required"),
   bookingTime: z.string().min(1, "Booking time is required"),
@@ -39,10 +39,10 @@ type BookingFormData = z.infer<typeof bookingSchema>;
 interface BookingFormProps {
   clients: { id: string; firstName: string; lastName: string }[];
   properties: {
-    id: string;
+    ref: string;
     name: string;
     pqtNumber: string;
-    district: string;
+    district: string | null;
   }[];
   agents: { id: string; firstName: string; lastName: string }[];
 }
@@ -74,9 +74,14 @@ export function BookingForm({ clients, properties, agents }: BookingFormProps) {
         `${data.bookingDate}T${data.bookingTime}`,
       );
 
+      const selectedProperty = properties.find(
+        (p) => p.ref === data.propertyRef,
+      );
+
       await createBooking({
         clientId: data.clientId,
-        propertyId: data.propertyId,
+        propertyRef: data.propertyRef,
+        propertyName: selectedProperty?.name ?? "",
         agentId: data.agentId,
         bookingDate: bookingDateTime,
         bookingType: data.bookingType,
@@ -120,21 +125,22 @@ export function BookingForm({ clients, properties, agents }: BookingFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="propertyId">Property *</Label>
-        <Select onValueChange={(value) => setValue("propertyId", value)}>
+        <Label htmlFor="propertyRef">Property *</Label>
+        <Select onValueChange={(value) => setValue("propertyRef", value)}>
           <SelectTrigger>
             <SelectValue placeholder="Select a property" />
           </SelectTrigger>
           <SelectContent>
             {properties.map((property) => (
-              <SelectItem key={property.id} value={property.id}>
-                {property.name} ({property.pqtNumber}) - {property.district}
+              <SelectItem key={property.ref} value={property.ref}>
+                {property.name} ({property.pqtNumber})
+                {property.district ? ` - ${property.district}` : ""}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        {errors.propertyId && (
-          <p className="text-sm text-red-500">{errors.propertyId.message}</p>
+        {errors.propertyRef && (
+          <p className="text-sm text-red-500">{errors.propertyRef.message}</p>
         )}
       </div>
 

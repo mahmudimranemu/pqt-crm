@@ -38,7 +38,14 @@ interface Booking {
   outcome: BookingOutcome | null;
   noSaleReason: string | null;
   client: { id: string; firstName: string; lastName: string };
-  property: { id: string; name: string; pqtNumber: string; district?: string };
+  property: {
+    id: string;
+    name: string;
+    pqtNumber: string;
+    district?: string;
+  } | null;
+  propertyRef?: string | null;
+  propertyName?: string | null;
   agent: { id: string; firstName: string; lastName: string };
 }
 
@@ -238,15 +245,15 @@ export function BookingTable({
               </TableCell>
               <TableCell>
                 <Link
-                  href={`/properties/${booking.property.id}`}
+                  href={`/properties/${booking.property?.id ?? booking.propertyRef ?? ""}`}
                   className="text-gray-900 hover:underline"
                 >
-                  {booking.property.name}
+                  {booking.property?.name ?? booking.propertyName ?? "—"}
                 </Link>
                 <br />
                 <span className="text-xs text-muted-foreground">
-                  {booking.property.pqtNumber}
-                  {booking.property.district &&
+                  {booking.property?.pqtNumber ?? booking.propertyRef ?? ""}
+                  {booking.property?.district &&
                     ` - ${booking.property.district}`}
                 </span>
               </TableCell>

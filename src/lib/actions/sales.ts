@@ -3,12 +3,15 @@
 import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { auth, type ExtendedSession } from "@/lib/auth";
+import { getPropertyOptions } from "@/lib/actions/property-options";
 import type { SaleStatus, Currency } from "@prisma/client";
 
 export interface SaleFormData {
   bookingId?: string;
   clientId: string;
-  propertyId: string;
+  // PMS property code + name snapshot (replaces the old local-catalog FK).
+  propertyRef: string;
+  propertyName: string;
   agentId: string;
   unitNumber?: string;
   salePrice: number;
@@ -351,17 +354,7 @@ export async function getSaleFormData() {
       select: { id: true, firstName: true, lastName: true },
       orderBy: { firstName: "asc" },
     }),
-    prisma.property.findMany({
-      where: { status: "ACTIVE" },
-      select: {
-        id: true,
-        name: true,
-        pqtNumber: true,
-        district: true,
-        priceFrom: true,
-      },
-      orderBy: { name: "asc" },
-    }),
+    getPropertyOptions(),
     prisma.user.findMany({
       where: {
         isActive: true,
@@ -386,10 +379,5 @@ export async function getSaleFormData() {
     }),
   ]);
 
-  const serializedProperties = properties.map((p) => ({
-    ...p,
-    priceFrom: p.priceFrom ? Number(p.priceFrom) : null,
-  }));
-
-  return { clients, properties: serializedProperties, agents, bookingsWithOffers };
+  return { clients, properties, agents, bookingsWithOffers };
 }

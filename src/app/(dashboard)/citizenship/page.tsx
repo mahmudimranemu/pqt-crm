@@ -184,7 +184,7 @@ export default async function CitizenshipPage() {
                         {app.client.nationality}
                       </span>
                     </TableCell>
-                    <TableCell>{app.sale.property.name}</TableCell>
+                    <TableCell>{app.sale.property?.name ?? app.sale.propertyName ?? "—"}</TableCell>
                     <TableCell>
                       {app.sale.agent.firstName} {app.sale.agent.lastName}
                     </TableCell>
