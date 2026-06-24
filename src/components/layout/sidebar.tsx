@@ -76,6 +76,7 @@ const navSections: NavSection[] = [
     label: "Main",
     items: [
       { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { title: "Calendar", href: "/calendar", icon: CalendarDays },
       {
         title: "Executive",
         href: "/dashboard/executive",
