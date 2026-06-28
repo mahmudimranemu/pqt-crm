@@ -195,6 +195,7 @@ export async function getAgentsList() {
 
   return prisma.user.findMany({
     where: {
+      isActive: true,
       role: { in: ["SALES_AGENT", "SALES_MANAGER", "ADMIN", "SUPER_ADMIN"] },
     },
     select: { id: true, firstName: true, lastName: true },

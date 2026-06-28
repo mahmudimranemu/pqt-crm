@@ -27,6 +27,7 @@ const ALLOWED_EVENTS = new Set([
   "user.created",
   "user.updated",
   "user.deactivated",
+  "user.deleted",
 ]);
 
 // CRM Office UUIDs are seeded in PMS (offices table) using uuid5(NAMESPACE_DNS,
@@ -94,6 +95,21 @@ async function applyEvent(event: string, user: PmsUserPayload): Promise<void> {
       where: { id: user.id },
       data: { isActive: false, syncedAt: new Date() },
     });
+    return;
+  }
+
+  if (event === "user.deleted") {
+    // Permanently removed in the PMS — drop the mirror row so the user vanishes
+    // from every list. If they still own CRM records (leads/clients/…), the FK
+    // constraint blocks the delete, so fall back to deactivating + hiding them.
+    try {
+      await prisma.user.delete({ where: { id: user.id } });
+    } catch {
+      await prisma.user.updateMany({
+        where: { id: user.id },
+        data: { isActive: false, syncedAt: new Date() },
+      });
+    }
     return;
   }
 
