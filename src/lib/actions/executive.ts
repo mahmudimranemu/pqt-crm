@@ -729,3 +729,21 @@ export async function getUserKpiReport(userId: string, period: KpiPeriod) {
     callSchedule: { previous: lp + ep, today: lt + et, future: lf + ef },
   };
 }
+
+/** The agent who logged the most recent note (lead or enquiry) — used to seed
+ *  the User KPIs picker with the most-recently-active user. */
+export async function getLatestActivityAgentId(): Promise<string | null> {
+  await requireExec();
+  const [ln, en] = await Promise.all([
+    prisma.leadNote.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { agentId: true, createdAt: true },
+    }),
+    prisma.enquiryNote.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: { agentId: true, createdAt: true },
+    }),
+  ]);
+  if (ln && en) return ln.createdAt >= en.createdAt ? ln.agentId : en.agentId;
+  return ln?.agentId ?? en?.agentId ?? null;
+}

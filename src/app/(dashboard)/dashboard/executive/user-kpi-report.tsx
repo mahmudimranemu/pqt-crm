@@ -34,7 +34,11 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getAgentsList } from "@/lib/actions/communications";
-import { getUserKpiReport, type KpiPeriod } from "@/lib/actions/executive";
+import {
+  getLatestActivityAgentId,
+  getUserKpiReport,
+  type KpiPeriod,
+} from "@/lib/actions/executive";
 
 type Agent = { id: string; firstName: string; lastName: string };
 type Report = Awaited<ReturnType<typeof getUserKpiReport>>;
@@ -63,6 +67,28 @@ function deltaInfo(cur: number, prev: number): {
   const pct = Math.round(((cur - prev) / prev) * 100);
   if (pct === 0) return { label: "0%", dir: "flat" };
   return { label: `${pct > 0 ? "+" : ""}${pct}%`, dir: pct > 0 ? "up" : "down" };
+}
+
+/** Larger overall-performance pill shown next to the user's name. */
+function OverallBadge({ cur, prev, vs }: { cur: number; prev: number; vs: string }) {
+  const d = deltaInfo(cur, prev);
+  const Arrow = d.dir === "up" ? ArrowUp : d.dir === "down" ? ArrowDown : Minus;
+  const tone =
+    d.dir === "up"
+      ? "bg-emerald-50 text-emerald-700"
+      : d.dir === "down"
+        ? "bg-red-50 text-red-700"
+        : "bg-gray-100 text-gray-600";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}
+      title={`${cur} vs ${prev} ${vs} (overall activity)`}
+    >
+      <Arrow className="h-3.5 w-3.5" />
+      {d.label}
+      <span className="font-normal opacity-70">overall vs {vs}</span>
+    </span>
+  );
 }
 
 function Delta({ cur, prev, vs }: { cur: number; prev: number; vs: string }) {
@@ -101,10 +127,17 @@ export function UserKpiReport() {
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    getAgentsList()
-      .then((rows) => {
+    Promise.all([
+      getAgentsList(),
+      getLatestActivityAgentId().catch(() => null),
+    ])
+      .then(([rows, latestId]) => {
         setAgents(rows);
-        setUserId((cur) => cur || rows[0]?.id || "");
+        // Default to the most-recently-active user (latest note), else the first.
+        const fallback = rows[0]?.id ?? "";
+        const def =
+          latestId && rows.some((r) => r.id === latestId) ? latestId : fallback;
+        setUserId((cur) => cur || def);
       })
       .catch(() => setAgents([]));
   }, []);
@@ -133,6 +166,11 @@ export function UserKpiReport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [report],
   );
+
+  const selectedUser = agents.find((a) => a.id === userId);
+  const selectedName = selectedUser
+    ? `${selectedUser.firstName} ${selectedUser.lastName}`
+    : "";
 
   return (
     <Card>
@@ -169,6 +207,20 @@ export function UserKpiReport() {
       </CardHeader>
 
       <CardContent className="space-y-5">
+        {/* Selected user + overall performance */}
+        <div className="flex flex-wrap items-center gap-3 border-b pb-3">
+          <span className="text-lg font-semibold text-gray-900">
+            {selectedName || "—"}
+          </span>
+          {report && (
+            <OverallBadge
+              cur={report.totals.total}
+              prev={report.previous.total}
+              vs={PREV_LABEL[period]}
+            />
+          )}
+        </div>
+
         {/* KPI totals for the selected period */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {METRICS.map((m) => {
