@@ -97,7 +97,7 @@ async function buildActivityDays(days = 30) {
   const since = new Date(startMidnight.getTime() - (days - 1) * 86_400_000);
 
   const users = await prisma.user.findMany({
-    where: { role: { in: ["SALES_AGENT", "SALES_MANAGER"] } },
+    where: { isActive: true, role: { in: ["SALES_AGENT", "SALES_MANAGER"] } },
     select: { id: true, firstName: true, lastName: true, role: true },
   });
   const ids = users.map((u) => u.id);
@@ -347,7 +347,7 @@ export async function getExecutiveData() {
 
   // --- Per-agent leaderboard, real for each range (7d / 30d / 90d) ---
   const agentUsers = await prisma.user.findMany({
-    where: { role: { in: ["SALES_AGENT", "SALES_MANAGER"] } },
+    where: { isActive: true, role: { in: ["SALES_AGENT", "SALES_MANAGER"] } },
     select: { id: true, firstName: true, lastName: true, role: true },
   });
   const [agents7d, agents30d, agents90d, series] = await Promise.all([
