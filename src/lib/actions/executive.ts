@@ -589,6 +589,49 @@ function _monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+/** The same-length period immediately before `pw` (yesterday / last week /
+ *  last calendar month / last calendar year) for vs-previous deltas. */
+function _kpiPrevWindow(
+  period: KpiPeriod,
+  pw: { start: Date; end: Date },
+): { start: Date; end: Date } {
+  const end = pw.start;
+  if (period === "daily") {
+    const start = new Date(end);
+    start.setDate(start.getDate() - 1);
+    return { start, end };
+  }
+  if (period === "weekly") {
+    const start = new Date(end);
+    start.setDate(start.getDate() - 7);
+    return { start, end };
+  }
+  if (period === "monthly") {
+    return { start: new Date(end.getFullYear(), end.getMonth() - 1, 1), end };
+  }
+  return { start: new Date(end.getFullYear() - 1, 0, 1), end };
+}
+
+/** Count a user's lead + enquiry notes in [gte, lt), optionally only those
+ *  whose content begins with `prefix` (e.g. "[CALL] "). */
+async function _countUserNotes(
+  userId: string,
+  gte: Date,
+  lt: Date,
+  prefix?: string,
+): Promise<number> {
+  const where = {
+    agentId: userId,
+    createdAt: { gte, lt },
+    ...(prefix ? { content: { startsWith: prefix } } : {}),
+  };
+  const [l, e] = await Promise.all([
+    prisma.leadNote.count({ where }),
+    prisma.enquiryNote.count({ where }),
+  ]);
+  return l + e;
+}
+
 export async function getUserKpiReport(userId: string, period: KpiPeriod) {
   await requireExec();
   if (!userId) throw new Error("Pick a user");
@@ -646,17 +689,32 @@ export async function getUserKpiReport(userId: string, period: KpiPeriod) {
 
   const trend = Array.from(buckets.entries()).map(([bucket, c]) => ({ bucket, ...c }));
 
+  // Previous-period totals (for the vs-previous deltas on each metric).
+  const prev = _kpiPrevWindow(period, pw);
   const today = _startOfDay(now);
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
-  const [lp, lt, lf, ep, et, ef] = await Promise.all([
-    prisma.lead.count({ where: { ownerId: userId, nextCallDate: { lt: today } } }),
-    prisma.lead.count({ where: { ownerId: userId, nextCallDate: { gte: today, lt: tomorrow } } }),
-    prisma.lead.count({ where: { ownerId: userId, nextCallDate: { gte: tomorrow } } }),
-    prisma.enquiry.count({ where: { assignedAgentId: userId, nextCallDate: { lt: today } } }),
-    prisma.enquiry.count({ where: { assignedAgentId: userId, nextCallDate: { gte: today, lt: tomorrow } } }),
-    prisma.enquiry.count({ where: { assignedAgentId: userId, nextCallDate: { gte: tomorrow } } }),
-  ]);
+  const [lp, lt, lf, ep, et, ef, pTotal, pCalls, pEmails, pSpoken] =
+    await Promise.all([
+      prisma.lead.count({ where: { ownerId: userId, nextCallDate: { lt: today } } }),
+      prisma.lead.count({ where: { ownerId: userId, nextCallDate: { gte: today, lt: tomorrow } } }),
+      prisma.lead.count({ where: { ownerId: userId, nextCallDate: { gte: tomorrow } } }),
+      prisma.enquiry.count({ where: { assignedAgentId: userId, nextCallDate: { lt: today } } }),
+      prisma.enquiry.count({ where: { assignedAgentId: userId, nextCallDate: { gte: today, lt: tomorrow } } }),
+      prisma.enquiry.count({ where: { assignedAgentId: userId, nextCallDate: { gte: tomorrow } } }),
+      _countUserNotes(userId, prev.start, prev.end),
+      _countUserNotes(userId, prev.start, prev.end, "[CALL] "),
+      _countUserNotes(userId, prev.start, prev.end, "[EMAIL] "),
+      _countUserNotes(userId, prev.start, prev.end, "[SPOKEN] "),
+    ]);
+
+  const previous = {
+    calls: pCalls,
+    emails: pEmails,
+    spoken: pSpoken,
+    notes: pTotal - pCalls - pEmails - pSpoken,
+    total: pTotal,
+  };
 
   return {
     period,
@@ -664,6 +722,7 @@ export async function getUserKpiReport(userId: string, period: KpiPeriod) {
       ...totals,
       total: totals.calls + totals.emails + totals.spoken + totals.notes,
     },
+    previous,
     byEntity,
     trend,
     trendUnit: tw.unit,

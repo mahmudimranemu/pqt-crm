@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   CalendarCheck,
   CalendarClock,
   CalendarX,
   Mail,
+  Minus,
   Phone,
   StickyNote,
   Users,
@@ -42,6 +45,46 @@ const PERIODS: { value: KpiPeriod; label: string }[] = [
   { value: "monthly", label: "Monthly" },
   { value: "yearly", label: "Yearly" },
 ];
+
+const PREV_LABEL: Record<KpiPeriod, string> = {
+  daily: "yesterday",
+  weekly: "last week",
+  monthly: "last month",
+  yearly: "last year",
+};
+
+function deltaInfo(cur: number, prev: number): {
+  label: string;
+  dir: "up" | "down" | "flat";
+} {
+  if (prev === 0) {
+    return cur > 0 ? { label: "new", dir: "up" } : { label: "—", dir: "flat" };
+  }
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  if (pct === 0) return { label: "0%", dir: "flat" };
+  return { label: `${pct > 0 ? "+" : ""}${pct}%`, dir: pct > 0 ? "up" : "down" };
+}
+
+function Delta({ cur, prev, vs }: { cur: number; prev: number; vs: string }) {
+  const d = deltaInfo(cur, prev);
+  const Arrow = d.dir === "up" ? ArrowUp : d.dir === "down" ? ArrowDown : Minus;
+  const tone =
+    d.dir === "up"
+      ? "text-emerald-600"
+      : d.dir === "down"
+        ? "text-red-600"
+        : "text-muted-foreground";
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${tone}`}
+      title={`${cur} vs ${prev} ${vs}`}
+    >
+      <Arrow className="h-3 w-3" />
+      {d.label}
+      <span className="font-normal text-muted-foreground">vs {vs}</span>
+    </span>
+  );
+}
 
 const METRICS = [
   { key: "calls", label: "Calls", icon: Phone, color: "#2563EB" },
@@ -142,6 +185,15 @@ export function UserKpiReport() {
                 <div className="mt-1 text-2xl font-semibold tabular-nums">
                   {pending && !report ? "…" : total}
                 </div>
+                {report && (
+                  <div className="mt-0.5">
+                    <Delta
+                      cur={total}
+                      prev={report.previous[m.key]}
+                      vs={PREV_LABEL[period]}
+                    />
+                  </div>
+                )}
                 <div className="text-[11px] text-muted-foreground">
                   {leads} leads · {enq} enquiries
                 </div>
