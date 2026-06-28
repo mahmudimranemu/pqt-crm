@@ -30,6 +30,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { getExecutiveSummary, askExecutive } from "@/lib/actions/executive";
+import { UserKpiReport } from "./user-kpi-report";
 import {
   AreaChart,
   Area,
@@ -1741,6 +1742,11 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
             })}
           </div>
         </div>
+      </div>
+
+      {/* ---------------- PER-USER KPIs ---------------- */}
+      <div className="fade">
+        <UserKpiReport />
       </div>
 
       {/* ---------------- AGENT LEADERBOARD ---------------- */}

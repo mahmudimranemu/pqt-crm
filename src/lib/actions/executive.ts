@@ -524,3 +524,149 @@ Answer in 1–3 short sentences, plain business English.`;
     return "I can answer questions about agent activity, calls, emails, notes, leads and enquiries — try one of the example questions below.";
   }
 }
+
+/* ---- Per-user KPI report (Executive dashboard) -------------------------
+ * Calls / emails / notes / spoken a user logged on leads + enquiries, by
+ * day/week/month/year, plus a nextCallDate schedule (previous/today/future).
+ * Counts come from the note content prefixes ([CALL]/[EMAIL]/[SPOKEN]/none),
+ * the source of truth for both leads AND enquiries (enquiry contact logs only
+ * write notes, not Activity rows). Attributed by note `agentId`.
+ */
+
+export type KpiPeriod = "daily" | "weekly" | "monthly" | "yearly";
+
+type KpiCounts = { calls: number; emails: number; spoken: number; notes: number };
+
+function _startOfDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function _kpiPeriodWindow(period: KpiPeriod, now: Date): { start: Date; end: Date } {
+  const today = _startOfDay(now);
+  if (period === "daily") {
+    return { start: today, end: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1) };
+  }
+  if (period === "weekly") {
+    const mondayOffset = (today.getDay() + 6) % 7; // Mon = 0
+    const start = new Date(today);
+    start.setDate(today.getDate() - mondayOffset);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 7);
+    return { start, end };
+  }
+  if (period === "monthly") {
+    return {
+      start: new Date(today.getFullYear(), today.getMonth(), 1),
+      end: new Date(today.getFullYear(), today.getMonth() + 1, 1),
+    };
+  }
+  return { start: new Date(today.getFullYear(), 0, 1), end: new Date(today.getFullYear() + 1, 0, 1) };
+}
+
+function _kpiTrendWindow(period: KpiPeriod, now: Date): { start: Date; end: Date; unit: "day" | "month" } {
+  if (period === "daily") {
+    const end = new Date(_startOfDay(now));
+    end.setDate(end.getDate() + 1);
+    const start = new Date(end);
+    start.setDate(start.getDate() - 7); // last 7 days for context
+    return { start, end, unit: "day" };
+  }
+  const w = _kpiPeriodWindow(period, now);
+  return { ...w, unit: period === "yearly" ? "month" : "day" };
+}
+
+function _noteType(content: string): keyof KpiCounts {
+  if (content.startsWith("[CALL] ")) return "calls";
+  if (content.startsWith("[EMAIL] ")) return "emails";
+  if (content.startsWith("[SPOKEN] ")) return "spoken";
+  return "notes";
+}
+
+function _dayKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function _monthKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export async function getUserKpiReport(userId: string, period: KpiPeriod) {
+  await requireExec();
+  if (!userId) throw new Error("Pick a user");
+
+  const now = new Date();
+  const pw = _kpiPeriodWindow(period, now);
+  const tw = _kpiTrendWindow(period, now);
+  const fetchStart = tw.start < pw.start ? tw.start : pw.start;
+  const fetchEnd = tw.end > pw.end ? tw.end : pw.end;
+
+  const [leadNotes, enquiryNotes] = await Promise.all([
+    prisma.leadNote.findMany({
+      where: { agentId: userId, createdAt: { gte: fetchStart, lt: fetchEnd } },
+      select: { content: true, createdAt: true },
+    }),
+    prisma.enquiryNote.findMany({
+      where: { agentId: userId, createdAt: { gte: fetchStart, lt: fetchEnd } },
+      select: { content: true, createdAt: true },
+    }),
+  ]);
+
+  const blank = (): KpiCounts => ({ calls: 0, emails: 0, spoken: 0, notes: 0 });
+  const totals = blank();
+  const byEntity = { leads: blank(), enquiries: blank() };
+
+  const bucketKey = tw.unit === "month" ? _monthKey : _dayKey;
+  const buckets = new Map<string, KpiCounts>();
+  if (tw.unit === "day") {
+    for (const d = new Date(tw.start); d < tw.end; d.setDate(d.getDate() + 1)) {
+      buckets.set(_dayKey(d), blank());
+    }
+  } else {
+    for (const m = new Date(tw.start); m < tw.end; m.setMonth(m.getMonth() + 1)) {
+      buckets.set(_monthKey(m), blank());
+    }
+  }
+
+  const rows: Array<{ content: string; createdAt: Date; entity: "leads" | "enquiries" }> = [
+    ...leadNotes.map((n) => ({ ...n, entity: "leads" as const })),
+    ...enquiryNotes.map((n) => ({ ...n, entity: "enquiries" as const })),
+  ];
+
+  for (const r of rows) {
+    const t = _noteType(r.content);
+    const created = new Date(r.createdAt);
+    if (created >= pw.start && created < pw.end) {
+      totals[t] += 1;
+      byEntity[r.entity][t] += 1;
+    }
+    if (created >= tw.start && created < tw.end) {
+      const b = buckets.get(bucketKey(created));
+      if (b) b[t] += 1;
+    }
+  }
+
+  const trend = Array.from(buckets.entries()).map(([bucket, c]) => ({ bucket, ...c }));
+
+  const today = _startOfDay(now);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const [lp, lt, lf, ep, et, ef] = await Promise.all([
+    prisma.lead.count({ where: { ownerId: userId, nextCallDate: { lt: today } } }),
+    prisma.lead.count({ where: { ownerId: userId, nextCallDate: { gte: today, lt: tomorrow } } }),
+    prisma.lead.count({ where: { ownerId: userId, nextCallDate: { gte: tomorrow } } }),
+    prisma.enquiry.count({ where: { assignedAgentId: userId, nextCallDate: { lt: today } } }),
+    prisma.enquiry.count({ where: { assignedAgentId: userId, nextCallDate: { gte: today, lt: tomorrow } } }),
+    prisma.enquiry.count({ where: { assignedAgentId: userId, nextCallDate: { gte: tomorrow } } }),
+  ]);
+
+  return {
+    period,
+    totals: {
+      ...totals,
+      total: totals.calls + totals.emails + totals.spoken + totals.notes,
+    },
+    byEntity,
+    trend,
+    trendUnit: tw.unit,
+    callSchedule: { previous: lp + ep, today: lt + et, future: lf + ef },
+  };
+}
