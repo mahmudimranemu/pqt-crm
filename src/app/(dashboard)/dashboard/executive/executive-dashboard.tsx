@@ -29,6 +29,7 @@
  */
 
 import React, { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { getExecutiveSummary, askExecutive } from "@/lib/actions/executive";
 import { UserKpiReport } from "./user-kpi-report";
 import {
@@ -243,6 +244,9 @@ const CSS = `
 .att{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }
 .att-row{ display:flex; align-items:center; gap:12px; padding:11px 12px; border:1px solid var(--line); border-radius:var(--radius-sm); transition:all .15s; }
 .att-row:hover{ background:var(--hover); }
+.att-link{ text-decoration:none; color:inherit; cursor:pointer; }
+.att-link:hover{ border-color:var(--brand); }
+.att-link:hover .att-cta{ text-decoration:underline; }
 .att-ico{ width:32px; height:32px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
 .att-red{ background:var(--brand-50); color:var(--brand); }
 .att-amber{ background:var(--amber-50); color:var(--amber); }
@@ -606,6 +610,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
           value: fmt(data.attention.staleEnquiries),
           valClass: "warnr",
           cta: "Review backlog",
+          href: "/clients/enquiries?status=NEW",
         },
         {
           icon: Inbox,
@@ -614,6 +619,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
           value: fmt(data.attention.unassigned),
           valClass: "warna",
           cta: "Assign owners",
+          href: "/clients/enquiries?agent=unassigned",
         },
         {
           icon: AlertTriangle,
@@ -622,6 +628,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
           value: data.attention.concentrationPct >= 35 ? "Risk" : "OK",
           valClass: "muted",
           cta: "Rebalance team load",
+          href: "/leaderboards",
         },
       ]
     : [];
@@ -1728,7 +1735,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
             {ATTN.map((a, i) => {
               const Ico = a.icon;
               return (
-                <div className="att-row" key={i}>
+                <Link className="att-row att-link" key={i} href={a.href}>
                   <span className={"att-ico att-" + a.tone}>
                     <Ico size={16} />
                   </span>
@@ -1737,7 +1744,7 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
                     <div className="att-cta">{a.cta} →</div>
                   </div>
                   <span className={"att-val " + a.valClass}>{a.value}</span>
-                </div>
+                </Link>
               );
             })}
           </div>
