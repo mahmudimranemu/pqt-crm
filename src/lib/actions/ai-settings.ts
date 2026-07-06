@@ -52,6 +52,7 @@ export async function getAISettings() {
         provider: meta.id,
         label: meta.label,
         defaultModel: meta.defaultModel,
+        models: meta.models,
         isEnabled: row?.isEnabled ?? false,
         hasKey: Boolean(row?.apiKeyEncrypted),
         keyHint: row?.apiKeyHint ?? null,
