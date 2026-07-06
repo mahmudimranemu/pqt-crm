@@ -263,12 +263,29 @@ export async function updateClient(id: string, data: Partial<ClientFormData>) {
     throw new Error("Unauthorized");
   }
 
+  // Coerce empty-string form values to null before writing. The edit form
+  // sends "" for cleared optional fields (see client-form defaultValues), and
+  // Prisma rejects "" for the PropertyType enum / the assignedAgentId FK — the
+  // update would throw (surfacing as a redacted "Server Components render"
+  // error in prod), so the client silently fails to save. createClient does
+  // the same coercion.
+  const sanitized: Record<string, unknown> = { ...data };
+  for (const key of [
+    "preferredPropertyType",
+    "assignedAgentId",
+    "whatsapp",
+    "city",
+    "notes",
+  ] as const) {
+    if (key in sanitized && !sanitized[key]) sanitized[key] = null;
+  }
+
   const client = await prisma.client.update({
     where: { id },
-    data,
+    data: sanitized,
   });
 
-  await auditLog("UPDATE", "Client", id, data as Record<string, unknown>);
+  await auditLog("UPDATE", "Client", id, sanitized);
   revalidatePath(`/clients/${id}`);
   revalidatePath("/clients");
   return client;
