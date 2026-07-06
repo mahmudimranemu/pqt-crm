@@ -25,6 +25,7 @@ type ProviderRow = {
   provider: AIProviderId;
   label: string;
   defaultModel: string;
+  models: string[];
   isEnabled: boolean;
   hasKey: boolean;
   keyHint: string | null;
@@ -221,12 +222,22 @@ function TaskCard({
   const dirty =
     providerId !== (row.provider ?? "") || model.trim() !== (row.model ?? "");
 
+  const selectedProvider = providers.find((x) => x.provider === providerId);
+  // Model options for the picked provider; keep any previously-saved custom
+  // model that isn't in the curated list so it isn't silently dropped.
+  const modelOptions = selectedProvider
+    ? [
+        ...selectedProvider.models,
+        ...(model && !selectedProvider.models.includes(model) ? [model] : []),
+      ]
+    : [];
+
   const onProviderSelect = (id: string) => {
     setProviderId(id);
-    if (!model) {
-      const p = providers.find((x) => x.provider === id);
-      if (p) setModel(p.defaultModel);
-    }
+    // Switching provider always resets to that provider's default model —
+    // no more copy-pasting a model name that belongs to another provider.
+    const p = providers.find((x) => x.provider === id);
+    setModel(p ? p.defaultModel : "");
   };
 
   const onSave = () => {
@@ -291,11 +302,27 @@ function TaskCard({
 
           <div className="grid gap-2">
             <Label>Model</Label>
-            <Input
+            <Select
               value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="e.g. claude-haiku-4-5-20251001"
-            />
+              onValueChange={setModel}
+              disabled={!providerId}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    providerId ? "Select model" : "Select a provider first"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {modelOptions.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                    {selectedProvider?.defaultModel === m ? " (default)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

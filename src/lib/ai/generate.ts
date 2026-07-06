@@ -9,11 +9,38 @@ export type AITaskType =
   | "client_profile"
   | "lead_overview";
 
-export const AI_PROVIDERS: { id: AIProviderId; label: string; defaultModel: string }[] = [
-  { id: "anthropic", label: "Anthropic (Claude)", defaultModel: "claude-haiku-4-5-20251001" },
-  { id: "openai", label: "OpenAI", defaultModel: "gpt-4o-mini" },
-  { id: "gemini", label: "Google Gemini", defaultModel: "gemini-1.5-flash" },
-  { id: "groq", label: "Groq", defaultModel: "llama-3.3-70b-versatile" },
+export const AI_PROVIDERS: {
+  id: AIProviderId;
+  label: string;
+  defaultModel: string;
+  // Selectable models for this provider, default first. Used to populate the
+  // model dropdown in Settings → AI so admins pick instead of typing.
+  models: string[];
+}[] = [
+  {
+    id: "anthropic",
+    label: "Anthropic (Claude)",
+    defaultModel: "claude-haiku-4-5-20251001",
+    models: ["claude-haiku-4-5-20251001", "claude-sonnet-5", "claude-opus-4-8"],
+  },
+  {
+    id: "openai",
+    label: "OpenAI",
+    defaultModel: "gpt-4o-mini",
+    models: ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"],
+  },
+  {
+    id: "gemini",
+    label: "Google Gemini",
+    defaultModel: "gemini-1.5-flash",
+    models: ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"],
+  },
+  {
+    id: "groq",
+    label: "Groq",
+    defaultModel: "llama-3.3-70b-versatile",
+    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+  },
 ];
 
 export const AI_TASKS: { id: AITaskType; label: string }[] = [
