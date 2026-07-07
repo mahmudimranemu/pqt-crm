@@ -525,6 +525,99 @@ Answer in 1–3 short sentences, plain business English.`;
   }
 }
 
+/* ---- AI: multi-turn "Ask the CRM" chatbot ------------------------------
+ * A conversational assistant: takes the running message history and a rich,
+ * server-computed data context (whole leaderboard, KPI trends, sources,
+ * nationalities, needs-attention) so it can answer follow-ups and far more
+ * than the single-shot `askExecutive`. Provider-agnostic — history is folded
+ * into the prompt, so it works with whatever is set in Settings → AI. */
+
+type ChatMessage = { role: "user" | "assistant"; content: string };
+
+function fmtMoney(n: number): string {
+  return n ? `$${Math.round(n).toLocaleString("en-US")}` : "$0";
+}
+
+/** Compact but comprehensive snapshot the chatbot reasons over. */
+function buildChatContext(data: Awaited<ReturnType<typeof getExecutiveData>>): string {
+  const ds = data.datasets;
+  const kpiLine = (label: string, k: (typeof ds)["30d"]) =>
+    `${label}: enquiries ${k.enquiries.v} (${k.enquiries.d >= 0 ? "+" : ""}${k.enquiries.d}% vs prev), leads ${k.leads.v}, new clients ${k.clients.v}, enq→lead ${k.conv.v}%, bookings ${k.bookings.v}, revenue ${fmtMoney(k.revenue.v)}`;
+
+  const roster = data.agentsByRange?.["30d"] ?? data.agents30d ?? [];
+  const board =
+    roster
+      .slice(0, 14)
+      .map(
+        (a) =>
+          `- ${a.name} (${a.role}): ${a.enq} enq, ${a.leads} leads, ${a.clients} clients, ${a.activity} activities, ${fmtMoney(a.rev)} revenue`,
+      )
+      .join("\n") || "No agent activity in the last 30 days.";
+
+  const sources =
+    (data.sourceSplit ?? []).map((s) => `${s.name} ${Math.round(s.p * 100)}%`).join(", ") ||
+    "n/a";
+  const nats =
+    (data.nationalities ?? [])
+      .slice(0, 6)
+      .map((n) => `${n.name} ${n.v}`)
+      .join(", ") || "n/a";
+  const att = data.attention;
+
+  return [
+    "KPI TOTALS (current window vs previous):",
+    kpiLine("Last 7 days", ds["7d"]),
+    kpiLine("Last 30 days", ds["30d"]),
+    kpiLine("Last 90 days", ds["90d"]),
+    "",
+    `AGENT LEADERBOARD — last 30 days (${roster.length} active agents):`,
+    board,
+    "",
+    `TOTAL CLIENTS: ${data.totalClients}. Lead sources (90d): ${sources}. Top nationalities: ${nats}.`,
+    `NEEDS ATTENTION: ${att?.staleEnquiries ?? 0} enquiries untouched 7+ days, ${att?.unassigned ?? 0} unassigned, top agent holds ${att?.concentrationPct ?? 0}% of all clients.`,
+  ].join("\n");
+}
+
+export async function chatExecutive(messages: ChatMessage[]): Promise<string> {
+  // Fully guarded: any failure returns a friendly string, never an unhandled
+  // server-action error.
+  try {
+    await requireExec();
+    const clean = (messages ?? [])
+      .filter((m) => m && typeof m.content === "string" && m.content.trim())
+      .slice(-10); // keep the last 10 turns to bound the prompt size
+    if (!clean.length) return "Ask me anything about your CRM performance.";
+
+    const data = await getExecutiveData();
+    const context = buildChatContext(data);
+    const transcript = clean
+      .map((m) => `${m.role === "user" ? "CEO" : "Assistant"}: ${m.content.trim()}`)
+      .join("\n");
+
+    const system =
+      "You are the analytics assistant for the Property Quest Turkey real-estate CRM, in conversation with the CEO. Answer using ONLY the CRM DATA provided. Be concise and specific, cite the real numbers, and use the earlier conversation to resolve follow-up questions (e.g. \"and last month?\", \"why?\"). If the data can't answer it, say so briefly and suggest what to ask. Plain business English — no markdown headings.";
+
+    const prompt = `CRM DATA (live):
+${context}
+
+CONVERSATION SO FAR:
+${transcript}
+
+Reply to the CEO's most recent message as the Assistant, in 1–4 short sentences.`;
+
+    const raw = await generateWithTask("assistant_chat", system, prompt, undefined, 700);
+    return raw.trim() || "I couldn't find an answer for that.";
+  } catch (e) {
+    if (e instanceof Error && /unauthorized|forbidden/i.test(e.message)) {
+      return "Your session looks expired — refresh the page and sign in again, then ask me once more.";
+    }
+    if (e instanceof Error && /not configured|not enabled|no API key/i.test(e.message)) {
+      return "AI isn't configured yet — set a provider in Settings → AI.";
+    }
+    return "Something went wrong answering that. Try rephrasing, or ask about agents, leads, enquiries, revenue or activity.";
+  }
+}
+
 /* ---- Per-user KPI report (Executive dashboard) -------------------------
  * Calls / emails / notes / spoken a user logged on leads + enquiries, by
  * day/week/month/year, plus a nextCallDate schedule (previous/today/future).

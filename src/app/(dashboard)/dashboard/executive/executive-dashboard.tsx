@@ -30,7 +30,10 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
-import { getExecutiveSummary, askExecutive } from "@/lib/actions/executive";
+import {
+  getExecutiveSummary,
+  chatExecutive,
+} from "@/lib/actions/executive";
 import { UserKpiReport } from "./user-kpi-report";
 import {
   AreaChart,
@@ -294,6 +297,10 @@ table.lb{ width:100%; border-collapse:collapse; min-width:840px; }
 .chat{ padding:18px 20px 16px; }
 .chat-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
 .chat-hint{ font-size:12px; color:var(--ink-4); }
+.chat-head-right{ display:flex; align-items:center; gap:12px; }
+.chat-clear{ font:inherit; font-size:12px; font-weight:550; color:var(--ink-3); background:transparent; border:1px solid var(--line-2); border-radius:8px; padding:4px 10px; cursor:pointer; transition:all .14s; }
+.chat-clear:hover{ border-color:var(--brand-100); color:var(--brand); background:var(--brand-50); }
+.chat-clear:disabled{ opacity:.4; cursor:default; }
 .chat-thread{ display:flex; flex-direction:column; gap:14px; margin-bottom:14px; }
 .chat-q{ align-self:flex-end; max-width:80%; }
 .chat-q span{ display:inline-block; background:var(--brand); color:#fff; font-size:13px; font-weight:500; padding:8px 13px; border-radius:13px 13px 4px 13px; }
@@ -651,6 +658,27 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
+  // Persist the conversation so it survives navigation / reloads.
+  const CHAT_KEY = "pqt-exec-chat";
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CHAT_KEY);
+      if (raw) setChatMsgs(JSON.parse(raw));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHAT_KEY, JSON.stringify(chatMsgs));
+    } catch {}
+  }, [chatMsgs]);
+
+  function clearChat() {
+    setChatMsgs([]);
+    try {
+      localStorage.removeItem(CHAT_KEY);
+    } catch {}
+  }
+
   // resolve the active window + which dataset "bucket" to use
   const { start, end, bucket } = useMemo(() => {
     if (range === "custom") {
@@ -948,21 +976,18 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
     }
 
     // Free-form questions go to the CRM's server-side AI (configured provider).
+    // We send the running conversation so the bot can handle follow-ups; only
+    // plain-text turns are included (structured cards have no prose to replay).
     setChatLoading(true);
     try {
-      const text = await askExecutive(q, {
-        rangeLabel,
-        kpi,
-        agents: agentsSorted.map((a) => ({
-          name: a.name,
-          role: a.role,
-          enq: a.enq,
-          leads: a.leads,
-          clients: a.clients,
-          activity: a.activity,
-          rev: a.rev,
-        })),
-      });
+      const history = [...chatMsgs, { role: "user", text: q }]
+        .map((m) => {
+          if (m.role === "user") return { role: "user", content: m.text };
+          const t = m.result?.kind === "text" ? m.result.text : null;
+          return t ? { role: "assistant", content: t } : null;
+        })
+        .filter(Boolean);
+      const text = await chatExecutive(history);
       setChatMsgs((m) => [
         ...m,
         { role: "bot", result: { kind: "text", text } },
@@ -1411,9 +1436,21 @@ export default function ExecutiveDashboard({ data }: { data?: any } = {}) {
             <span className="ai-label">Ask the CRM</span>
             <span className="ai-pill">Claude</span>
           </div>
-          <span className="chat-hint">
-            Ask about any agent or metric — answers in plain English
-          </span>
+          <div className="chat-head-right">
+            <span className="chat-hint">
+              Remembers the conversation — ask follow-ups
+            </span>
+            {chatMsgs.length > 0 && (
+              <button
+                type="button"
+                className="chat-clear"
+                onClick={clearChat}
+                disabled={chatLoading}
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
 
         {chatMsgs.length > 0 && (
