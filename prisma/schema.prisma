@@ -106,6 +106,7 @@ enum EnquirySource {
   WHATSAPP
   LIVE_CHAT
   PARTNER_REFERRAL
+  FACEBOOK_ADS
 }
 
 enum EnquiryStatus {

@@ -53,6 +53,7 @@ const sourceLabels: Record<EnquirySource, string> = {
   WHATSAPP: "WhatsApp",
   LIVE_CHAT: "Live Chat",
   PARTNER_REFERRAL: "Partner Referral",
+  FACEBOOK_ADS: "Facebook / Meta",
 };
 
 export default async function EnquiryDetailPage({ params }: PageProps) {
