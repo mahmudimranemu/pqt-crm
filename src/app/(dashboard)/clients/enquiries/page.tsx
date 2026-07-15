@@ -62,6 +62,7 @@ const ENQUIRY_SOURCE_OPTIONS = [
   { value: "WHATSAPP", label: "WhatsApp" },
   { value: "LIVE_CHAT", label: "Live Chat" },
   { value: "PARTNER_REFERRAL", label: "Partner Referral" },
+  { value: "FACEBOOK_ADS", label: "Facebook / Meta" },
 ];
 
 const SEGMENT_OPTIONS = [

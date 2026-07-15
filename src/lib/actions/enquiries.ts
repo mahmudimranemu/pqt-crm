@@ -698,6 +698,7 @@ function mapEnquirySourceToLeadSource(source: EnquirySource): LeadSource {
     WHATSAPP: "SOCIAL_MEDIA",
     LIVE_CHAT: "WEBSITE",
     PARTNER_REFERRAL: "PARTNER",
+    FACEBOOK_ADS: "FACEBOOK_ADS",
   };
   return mapping[source];
 }
