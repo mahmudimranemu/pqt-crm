@@ -10,7 +10,7 @@ import {
   assignLeadToPool,
   removeLeadFromPool,
 } from "@/lib/actions/leads";
-import { Settings, ChevronLeft, ChevronRight } from "lucide-react";
+import { Settings, ChevronLeft, ChevronRight, CheckSquare, Square } from "lucide-react";
 
 interface Pool {
   tag: string;
@@ -28,6 +28,8 @@ interface LeadDetailFieldsProps {
     ownerId: string;
     temperature: string | null;
     tags: string[];
+    called: boolean;
+    spoken: boolean;
   };
   agents: { id: string; firstName: string; lastName: string }[];
   pools?: Pool[];
@@ -362,6 +364,41 @@ export function LeadDetailFields({ lead, agents, pools = [] }: LeadDetailFieldsP
                   ))}
                 </select>
               </div>
+            </div>
+
+            {/* Row 3: Called / Spoken */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => handleChange("called", !lead.called)}
+                className="flex items-center gap-2 rounded-lg border border-gray-200 p-3 hover:bg-gray-50 transition-colors text-left"
+              >
+                {lead.called ? (
+                  <CheckSquare className="h-5 w-5 text-[#dc2626]" />
+                ) : (
+                  <Square className="h-5 w-5 text-gray-300" />
+                )}
+                <div>
+                  <p className="text-xs text-gray-500">Called</p>
+                  <p className="text-sm font-medium">{lead.called ? "Yes" : "No"}</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleChange("spoken", !lead.spoken)}
+                className="flex items-center gap-2 rounded-lg border border-gray-200 p-3 hover:bg-gray-50 transition-colors text-left"
+              >
+                {lead.spoken ? (
+                  <CheckSquare className="h-5 w-5 text-[#dc2626]" />
+                ) : (
+                  <Square className="h-5 w-5 text-gray-300" />
+                )}
+                <div>
+                  <p className="text-xs text-gray-500">Spoken</p>
+                  <p className="text-sm font-medium">{lead.spoken ? "Yes" : "No"}</p>
+                </div>
+              </button>
             </div>
           </div>
 

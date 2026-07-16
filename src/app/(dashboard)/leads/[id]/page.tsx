@@ -201,6 +201,8 @@ export default async function LeadDetailPage({
           ownerId: lead.ownerId,
           temperature: lead.temperature,
           tags: lead.tags,
+          called: lead.called,
+          spoken: lead.spoken,
         }}
         agents={agents}
         pools={pools}
