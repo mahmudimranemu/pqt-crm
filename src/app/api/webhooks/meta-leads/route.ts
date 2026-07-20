@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import prisma from "@/lib/prisma";
-import { notifySuperAdmins } from "@/lib/notifications";
-import { generateRefId } from "@/lib/ref-id";
-import { fetchMetaLead, mapLeadFieldData } from "@/lib/api/meta-leads";
+import { fetchMetaLead } from "@/lib/api/meta-leads";
+import { syncMetaLeadToEnquiry } from "@/lib/meta-lead-sync";
 
 /**
  * Inbound webhook for Meta (Facebook / Instagram) Lead Ads.
@@ -113,57 +111,16 @@ export async function POST(request: NextRequest) {
   for (const v of leads) {
     const leadgenId = v.leadgen_id as string;
     try {
-      // Dedup — Meta retries deliveries; the leadgen_id is our idempotency key.
-      const existing = await prisma.enquiry.findFirst({
-        where: { sourceUrl: { contains: `meta:leadgen:${leadgenId}` } },
-        select: { id: true },
-      });
-      if (existing) {
-        skipped++;
-        continue;
-      }
-
       if (!writeEnabled) {
         console.log(TAG, "log-only", { leadgen_id: leadgenId, form_id: v.form_id });
         continue;
       }
-
+      // The payload has no field data — fetch the full lead, then create/dedup
+      // via the shared helper (same path as the backfill).
       const lead = await fetchMetaLead(leadgenId);
-      const m = mapLeadFieldData(lead);
-      if (!m.email && !m.phone) {
-        console.error(TAG, "lead has no email/phone; skipping", { leadgen_id: leadgenId });
-        skipped++;
-        continue;
-      }
-
-      const refId = await generateRefId();
-      const enquiry = await prisma.enquiry.create({
-        data: {
-          refId,
-          firstName: m.firstName || "-",
-          lastName: m.lastName || "-",
-          email: m.email || "-",
-          phone: m.phone || "-",
-          message: m.message,
-          budget: m.budget,
-          country: m.country,
-          source: "FACEBOOK_ADS",
-          sourceUrl: `meta:leadgen:${leadgenId}${v.form_id ? ` | form:${v.form_id}` : ""}`,
-          status: "NEW",
-          segment: "Buyer",
-          priority: "Medium",
-          nextCallDate: new Date(),
-        },
-      });
-      created++;
-      console.log(TAG, "enquiry created", { id: enquiry.id, leadgen_id: leadgenId });
-
-      await notifySuperAdmins(
-        "SYSTEM_ALERT",
-        "New Facebook lead",
-        `${m.firstName} ${m.lastName}`.trim() + (m.email ? ` · ${m.email}` : ""),
-        `/clients/enquiries/${enquiry.id}`,
-      ).catch((e) => console.error(TAG, "notify failed", e));
+      const result = await syncMetaLeadToEnquiry(lead, v.form_id);
+      if (result === "created") created++;
+      else skipped++;
     } catch (err) {
       // Log and move on — return 200 regardless so Meta doesn't disable the
       // endpoint. Un-created leads can be re-pulled from Meta if needed.
