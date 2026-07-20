@@ -57,6 +57,60 @@ export async function fetchMetaLead(leadgenId: string): Promise<MetaLead> {
   return (await res.json()) as MetaLead;
 }
 
+async function graphGet<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Graph API ${res.status}: ${body.slice(0, 300)}`);
+  }
+  return (await res.json()) as T;
+}
+
+function pageToken(): string {
+  const token = process.env.META_PAGE_ACCESS_TOKEN;
+  if (!token) throw new Error("META_PAGE_ACCESS_TOKEN is not set");
+  return token;
+}
+
+/** List the lead forms on a Page (paginated). Needs a Page token. */
+export async function fetchPageLeadForms(
+  pageId: string,
+): Promise<{ id: string; name: string }[]> {
+  const token = pageToken();
+  const out: { id: string; name: string }[] = [];
+  let url =
+    `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(pageId)}/leadgen_forms` +
+    `?fields=id,name&limit=100&access_token=${encodeURIComponent(token)}`;
+  // Follow paging.next until exhausted (guard against runaway loops).
+  for (let i = 0; i < 50 && url; i++) {
+    const page = await graphGet<{ data?: { id: string; name: string }[]; paging?: { next?: string } }>(url);
+    out.push(...(page.data ?? []));
+    url = page.paging?.next ?? "";
+  }
+  return out;
+}
+
+/**
+ * List every lead for a form (paginated). Each row already carries `field_data`,
+ * so `mapLeadFieldData` can be applied directly (no per-lead fetch). Needs a
+ * Page token with `leads_retrieval`.
+ */
+export async function fetchFormLeads(formId: string): Promise<MetaLead[]> {
+  const token = pageToken();
+  const fields =
+    "id,created_time,ad_id,ad_name,campaign_id,campaign_name,platform,field_data";
+  const out: MetaLead[] = [];
+  let url =
+    `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(formId)}/leads` +
+    `?fields=${fields}&limit=100&access_token=${encodeURIComponent(token)}`;
+  for (let i = 0; i < 200 && url; i++) {
+    const page = await graphGet<{ data?: MetaLead[]; paging?: { next?: string } }>(url);
+    out.push(...(page.data ?? []));
+    url = page.paging?.next ?? "";
+  }
+  return out;
+}
+
 const val = (fd: MetaFieldDatum[], ...names: string[]): string | undefined => {
   for (const n of names) {
     const hit = fd.find((f) => f.name?.toLowerCase() === n);

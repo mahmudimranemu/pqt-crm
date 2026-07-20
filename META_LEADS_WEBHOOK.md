@@ -93,6 +93,25 @@ from the app's Webhooks UI where it lists your Pages.)
    "New Facebook lead" notification.
 4. Filter Enquiries by **Source → Facebook / Meta** to see them.
 
+## Backfill — import leads that came in *before* the webhook was connected
+Meta only pushes **new** submissions to the webhook; it never replays past
+leads. To pull historical leads into the CRM, call the one-time backfill
+endpoint (it fetches every lead on the page's forms via the Graph API and
+creates enquiries, deduped — safe to run repeatedly):
+
+```bash
+curl -X POST \
+  "https://crm.propertyquestturkey.com/api/webhooks/meta-leads/backfill?page_id=<PAGE_ID>&secret=<META_VERIFY_TOKEN>"
+```
+- `secret` must equal `META_VERIFY_TOKEN`. Use `page_id=<PAGE_ID>` (e.g.
+  `837714986098139`) to backfill all forms, or `form_id=<FORM_ID>` for one form.
+- Response: `{ "created": N, "skipped": M, "forms": X, "leads": Y }`.
+- Re-running is idempotent (`created: 0` the second time) and won't clash with
+  the live webhook — both dedup on the Meta `leadgen_id`.
+- Requires `META_PAGE_ACCESS_TOKEN` with `leads_retrieval` (same token the
+  webhook uses). Backfilled leads land in Enquiries with source **Facebook /
+  Meta** (no per-lead notification, to avoid spam).
+
 ---
 
 ## Notes & troubleshooting
