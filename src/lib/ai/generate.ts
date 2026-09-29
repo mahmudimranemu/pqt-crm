@@ -13,15 +13,16 @@ export const AI_PROVIDERS: {
   id: AIProviderId;
   label: string;
   defaultModel: string;
-  // Selectable models for this provider, default first. Used to populate the
-  // model dropdown in Settings → AI so admins pick instead of typing.
+  // Fallback model list, default first. Settings → AI loads the provider's
+  // live list with the saved key (listProviderModels); this is only shown
+  // when that fails. Names here go stale — Google retired gemini-1.5/2.0.
   models: string[];
 }[] = [
   {
     id: "anthropic",
     label: "Anthropic (Claude)",
     defaultModel: "claude-haiku-4-5-20251001",
-    models: ["claude-haiku-4-5-20251001", "claude-sonnet-5", "claude-opus-4-8"],
+    models: ["claude-haiku-4-5-20251001", "claude-sonnet-5", "claude-opus-5-5"],
   },
   {
     id: "openai",
@@ -32,14 +33,15 @@ export const AI_PROVIDERS: {
   {
     id: "gemini",
     label: "Google Gemini",
-    defaultModel: "gemini-1.5-flash",
-    models: ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"],
+    defaultModel: "gemini-3.8-flash",
+    models: ["gemini-3.8-flash"],
   },
   {
     id: "groq",
     label: "Groq",
-    defaultModel: "llama-3.3-70b-versatile",
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+    // llama-3.3-70b-versatile was retired by Groq.
+    defaultModel: "openai/gpt-oss-120b",
+    models: ["openai/gpt-oss-120b", "openai/gpt-oss-20b"],
   },
 ];
 
@@ -103,7 +105,7 @@ async function callOpenAICompat(url: string, { model, apiKey, systemPrompt, user
   return data.choices?.[0]?.message?.content ?? "";
 }
 
-async function callGemini({ model, apiKey, systemPrompt, userPrompt, maxTokens }: CallArgs): Promise<string> {
+async function callGemini({ model, apiKey, systemPrompt, userPrompt }: CallArgs): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const res = await fetch(url, {
     method: "POST",
@@ -111,12 +113,57 @@ async function callGemini({ model, apiKey, systemPrompt, userPrompt, maxTokens }
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: { maxOutputTokens: maxTokens ?? 1024 },
+      // No output cap for Gemini: its newer models "think" first and the
+      // thinking counts against maxOutputTokens, so 1024 cut replies short.
+      // The prompts already ask for short output.
     }),
   });
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
   const data = await res.json();
   return data.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
+}
+
+/** Not chat models — embeddings, speech, images, video, moderation… */
+const NON_CHAT =
+  /embed|tts|whisper|audio|image|imagen|veo|dall-e|moderation|realtime|transcribe|guard|aqa|live|search/i;
+
+/**
+ * The chat models this key can use, fetched live from the provider, so
+ * Settings → AI offers what really exists instead of a list that goes stale.
+ */
+export async function listProviderModels(
+  provider: AIProviderId,
+  apiKey: string,
+): Promise<string[]> {
+  let ids: string[] = [];
+  if (provider === "gemini") {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(apiKey)}`,
+    );
+    if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+    const data = (await res.json()) as {
+      models?: { name: string; supportedGenerationMethods?: string[] }[];
+    };
+    ids = (data.models ?? [])
+      .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+      .map((m) => m.name.replace(/^models\//, ""))
+      .filter((id) => id.startsWith("gemini"));
+  } else if (provider === "anthropic") {
+    const res = await fetch("https://api.anthropic.com/v1/models?limit=1000", {
+      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+    });
+    if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
+    ids = ((await res.json()) as { data?: { id: string }[] }).data?.map((m) => m.id) ?? [];
+  } else {
+    const base =
+      provider === "openai" ? "https://api.openai.com/v1" : "https://api.groq.com/openai/v1";
+    const res = await fetch(`${base}/models`, {
+      headers: { authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) throw new Error(`${provider} ${res.status}: ${await res.text()}`);
+    ids = ((await res.json()) as { data?: { id: string }[] }).data?.map((m) => m.id) ?? [];
+  }
+  return [...new Set(ids.filter((id) => !NON_CHAT.test(id)))].sort().reverse();
 }
 
 async function dispatch(args: CallArgs): Promise<string> {

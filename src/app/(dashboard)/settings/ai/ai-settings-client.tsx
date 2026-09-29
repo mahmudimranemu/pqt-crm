@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
 import {
+  listAIModels,
   upsertAIProvider,
   upsertAITaskConfig,
 } from "@/lib/actions/ai-settings";
@@ -223,13 +224,12 @@ function TaskCard({
     providerId !== (row.provider ?? "") || model.trim() !== (row.model ?? "");
 
   const selectedProvider = providers.find((x) => x.provider === providerId);
-  // Model options for the picked provider; keep any previously-saved custom
-  // model that isn't in the curated list so it isn't silently dropped.
+  const live = useLiveModels(selectedProvider);
+  // The provider's live list when it loaded, else the built-in fallback. A
+  // saved model that isn't listed is kept so it isn't silently dropped.
+  const listed = live.models ?? selectedProvider?.models ?? [];
   const modelOptions = selectedProvider
-    ? [
-        ...selectedProvider.models,
-        ...(model && !selectedProvider.models.includes(model) ? [model] : []),
-      ]
+    ? [...listed, ...(model && !listed.includes(model) ? [model] : [])]
     : [];
 
   const onProviderSelect = (id: string) => {
@@ -318,11 +318,23 @@ function TaskCard({
                 {modelOptions.map((m) => (
                   <SelectItem key={m} value={m}>
                     {m}
-                    {selectedProvider?.defaultModel === m ? " (default)" : ""}
+                    {m === row.model ? " (current)" : ""}
+                    {!live.models && selectedProvider?.defaultModel === m ? " (default)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {selectedProvider && (
+              <p className="text-xs text-gray-500">
+                {live.loading
+                  ? "Loading the models your key can use…"
+                  : live.error
+                    ? `Couldn't load the live list (${live.error}) — showing the built-in list.`
+                    : live.models
+                      ? `${live.models.length} models available to your key.`
+                      : null}
+              </p>
+            )}
           </div>
         </div>
 
@@ -339,4 +351,48 @@ function TaskCard({
       </CardContent>
     </Card>
   );
+}
+
+/**
+ * The models the provider really offers for the saved key, loaded once per
+ * provider. The built-in list named models Google had already retired
+ * (gemini-1.5 / 2.0), and a retired model fails every generation.
+ */
+const liveModelCache = new Map<string, Promise<{ ok: true; models: string[] } | { ok: false; error: string }>>();
+
+function useLiveModels(provider: ProviderRow | undefined) {
+  const id = provider?.hasKey ? provider.provider : null;
+  const [state, setState] = useState<{
+    id: string | null;
+    models: string[] | null;
+    error: string | null;
+  }>({ id: null, models: null, error: null });
+
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    let request = liveModelCache.get(id);
+    if (!request) {
+      request = listAIModels(id as AIProviderId);
+      liveModelCache.set(id, request);
+    }
+    void request.then((res) => {
+      if (!alive) return;
+      if (res.ok) setState({ id, models: res.models.length ? res.models : null, error: null });
+      else {
+        liveModelCache.delete(id);
+        setState({ id, models: null, error: res.error.slice(0, 120) });
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  const current = state.id === id;
+  return {
+    loading: Boolean(id) && !current,
+    models: current ? state.models : null,
+    error: current ? state.error : null,
+  };
 }

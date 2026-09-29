@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import prisma from "@/lib/prisma";
 import { auth, type ExtendedSession } from "@/lib/auth";
 import { auditLog } from "@/lib/audit";
-import { encryptSecret, maskApiKey } from "@/lib/crypto";
+import { decryptSecret, encryptSecret, maskApiKey } from "@/lib/crypto";
 import { sendEmail } from "@/lib/email";
 import {
   AI_PROVIDERS,
   AI_TASKS,
   generateWithTask,
+  listProviderModels,
   type AIProviderId,
   type AITaskType,
 } from "@/lib/ai/generate";
@@ -116,6 +117,22 @@ export async function upsertAIProvider(input: {
 
   revalidatePath("/settings/ai");
   return { ok: true };
+}
+
+/** The provider's live model list for the Model dropdown, using the saved key. */
+export async function listAIModels(
+  provider: AIProviderId,
+): Promise<{ ok: true; models: string[] } | { ok: false; error: string }> {
+  try {
+    await requireSuperAdmin();
+    if (!AI_PROVIDERS.some((p) => p.id === provider)) throw new Error("Unknown provider");
+    const row = await prisma.aIProvider.findUnique({ where: { provider } });
+    if (!row?.apiKeyEncrypted) throw new Error("Add an API key first.");
+    const models = await listProviderModels(provider, decryptSecret(row.apiKeyEncrypted));
+    return { ok: true, models };
+  } catch (e) {
+    return { ok: false, error: aiError(e) };
+  }
 }
 
 export async function upsertAITaskConfig(input: {
