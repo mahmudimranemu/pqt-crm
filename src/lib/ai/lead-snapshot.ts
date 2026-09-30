@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import prisma from "@/lib/prisma";
 import { fetchProperties } from "@/lib/api/external-properties";
+import { ANALYSIS_ACTIVITY_TITLE } from "@/lib/ai/lead-analysis-config";
 
 /**
  * The "lead snapshot" for the lead Analysis button (CRM_LEAD_ANALYSIS.md,
@@ -179,7 +180,13 @@ export async function buildLeadSnapshot(
         orderBy: { createdAt: "desc" },
         include: { agent: { select: { firstName: true } } },
       },
-      activities: { orderBy: { createdAt: "desc" }, take: 200 },
+      // Not the "AI Analysis run by …" log lines: they aren't about the
+      // client, and they would change the fingerprint on every run.
+      activities: {
+        where: { title: { not: ANALYSIS_ACTIVITY_TITLE } },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+      },
       tasks: {
         where: { status: { in: [...OPEN_TASK_STATUSES] } },
         orderBy: { dueDate: "asc" },

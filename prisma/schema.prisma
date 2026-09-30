@@ -1361,6 +1361,17 @@ model PMSIntegration {
   @@map("pms_integrations")
 }
 
+/// Small settings changed from the CRM itself, e.g. who may use the lead
+/// Analysis button ("lead_analysis.access").
+model AppSetting {
+  key         String   @id
+  value       String
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
 model AITaskConfig {
   id        String   @id @default(cuid())
   taskType  String   @unique
