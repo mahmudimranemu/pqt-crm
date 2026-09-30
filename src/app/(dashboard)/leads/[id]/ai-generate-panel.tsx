@@ -69,7 +69,10 @@ export function AIGeneratePanel({
       }
       setAnalysis(res.state);
       if (res.cached) {
-        toast({ title: "No new activity", description: "Showing the saved analysis." });
+        toast({
+          title: res.notice ? "Recently analysed" : "No new activity",
+          description: res.notice ?? "Showing the saved analysis.",
+        });
       }
     });
 

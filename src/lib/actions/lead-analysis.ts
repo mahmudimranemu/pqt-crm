@@ -8,6 +8,15 @@ import { updateLeadField } from "@/lib/actions/leads";
 import { createTaskAction } from "@/lib/actions/tasks";
 import { runLeadAnalysis } from "@/lib/ai/run-lead-analysis";
 import type { LeadAnalysisResult } from "@/lib/ai/lead-analysis";
+import {
+  ANALYSIS_ACCESS_KEY,
+  ANALYSIS_ACTIVITY_TITLE,
+  analysisAllowedFor,
+  canAnalyseLead,
+  estimateCostUsd,
+  getAnalysisAccess,
+  type AnalysisAccess,
+} from "@/lib/ai/lead-analysis-config";
 
 /**
  * Server actions for the lead Analysis button. Who may run it follows the
@@ -40,15 +49,19 @@ export interface LeadAnalysisState {
 
 type Session = ExtendedSession & { user: NonNullable<ExtendedSession["user"]> };
 
+/** Checked on every request: the admin switch, then access to the lead. */
 async function requireLeadAccess(leadId: string) {
   const session = (await auth()) as Session | null;
   if (!session?.user) throw new Error("Unauthorized");
+  if (!analysisAllowedFor(await getAnalysisAccess(), session.user.role)) {
+    throw new Error("AI Analysis is turned off.");
+  }
   const lead = await prisma.lead.findUnique({
     where: { id: leadId },
     select: { id: true, ownerId: true },
   });
   if (!lead) throw new Error("Lead not found");
-  if (session.user.role !== "SUPER_ADMIN" && lead.ownerId !== session.user.id) {
+  if (!canAnalyseLead(session.user, lead.ownerId)) {
     throw new Error("You don't have access to this lead.");
   }
   return { session, lead };
@@ -79,13 +92,23 @@ async function toView(row: {
   };
 }
 
+/** A saved result the panel can draw — a bad row must not break the lead page. */
+function looksComplete(result: Prisma.JsonValue): boolean {
+  const r = result as Partial<LeadAnalysisResult> | null;
+  return Boolean(r?.health?.label && r?.next_action?.what && Array.isArray(r?.suggested_updates));
+}
+
 async function newestActivityAt(leadId: string): Promise<Date | null> {
   const [note, activity] = await Promise.all([
     prisma.leadNote.findFirst({ where: { leadId }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
     // Changes made by applying a suggestion aren't news to the analysis —
     // counting them showed "New activity… run again" right after Apply.
     prisma.activity.findFirst({
-      where: { leadId, NOT: { description: { endsWith: AI_NOTE } } },
+      where: {
+        leadId,
+        title: { not: ANALYSIS_ACTIVITY_TITLE },
+        NOT: { description: { endsWith: AI_NOTE } },
+      },
       orderBy: { createdAt: "desc" },
       select: { createdAt: true },
     }),
@@ -108,7 +131,7 @@ export async function getLeadAnalysisState(leadId: string): Promise<LeadAnalysis
     newestActivityAt(leadId),
   ]);
   return {
-    analysis: row?.result ? await toView(row) : null,
+    analysis: row?.result && looksComplete(row.result) ? await toView(row) : null,
     newActivity: Boolean(row?.dataAsOf && newest && newest > row.dataAsOf),
     counts: { notes: Math.min(notes, MAX_NOTES), activities: Math.min(activities, MAX_ACTIVITIES) },
     canApply: canEdit(session, lead.ownerId),
@@ -117,12 +140,24 @@ export async function getLeadAnalysisState(leadId: string): Promise<LeadAnalysis
 
 export async function analyseLead(
   leadId: string,
-): Promise<{ ok: true; state: LeadAnalysisState; cached: boolean } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; state: LeadAnalysisState; cached: boolean; notice?: string }
+  | { ok: false; error: string }
+> {
   try {
     const { session } = await requireLeadAccess(leadId);
-    const run = await runLeadAnalysis({ leadId, requestedById: session.user.id });
+    const run = await runLeadAnalysis({
+      leadId,
+      requestedById: session.user.id,
+      requestedByName: session.user.firstName,
+    });
     if (!run.ok) return { ok: false, error: run.error };
-    return { ok: true, cached: run.cached, state: await getLeadAnalysisState(leadId) };
+    return {
+      ok: true,
+      cached: run.cached,
+      notice: run.notice,
+      state: await getLeadAnalysisState(leadId),
+    };
   } catch (e) {
     console.error("analyseLead failed:", e);
     return { ok: false, error: e instanceof Error ? e.message.slice(0, 400) : "Analysis failed." };
@@ -201,4 +236,89 @@ export async function applyAnalysisSuggestion(
     console.error("applyAnalysisSuggestion failed:", e);
     return { ok: false, error: e instanceof Error ? e.message.slice(0, 300) : "Couldn't apply it." };
   }
+}
+
+// --- admin: switch and usage ---------------------------------------------------
+
+async function requireSuperAdmin() {
+  const session = (await auth()) as Session | null;
+  if (!session?.user || session.user.role !== "SUPER_ADMIN") throw new Error("Unauthorized");
+  return session;
+}
+
+export async function setAnalysisAccess(access: AnalysisAccess): Promise<{ ok: true }> {
+  const session = await requireSuperAdmin();
+  if (!["off", "admins", "all"].includes(access)) throw new Error("Unknown setting");
+  await prisma.appSetting.upsert({
+    where: { key: ANALYSIS_ACCESS_KEY },
+    create: { key: ANALYSIS_ACCESS_KEY, value: access, updatedById: session.user.id },
+    update: { value: access, updatedById: session.user.id },
+  });
+  revalidatePath("/settings/ai/lead-analysis");
+  return { ok: true };
+}
+
+export interface LeadAnalysisUsage {
+  access: AnalysisAccess;
+  month: { runs: number; failed: number; inputTokens: number; outputTokens: number; costUsd: number };
+  byDay: { day: string; runs: number; failed: number; tokens: number; costUsd: number }[];
+  byUser: { name: string; runs: number; tokens: number; costUsd: number }[];
+}
+
+/** This month's analyses: per day, per user, tokens and estimated cost. */
+export async function getLeadAnalysisUsage(now: Date = new Date()): Promise<LeadAnalysisUsage> {
+  await requireSuperAdmin();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const rows = await prisma.leadAnalysis.findMany({
+    where: { createdAt: { gte: monthStart } },
+    select: {
+      createdAt: true,
+      status: true,
+      model: true,
+      inputTokens: true,
+      outputTokens: true,
+      requestedBy: { select: { firstName: true, lastName: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const month = { runs: 0, failed: 0, inputTokens: 0, outputTokens: 0, costUsd: 0 };
+  const days = new Map<string, LeadAnalysisUsage["byDay"][number]>();
+  const users = new Map<string, LeadAnalysisUsage["byUser"][number]>();
+  const dayOf = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" });
+
+  for (const r of rows) {
+    const cost = estimateCostUsd(r.model, r.inputTokens, r.outputTokens);
+    const tokens = r.inputTokens + r.outputTokens;
+    const failed = r.status === "failed" ? 1 : 0;
+    month.runs += 1;
+    month.failed += failed;
+    month.inputTokens += r.inputTokens;
+    month.outputTokens += r.outputTokens;
+    month.costUsd += cost;
+
+    const day = dayOf.format(r.createdAt);
+    const d = days.get(day) ?? { day, runs: 0, failed: 0, tokens: 0, costUsd: 0 };
+    d.runs += 1;
+    d.failed += failed;
+    d.tokens += tokens;
+    d.costUsd += cost;
+    days.set(day, d);
+
+    const name = r.requestedBy
+      ? `${r.requestedBy.firstName} ${r.requestedBy.lastName}`.trim()
+      : "Deleted user";
+    const u = users.get(name) ?? { name, runs: 0, tokens: 0, costUsd: 0 };
+    u.runs += 1;
+    u.tokens += tokens;
+    u.costUsd += cost;
+    users.set(name, u);
+  }
+
+  return {
+    access: await getAnalysisAccess(),
+    month,
+    byDay: [...days.values()],
+    byUser: [...users.values()].sort((a, b) => b.runs - a.runs),
+  };
 }
