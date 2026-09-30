@@ -24,6 +24,7 @@ import { LeadDetailFields } from "./lead-detail-fields";
 import { LeadNotes } from "./lead-notes";
 import { LeadPropertySelector } from "./lead-property-selector";
 import { AIGeneratePanel } from "./ai-generate-panel";
+import { getLeadAnalysisState } from "@/lib/actions/lead-analysis";
 import { CreateProfilePanel } from "./create-profile-panel";
 import { LeadOverviewPanel } from "./lead-overview-panel";
 import { TagManager } from "@/components/tag-manager";
@@ -87,6 +88,9 @@ export default async function LeadDetailPage({
   // AI overview state: shown once the client's profile exists. The Regenerate
   // button is enabled only when a note or activity (incl. call-date changes)
   // is newer than the stored overview.
+  // The lead Analysis panel; null hides the button (no access, or an error).
+  const analysisState = await getLeadAnalysisState(lead.id).catch(() => null);
+
   const hasProfile = Boolean(lead.client.aiProfile);
   const overviewAt = lead.aiOverviewGeneratedAt
     ? new Date(lead.aiOverviewGeneratedAt)
@@ -328,6 +332,8 @@ export default async function LeadDetailPage({
             clientEmail={lead.client.email}
             clientPhone={lead.client.phone}
             clientWhatsapp={lead.client.whatsapp}
+            analysisState={analysisState}
+            userId={session.user.id}
           />
 
           {/* AI client profile / overview */}
