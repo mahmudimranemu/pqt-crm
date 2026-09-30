@@ -15,18 +15,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
-import { Sparkles, Loader2, MessageSquare, Mail, RefreshCw, Send } from "lucide-react";
+import { Sparkles, Loader2, MessageSquare, Mail, RefreshCw, Send, ScanSearch } from "lucide-react";
 import {
   generateLeadEmail,
   generateLeadWhatsApp,
   sendLeadEmail,
 } from "@/lib/actions/ai-settings";
+import { analyseLead, type LeadAnalysisState } from "@/lib/actions/lead-analysis";
+import { LeadAnalysisPanel } from "./lead-analysis-panel";
 
 interface Props {
   leadId: string;
   clientEmail: string;
   clientPhone: string | null;
   clientWhatsapp: string | null;
+  /** Saved analysis for this lead; null when the user can't run it. */
+  analysisState: LeadAnalysisState | null;
+  userId: string;
 }
 
 export function AIGeneratePanel({
@@ -34,7 +39,13 @@ export function AIGeneratePanel({
   clientEmail,
   clientPhone,
   clientWhatsapp,
+  analysisState,
+  userId,
 }: Props) {
+  const [analysis, setAnalysis] = useState(analysisState);
+  const [analysing, startAnalysis] = useTransition();
+  // The "Draft this message" plan from the analysis, used by Regenerate too.
+  const [plan, setPlan] = useState<string | undefined>(undefined);
   const [waOpen, setWaOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
 
@@ -49,10 +60,32 @@ export function AIGeneratePanel({
 
   const waTarget = clientWhatsapp?.trim() || clientPhone?.trim() || "";
 
-  const generateWa = () => {
+  const runAnalysis = () =>
+    startAnalysis(async () => {
+      const res = await analyseLead(leadId);
+      if (!res.ok) {
+        toast({ variant: "destructive", title: "Analysis failed", description: res.error });
+        return;
+      }
+      setAnalysis(res.state);
+      if (res.cached) {
+        toast({
+          title: res.notice ? "Recently analysed" : "No new activity",
+          description: res.notice ?? "Showing the saved analysis.",
+        });
+      }
+    });
+
+  const draftFromAnalysis = (channel: string, nextPlan: string) => {
+    setPlan(nextPlan);
+    if (channel === "email") generateEmail(nextPlan);
+    else generateWa(nextPlan);
+  };
+
+  const generateWa = (withPlan?: string) => {
     setWaOpen(true);
     startWaTransition(async () => {
-      const res = await generateLeadWhatsApp(leadId);
+      const res = await generateLeadWhatsApp(leadId, withPlan);
       if (!res.ok) {
         toast({ variant: "destructive", title: "Generation failed", description: res.error });
         setWaOpen(false);
@@ -62,10 +95,10 @@ export function AIGeneratePanel({
     });
   };
 
-  const generateEmail = () => {
+  const generateEmail = (withPlan?: string) => {
     setEmailOpen(true);
     startEmailGen(async () => {
-      const res = await generateLeadEmail(leadId);
+      const res = await generateLeadEmail(leadId, withPlan);
       if (!res.ok) {
         toast({ variant: "destructive", title: "Generation failed", description: res.error });
         setEmailOpen(false);
@@ -121,10 +154,30 @@ export function AIGeneratePanel({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div
+            className={`grid grid-cols-1 gap-2 ${analysis ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
+          >
+            {analysis && (
+              <Button
+                variant="outline"
+                onClick={runAnalysis}
+                disabled={analysing}
+                className="justify-start"
+              >
+                {analysing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ScanSearch className="mr-2 h-4 w-4" />
+                )}
+                Analysis
+              </Button>
+            )}
             <Button
               variant="outline"
-              onClick={generateWa}
+              onClick={() => {
+                setPlan(undefined);
+                generateWa();
+              }}
               disabled={waPending}
               className="justify-start"
             >
@@ -133,7 +186,10 @@ export function AIGeneratePanel({
             </Button>
             <Button
               variant="outline"
-              onClick={generateEmail}
+              onClick={() => {
+                setPlan(undefined);
+                generateEmail();
+              }}
               disabled={emailGenPending}
               className="justify-start"
             >
@@ -141,10 +197,28 @@ export function AIGeneratePanel({
               Generate Email
             </Button>
           </div>
+          {analysing && analysis && (
+            <p className="mt-2 flex items-center text-xs text-gray-600">
+              <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+              Reading {analysis.counts.notes} note{analysis.counts.notes === 1 ? "" : "s"} and{" "}
+              {analysis.counts.activities} activit{analysis.counts.activities === 1 ? "y" : "ies"}…
+            </p>
+          )}
           <p className="mt-2 text-xs text-gray-500">
-            Drafts are generated from this lead&apos;s notes, client info, and
-            interested property. You can edit before sending.
+            {analysis
+              ? "Analysis and drafts are generated from this lead's notes, activity and fields. Nothing changes until you click Apply."
+              : "Drafts are generated from this lead's notes, client info, and interested property. You can edit before sending."}
           </p>
+          {analysis && (
+            <LeadAnalysisPanel
+              state={analysis}
+              userId={userId}
+              onStateChange={setAnalysis}
+              onRerun={runAnalysis}
+              onDraft={draftFromAnalysis}
+              rerunning={analysing}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -182,7 +256,7 @@ export function AIGeneratePanel({
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={generateWa}
+              onClick={() => generateWa(plan)}
               disabled={waPending}
             >
               <RefreshCw className="mr-2 h-4 w-4" />
@@ -247,7 +321,7 @@ export function AIGeneratePanel({
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={generateEmail}
+              onClick={() => generateEmail(plan)}
               disabled={emailGenPending || emailSendPending}
             >
               <RefreshCw className="mr-2 h-4 w-4" />

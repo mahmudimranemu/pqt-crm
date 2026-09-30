@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { generateWithTaskDetailed, type Completion } from "@/lib/ai/generate";
 import { buildLeadSnapshot } from "@/lib/ai/lead-snapshot";
+import { ANALYSIS_ACTIVITY_TITLE, ANALYSIS_LIMITS } from "@/lib/ai/lead-analysis-config";
 import {
   LEAD_ANALYSIS_SYSTEM_PROMPT,
   leadAnalysisUserPrompt,
@@ -29,6 +30,10 @@ export const BUSY =
 /** Wait this long at most when the provider asks us to slow down. */
 const MAX_RATE_LIMIT_WAIT_MS = 10_000;
 const BAD_ANSWER = "The AI's answer couldn't be used. Please try again.";
+export const HOURLY_LIMIT = `You've run ${ANALYSIS_LIMITS.perUserPerHour} analyses in the last hour. Please wait a little before running another.`;
+export const COOLDOWN =
+  "This lead was analysed less than 2 minutes ago. Please wait a moment before running it again.";
+export const RECENT_NOTICE = "Analysed less than 2 minutes ago — showing that result.";
 
 type Generate = (system: string, user: string, signal: AbortSignal) => Promise<Completion>;
 
@@ -47,6 +52,8 @@ export type LeadAnalysisRun =
       result: LeadAnalysisResult;
       createdAt: Date;
       model: string | null;
+      /** Why a saved result was returned instead of a new one, if not obvious. */
+      notice?: string;
     }
   | { ok: false; error: string; analysisId: string | null };
 
@@ -68,10 +75,35 @@ function isTimeout(e: unknown): boolean {
 export async function runLeadAnalysis(args: {
   leadId: string;
   requestedById: string | null;
+  /** First name for the "AI Analysis run by …" activity line. */
+  requestedByName?: string;
   now?: Date;
   generate?: Generate;
 }): Promise<LeadAnalysisRun> {
-  const { leadId, requestedById, now = new Date(), generate = defaultGenerate } = args;
+  const { leadId, requestedById, requestedByName, now = new Date(), generate = defaultGenerate } = args;
+
+  // Same lead again within 2 minutes: the saved result, not a new run.
+  const recent = await prisma.leadAnalysis.findFirst({
+    where: { leadId, createdAt: { gte: new Date(now.getTime() - ANALYSIS_LIMITS.leadCooldownMs) } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (recent) {
+    const lastGood = await prisma.leadAnalysis.findFirst({
+      where: { leadId, status: "ok" },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!lastGood?.result) return { ok: false, error: COOLDOWN, analysisId: null };
+    return {
+      ok: true,
+      cached: true,
+      notice: RECENT_NOTICE,
+      analysisId: lastGood.id,
+      result: lastGood.result as unknown as LeadAnalysisResult,
+      createdAt: lastGood.createdAt,
+      model: lastGood.model,
+    };
+  }
+
   const { snapshot, dataAsOf, fingerprint } = await buildLeadSnapshot(leadId, now);
 
   // Nothing changed since the last good analysis: show it, don't pay again.
@@ -88,6 +120,16 @@ export async function runLeadAnalysis(args: {
       createdAt: saved.createdAt,
       model: saved.model,
     };
+  }
+
+  // Only real AI calls count towards the hourly limit (saved results are free).
+  if (requestedById) {
+    const lastHour = await prisma.leadAnalysis.count({
+      where: { requestedById, createdAt: { gte: new Date(now.getTime() - 3_600_000) } },
+    });
+    if (lastHour >= ANALYSIS_LIMITS.perUserPerHour) {
+      return { ok: false, error: HOURLY_LIMIT, analysisId: null };
+    }
   }
 
   const user = leadAnalysisUserPrompt(snapshot);
@@ -143,6 +185,18 @@ export async function runLeadAnalysis(args: {
       outputTokens,
     },
   });
+
+  if (requestedById) {
+    await prisma.activity.create({
+      data: {
+        type: "NOTE",
+        title: ANALYSIS_ACTIVITY_TITLE,
+        description: `AI Analysis run by ${requestedByName || "a user"}${result ? "" : " (failed)"}`,
+        leadId,
+        userId: requestedById,
+      },
+    });
+  }
 
   if (!result) {
     console.error("lead analysis failed", { leadId, reason });

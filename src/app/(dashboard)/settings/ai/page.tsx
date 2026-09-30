@@ -1,4 +1,5 @@
 import { auth, type ExtendedSession } from "@/lib/auth";
+import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { getAISettings } from "@/lib/actions/ai-settings";
 import { AISettingsClient } from "./ai-settings-client";
@@ -32,6 +33,13 @@ export default async function AISettingsPage() {
           </p>
         </div>
       </div>
+
+      <Link
+        href="/settings/ai/lead-analysis"
+        className="inline-flex items-center gap-1 text-sm font-medium text-[#dc2626] hover:underline"
+      >
+        Lead Analysis — who can use it, and usage &amp; cost →
+      </Link>
 
       <AISettingsClient initialData={data} />
     </div>
