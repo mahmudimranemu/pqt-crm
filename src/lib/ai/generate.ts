@@ -61,11 +61,24 @@ interface CallArgs {
   userPrompt: string;
   /** Output token cap. Defaults to 1024 — raise for large structured outputs. */
   maxTokens?: number;
+  /** Sampling temperature. Defaults to 0.7 (drafting); analysis uses 0.2. */
+  temperature?: number;
+  /** Aborts the provider call — e.g. AbortSignal.timeout(30_000). */
+  signal?: AbortSignal;
 }
 
-async function callAnthropic({ model, apiKey, systemPrompt, userPrompt, maxTokens }: CallArgs): Promise<string> {
+/** The text plus what the provider says it used — for cost tracking. */
+export interface Completion {
+  text: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+async function callAnthropic({ model, apiKey, systemPrompt, userPrompt, maxTokens, temperature, signal }: CallArgs): Promise<Completion> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
+    signal,
     headers: {
       "content-type": "application/json",
       "x-api-key": apiKey,
@@ -74,18 +87,25 @@ async function callAnthropic({ model, apiKey, systemPrompt, userPrompt, maxToken
     body: JSON.stringify({
       model,
       max_tokens: maxTokens ?? 1024,
+      ...(temperature !== undefined ? { temperature } : {}),
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     }),
   });
   if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
   const data = await res.json();
-  return data.content?.[0]?.text ?? "";
+  return {
+    text: data.content?.[0]?.text ?? "",
+    model: data.model ?? model,
+    inputTokens: data.usage?.input_tokens ?? 0,
+    outputTokens: data.usage?.output_tokens ?? 0,
+  };
 }
 
-async function callOpenAICompat(url: string, { model, apiKey, systemPrompt, userPrompt, maxTokens }: CallArgs): Promise<string> {
+async function callOpenAICompat(url: string, { model, apiKey, systemPrompt, userPrompt, maxTokens, temperature, signal }: CallArgs): Promise<Completion> {
   const res = await fetch(url, {
     method: "POST",
+    signal,
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${apiKey}`,
@@ -96,23 +116,30 @@ async function callOpenAICompat(url: string, { model, apiKey, systemPrompt, user
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.7,
+      temperature: temperature ?? 0.7,
       max_tokens: maxTokens ?? 1024,
     }),
   });
   if (!res.ok) throw new Error(`${url} ${res.status}: ${await res.text()}`);
   const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? "";
+  return {
+    text: data.choices?.[0]?.message?.content ?? "",
+    model: data.model ?? model,
+    inputTokens: data.usage?.prompt_tokens ?? 0,
+    outputTokens: data.usage?.completion_tokens ?? 0,
+  };
 }
 
-async function callGemini({ model, apiKey, systemPrompt, userPrompt }: CallArgs): Promise<string> {
+async function callGemini({ model, apiKey, systemPrompt, userPrompt, temperature, signal }: CallArgs): Promise<Completion> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const res = await fetch(url, {
     method: "POST",
+    signal,
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: systemPrompt }] },
       contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      ...(temperature !== undefined ? { generationConfig: { temperature } } : {}),
       // No output cap for Gemini: its newer models "think" first and the
       // thinking counts against maxOutputTokens, so 1024 cut replies short.
       // The prompts already ask for short output.
@@ -120,7 +147,13 @@ async function callGemini({ model, apiKey, systemPrompt, userPrompt }: CallArgs)
   });
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
+  return {
+    text:
+      data.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "",
+    model: data.modelVersion ?? model,
+    inputTokens: data.usageMetadata?.promptTokenCount ?? 0,
+    outputTokens: data.usageMetadata?.candidatesTokenCount ?? 0,
+  };
 }
 
 /** Not chat models — embeddings, speech, images, video, moderation… */
@@ -166,7 +199,7 @@ export async function listProviderModels(
   return [...new Set(ids.filter((id) => !NON_CHAT.test(id)))].sort().reverse();
 }
 
-async function dispatch(args: CallArgs): Promise<string> {
+async function dispatch(args: CallArgs): Promise<Completion> {
   switch (args.provider) {
     case "anthropic": return callAnthropic(args);
     case "openai": return callOpenAICompat("https://api.openai.com/v1/chat/completions", args);
@@ -182,6 +215,30 @@ export async function generateWithTask(
   fallbackTask?: AITaskType,
   maxTokens?: number,
 ): Promise<string> {
+  const completion = await generateWithTaskDetailed(taskType, systemPrompt, userPrompt, {
+    fallbackTask,
+    maxTokens,
+  });
+  return completion.text;
+}
+
+/**
+ * `generateWithTask`, but returning the model and token counts too, and
+ * taking a temperature and an abort signal — for callers that record cost
+ * (the lead Analysis button).
+ */
+export async function generateWithTaskDetailed(
+  taskType: AITaskType,
+  systemPrompt: string,
+  userPrompt: string,
+  opts: {
+    fallbackTask?: AITaskType;
+    maxTokens?: number;
+    temperature?: number;
+    signal?: AbortSignal;
+  } = {},
+): Promise<Completion> {
+  const { fallbackTask, maxTokens, temperature, signal } = opts;
   let taskCfg = await prisma.aITaskConfig.findUnique({ where: { taskType } });
   // Reuse a sibling task's provider when this one hasn't been assigned yet, so
   // a new task type works out of the box once any provider is configured.
@@ -211,5 +268,7 @@ export async function generateWithTask(
     systemPrompt,
     userPrompt,
     maxTokens,
+    temperature,
+    signal,
   });
 }
