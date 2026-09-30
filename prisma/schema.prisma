@@ -303,6 +303,7 @@ model User {
   notesAuthored    UserNote[]     @relation("NotesAuthored")
   apiKeys          ApiKey[]       @relation("ApiKeyCreator")
   calendarNotes    CalendarNote[]
+  leadAnalyses     LeadAnalysis[] @relation("LeadAnalysisRequester")
 
   @@map("users")
 }
@@ -877,20 +878,51 @@ model Lead {
   aiOverviewGeneratedAt DateTime?
 
   // Relations
-  client             Client     @relation(fields: [clientId], references: [id])
-  owner              User       @relation("LeadOwner", fields: [ownerId], references: [id])
-  convertedDeal      Deal?      @relation("LeadToDeal", fields: [convertedDealId], references: [id])
-  interestedProperty Property?  @relation("LeadProperty", fields: [interestedPropertyId], references: [id])
+  client             Client         @relation(fields: [clientId], references: [id])
+  owner              User           @relation("LeadOwner", fields: [ownerId], references: [id])
+  convertedDeal      Deal?          @relation("LeadToDeal", fields: [convertedDealId], references: [id])
+  interestedProperty Property?      @relation("LeadProperty", fields: [interestedPropertyId], references: [id])
   activities         Activity[]
-  tasks              Task[]     @relation("LeadTasks")
+  tasks              Task[]         @relation("LeadTasks")
   notes              LeadNote[]
   calendarNotes      CalendarNote[]
+  analyses           LeadAnalysis[]
 
   @@index([stage])
   @@index([ownerId])
   @@index([clientId])
   @@index([createdAt])
   @@map("leads")
+}
+
+/// One run of the lead "Analysis" button (CRM_LEAD_ANALYSIS.md). Every run
+/// adds a row — nothing is overwritten — so results can be shown again,
+/// compared and costed. Deleting the lead deletes its analyses.
+model LeadAnalysis {
+  id               String    @id @default(cuid())
+  leadId           String
+  requestedById    String?
+  createdAt        DateTime  @default(now())
+  /// "ok" or "failed"
+  status           String
+  /// The AI's structured answer; null when the run failed.
+  result           Json?
+  errorMessage     String?   @db.Text
+  /// Time of the newest note/activity included in the input — drives the
+  /// "New activity since this analysis" banner.
+  dataAsOf         DateTime?
+  /// Hash of the input, so an identical re-run returns the saved result.
+  inputFingerprint String
+  model            String?
+  inputTokens      Int       @default(0)
+  outputTokens     Int       @default(0)
+
+  lead        Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  requestedBy User? @relation("LeadAnalysisRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([leadId, createdAt])
+  @@index([requestedById, createdAt])
+  @@map("lead_analyses")
 }
 
 model LeadNote {
