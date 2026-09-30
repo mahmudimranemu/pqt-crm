@@ -174,12 +174,19 @@ function aiError(e: unknown): string {
   return m.slice(0, 400);
 }
 
+/** The agent's plan for this message (e.g. the Analysis next step), if any. */
+function withPlan(context: string, plan?: string): string {
+  const p = plan?.trim();
+  return p ? `${context}\n\n== What this message should do ==\n${p.slice(0, 1500)}` : context;
+}
+
 export async function generateLeadWhatsApp(
   leadId: string,
+  plan?: string,
 ): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   try {
     await requireSession();
-    const context = await buildLeadContext(leadId);
+    const context = withPlan(await buildLeadContext(leadId), plan);
     const text = await generateWithTask(
       "whatsapp_generation",
       WHATSAPP_SYSTEM_PROMPT,
@@ -194,13 +201,14 @@ export async function generateLeadWhatsApp(
 
 export async function generateLeadEmail(
   leadId: string,
+  plan?: string,
 ): Promise<
   | { ok: true; subject: string; body: string }
   | { ok: false; error: string }
 > {
   try {
     await requireSession();
-    const context = await buildLeadContext(leadId);
+    const context = withPlan(await buildLeadContext(leadId), plan);
     const raw = await generateWithTask(
       "email_generation",
       EMAIL_SYSTEM_PROMPT,

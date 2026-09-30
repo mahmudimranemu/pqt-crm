@@ -493,6 +493,8 @@ export async function updateLeadField(
   leadId: string,
   field: string,
   value: string | boolean | Date | null,
+  /** Appended to the activity-log line, e.g. "(suggested by AI Analysis)". */
+  opts: { activityNote?: string } = {},
 ) {
   const session = (await auth()) as ExtendedSession | null;
   if (!session?.user) throw new Error("Unauthorized");
@@ -551,7 +553,7 @@ export async function updateLeadField(
       data: {
         type: "FOLLOW_UP",
         title: "Next Call Date Updated",
-        description: `Next call date ${value ? `set to ${dateDisplay}` : "cleared"}`,
+        description: `Next call date ${value ? `set to ${dateDisplay}` : "cleared"}${opts.activityNote ? ` ${opts.activityNote}` : ""}`,
         leadId,
         userId: session.user.id,
       },
