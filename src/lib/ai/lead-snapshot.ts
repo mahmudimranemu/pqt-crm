@@ -35,6 +35,7 @@ export interface LeadSnapshot {
     daysUntilNextCall: number | null;
     nextCallOverdue: boolean;
     nextCallDateChangesLast7Days: number;
+    nextCallDateChangesTotal: number;
     openTasks: number;
     overdueTasks: number;
   };
@@ -201,9 +202,8 @@ export async function buildLeadSnapshot(
   const daysUntilNextCall = nextCall ? daysBetween(today, nextCall) : null;
 
   const weekAgo = now.getTime() - 7 * 86_400_000;
-  const nextCallChanges = lead.activities.filter(
-    (a) => a.title === "Next Call Date Updated" && a.createdAt.getTime() >= weekAgo,
-  ).length;
+  const nextCallUpdates = lead.activities.filter((a) => a.title === "Next Call Date Updated");
+  const nextCallChanges = nextCallUpdates.filter((a) => a.createdAt.getTime() >= weekAgo).length;
 
   const openTasks = lead.tasks.map((t) => ({
     title: clip(redact(t.title), 200),
@@ -223,6 +223,9 @@ export async function buildLeadSnapshot(
       daysUntilNextCall,
       nextCallOverdue: daysUntilNextCall !== null && daysUntilNextCall < 0,
       nextCallDateChangesLast7Days: nextCallChanges,
+      // The 7-day window alone missed a lead whose date was pushed 8 times
+      // over three weeks and then left alone (PQT-L-0256).
+      nextCallDateChangesTotal: nextCallUpdates.length,
       openTasks: openTasks.length,
       overdueTasks: openTasks.filter((t) => t.overdue).length,
     },
