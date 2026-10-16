@@ -305,6 +305,11 @@ model User {
   calendarNotes    CalendarNote[]
   leadAnalyses     LeadAnalysis[] @relation("LeadAnalysisRequester")
 
+  // Inquiry Qualifier (PQT_LEAD_QUALIFIER_AGENT_SPEC.md)
+  agentProfile      AgentProfile?
+  agentTimeOff      AgentTimeOff[]
+  agentDailyDigests AgentDailyDigest[]
+
   @@map("users")
 }
 
@@ -1399,4 +1404,212 @@ model ApiKey {
 
   @@index([keyHash])
   @@map("api_keys")
+}
+
+// =====================
+// INQUIRY QUALIFIER (PQT_LEAD_QUALIFIER_AGENT_SPEC.md)
+// New tables only — applied with prisma/sql/qualifier_phase1_up.sql, never
+// `db push`. Enquiries are referenced by id WITHOUT a foreign key: converting
+// an enquiry deletes its row, and the qualifier must keep its history.
+// =====================
+
+/// One row per sales agent / senior consultant — the facts the CRM doesn't
+/// know (languages, countries, hours). Filled by Imran, never guessed.
+model AgentProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  /// e.g. English, Turkish, Arabic, Bengali
+  languages          String[] @default([])
+  /// Country codes or regions, e.g. AE, GB, "Gulf"
+  strongCountries    String[] @default([])
+  /// e.g. citizenship, investment, high_budget, rental
+  specialties        String[] @default([])
+  timezone           String   @default("Europe/Istanbul")
+  /// Working days and hours, in the agent's own timezone:
+  /// { "mon": [{ "start": "09:00", "end": "18:00" }], ... }. Null = not set.
+  weeklySchedule     Json?
+  /// Manual on/off switch, e.g. for leave
+  isAvailable        Boolean  @default(true)
+  /// Receives the Telegram alerts and makes the final assignment
+  isSeniorConsultant Boolean  @default(false)
+  /// Only registered chats may press the Telegram buttons
+  telegramChatId     String?  @unique
+  maxOpenLeads       Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("agent_profiles")
+}
+
+/// Planned leave — an agent is never suggested while on time off.
+model AgentTimeOff {
+  id          String   @id @default(cuid())
+  userId      String
+  startsAt    DateTime
+  endsAt      DateTime
+  reason      String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startsAt])
+  @@map("agent_time_off")
+}
+
+/// One row per agent per day, built from CRM activity (spec Phase 4).
+/// Numbers come from code; only aiSummary is written by the AI.
+model AgentDailyDigest {
+  id                      String   @id @default(cuid())
+  userId                  String
+  date                    DateTime @db.Date
+  callsLogged             Int      @default(0)
+  notesLogged             Int      @default(0)
+  tasksCompleted          Int      @default(0)
+  inquiriesHandled        Int      @default(0)
+  leadsConverted          Int      @default(0)
+  dealsWon                Int      @default(0)
+  dealsLost               Int      @default(0)
+  avgFirstResponseMinutes Float?
+  openLeadCount           Int      @default(0)
+  /// Rolling 30-day numbers and conversion by tier / client country
+  rollingStats            Json?
+  /// Fewer than ~10 handled inquiries in the period — don't over-trust
+  lowData                 Boolean  @default(false)
+  aiSummary               String?  @db.Text
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([date])
+  @@map("agent_daily_digests")
+}
+
+/// The score and suggested agent for one enquiry. Unique on enquiryId, so
+/// processing an enquiry twice can never create a second row. The ref,
+/// source and arrival time are copied here because converting an enquiry
+/// deletes it; outcomes are traced through the Lead with the same refId.
+model InquiryQualification {
+  id                       String        @id @default(cuid())
+  enquiryId                String        @unique
+  enquiryRefId             String?
+  enquirySource            EnquirySource
+  enquiryCreatedAt         DateTime
+  /// 0–100, computed by the rules — never by the AI
+  score                    Int
+  /// "hot" | "warm" | "cold" | "junk"
+  tier                     String
+  /// Human-readable, e.g. "Budget 400k+ (+30)"
+  scoreReasons             String[]      @default([])
+  /// Budget, purpose, timeline, language, country, call time
+  extractedData            Json?
+  aiSummary                String?       @db.Text
+  /// Duplicate of an existing enquiry/lead/client — flagged, not scored
+  isDuplicate              Boolean       @default(false)
+  /// e.g. "lead:PQT-0012"
+  duplicateOf              String?
+  suggestedAgentId         String?
+  backupAgentId            String?
+  suggestionReasons        String[]      @default([])
+  suggestionScoreBreakdown Json?
+  /// "shadow" | "live" | "backtest"
+  mode                     String
+  /// "pending" | "notified" | "approved" | "changed" | "expired"
+  status                   String        @default("pending")
+  finalAgentId             String?
+  decidedByUserId          String?
+  decidedAt                DateTime?
+  qualifiedAt              DateTime      @default(now())
+  /// QualifierRules.version used for this score
+  rulesVersion             Int
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+
+  @@index([enquiryRefId])
+  @@index([status])
+  @@index([tier, qualifiedAt])
+  @@index([mode, qualifiedAt])
+  @@map("inquiry_qualifications")
+}
+
+/// Scoring weights and tier thresholds as data, so they can be tuned
+/// without code. Each version is a row; only one is active at a time
+/// (enforced by a partial unique index in the SQL file).
+model QualifierRules {
+  id          String   @id @default(cuid())
+  version     Int      @unique
+  rules       Json
+  isActive    Boolean  @default(false)
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@map("qualifier_rules")
+}
+
+/// Every Telegram message / email the qualifier sends.
+model QualifierNotification {
+  id                String    @id @default(cuid())
+  /// Null for messages not about one enquiry (weekly report, errors)
+  enquiryId         String?
+  /// "telegram" | "email"
+  channel           String
+  /// "new_inquiry" | "reminder" | "escalation" | "error" | "weekly_report"
+  kind              String
+  recipientUserId   String?
+  /// Stops the same message going out twice, e.g. "new_inquiry:<enquiryId>:<chatId>"
+  dedupeKey         String?   @unique
+  /// Telegram message id, so the buttons can be updated later
+  externalMessageId String?
+  sentAt            DateTime  @default(now())
+  /// "sent" | "failed"
+  deliveryStatus    String
+  responseAt        DateTime?
+  errorMessage      String?   @db.Text
+
+  @@index([enquiryId])
+  @@index([sentAt])
+  @@map("qualifier_notifications")
+}
+
+/// Append-only log of every qualifier action and error. Never holds phone
+/// numbers, emails or client notes.
+model QualifierAudit {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  /// e.g. "n8n", "system", "user:<id>"
+  actor        String
+  action       String
+  enquiryId    String?
+  /// "ok" | "error" | "rejected"
+  outcome      String
+  summary      Json?
+  errorMessage String?  @db.Text
+
+  @@index([createdAt])
+  @@index([enquiryId])
+  @@index([action, createdAt])
+  @@map("qualifier_audit")
+}
+
+/// One row per automation run (e.g. one poll of new enquiries).
+model QualifierRunLog {
+  id             String    @id @default(cuid())
+  /// e.g. "qualify", "reminders", "digest", "weekly_report"
+  workflow       String
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  processedCount Int       @default(0)
+  failedCount    Int       @default(0)
+  skippedCount   Int       @default(0)
+  /// "running" | "ok" | "failed"
+  status         String    @default("running")
+  note           String?   @db.Text
+
+  @@index([workflow, startedAt])
+  @@map("qualifier_run_log")
 }
